@@ -1,0 +1,9 @@
+h:\Quadcopter\ardupilot-mpng\Tools\SerialProxy\SerialProxy\bin\Release\SerialProxy.exe.config
+h:\Quadcopter\ardupilot-mpng\Tools\SerialProxy\SerialProxy\bin\Release\SerialProxy.exe
+h:\Quadcopter\ardupilot-mpng\Tools\SerialProxy\SerialProxy\bin\Release\SerialProxy.pdb
+h:\Quadcopter\ardupilot-mpng\Tools\SerialProxy\SerialProxy\obj\x86\Release\SerialProxy.csprojResolveAssemblyReference.cache
+h:\Quadcopter\ardupilot-mpng\Tools\SerialProxy\SerialProxy\obj\x86\Release\SerialProxy.Form1.resources
+h:\Quadcopter\ardupilot-mpng\Tools\SerialProxy\SerialProxy\obj\x86\Release\SerialProxy.Properties.Resources.resources
+h:\Quadcopter\ardupilot-mpng\Tools\SerialProxy\SerialProxy\obj\x86\Release\SerialProxy.csproj.GenerateResource.Cache
+h:\Quadcopter\ardupilot-mpng\Tools\SerialProxy\SerialProxy\obj\x86\Release\SerialProxy.exe
+h:\Quadcopter\ardupilot-mpng\Tools\SerialProxy\SerialProxy\obj\x86\Release\SerialProxy.pdb
