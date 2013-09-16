@@ -27,7 +27,9 @@ void perf_info_check_loop_time(uint32_t time_in_micros)
         perf_info_max_time = time_in_micros;
     }
     if( time_in_micros > PERF_INFO_OVERTIME_THRESHOLD_MICROS ) {
+		  hal.gpio->write(45,1); 
         perf_info_long_running++;
+		  hal.gpio->write(45,0); 
     }
 }
 

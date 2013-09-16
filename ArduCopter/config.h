@@ -80,6 +80,15 @@
  # define CONFIG_RELAY      DISABLED
  # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
  # define MAGNETOMETER ENABLED
+#elif CONFIG_HAL_BOARD == HAL_BOARD_MPNG
+ # define CONFIG_IMU_TYPE   CONFIG_IMU_MPU6000_I2C
+ # define CONFIG_BARO       AP_BARO_MS5611
+ # define CONFIG_MS5611_SERIAL AP_BARO_MS5611_I2C
+ # define CONFIG_ADC        DISABLED
+ # define CONFIG_PUSHBUTTON DISABLED
+ # define CONFIG_RELAY      DISABLED
+ # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
+ # define MAGNETOMETER ENABLED
 #elif CONFIG_HAL_BOARD == HAL_BOARD_SMACCM
  # define CONFIG_IMU_TYPE   CONFIG_IMU_MPU6000
  # define CONFIG_BARO       AP_BARO_MS5611
@@ -170,6 +179,16 @@
  # define USB_MUX_PIN      -1
  # define BATTERY_VOLT_PIN      0      // Battery voltage on A0
  # define BATTERY_CURR_PIN      1      // Battery current on A1
+#elif CONFIG_HAL_BOARD == HAL_BOARD_MPNG
+ # define A_LED_PIN        13
+ # define B_LED_PIN        31
+ # define C_LED_PIN        30
+ # define LED_ON           HIGH
+ # define LED_OFF          LOW
+ # define PUSHBUTTON_PIN   (-1)
+ # define USB_MUX_PIN      (-1)
+ # define BATTERY_VOLT_PIN      0      // Battery voltage on A0
+ # define BATTERY_CURR_PIN      1      // Battery current on A1
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
  # define A_LED_PIN        27
  # define B_LED_PIN        26
@@ -218,7 +237,7 @@
 //
 
 #ifndef COPTER_LEDS
- #define COPTER_LEDS ENABLED
+ #define COPTER_LEDS DISABLED
 #endif
 
 #define COPTER_LED_ON           HIGH
@@ -233,7 +252,7 @@
  #define COPTER_LED_6 AN9       // Motor LED
  #define COPTER_LED_7 AN10      // Motor LED
  #define COPTER_LED_8 AN11      // Motor LED
-#elif CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL || CONFIG_HAL_BOARD == HAL_BOARD_PX4 || HAL_BOARD_SMACCM
+#elif CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_MPNG || CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL || CONFIG_HAL_BOARD == HAL_BOARD_PX4 || HAL_BOARD_SMACCM
  #define COPTER_LED_1 AN8       // Motor or Aux LED
  #define COPTER_LED_2 AN9       // Motor LED
  #define COPTER_LED_3 AN10      // Motor or GPS LED
@@ -435,7 +454,7 @@
 //////////////////////////////////////////////////////////////////////////////
 //  OPTICAL_FLOW
 #if defined( __AVR_ATmega2560__ )       // determines if optical flow code is included
- #define OPTFLOW                        ENABLED
+ #define OPTFLOW                        DISABLED
 #endif
 #ifndef OPTFLOW                         // sets global enabled/disabled flag for optflow (as seen in CLI)
  # define OPTFLOW                       DISABLED
@@ -831,7 +850,7 @@
  # define RATE_YAW_P              	0.200f
 #endif
 #ifndef RATE_YAW_I
- # define RATE_YAW_I              	0.015f
+ # define RATE_YAW_I              	0.020f
 #endif
 #ifndef RATE_YAW_D
  # define RATE_YAW_D              	0.000f
@@ -873,7 +892,7 @@
 // Loiter position control gains
 //
 #ifndef LOITER_P
- # define LOITER_P             		0.8f
+ # define LOITER_P             		1.0f
 #endif
 #ifndef LOITER_I
  # define LOITER_I             		0.0f

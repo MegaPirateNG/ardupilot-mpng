@@ -190,6 +190,7 @@ static void init_ardupilot()
     init_rc_in();               // sets up rc channels from radio
     init_rc_out();              // sets up motors and output to escs
 
+    cliSerial->println_P(PSTR(BOOTLOADER_BUGFIX)); 
     /*
      *  setup the 'main loop is dead' check. Note that this relies on
      *  the RC library being initialised.
@@ -208,8 +209,12 @@ static void init_ardupilot()
     // GPS Initialization
     g_gps->init(hal.uartB, GPS::GPS_ENGINE_AIRBORNE_1G);
 
-    if(g.compass_enabled)
+    if(g.compass_enabled) {
+			#if CONFIG_IMU_TYPE == CONFIG_IMU_MPU6000_I2C && HIL_MODE == HIL_MODE_DISABLED
+    		ins.hardware_init_i2c_bypass();
+    	#endif
         init_compass();
+    }
 
     // init the optical flow sensor
     if(g.optflow_enabled) {

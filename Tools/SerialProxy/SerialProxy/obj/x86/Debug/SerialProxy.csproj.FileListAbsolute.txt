@@ -1,0 +1,1 @@
+h:\Quadcopter\ardupilot-mpng\Tools\SerialProxy\SerialProxy\bin\Debug\SerialProxy.exe.config

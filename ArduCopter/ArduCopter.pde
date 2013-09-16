@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduCopter V3.0.1-rc2"
+#define THISFIRMWARE "ArduCopter-MPNG V3.0.1 R2"
 /*
  *  ArduCopter Version 3.0
  *  Creator:        Jason Short
@@ -67,6 +67,7 @@
 // AP_HAL
 #include <AP_HAL.h>
 #include <AP_HAL_AVR.h>
+#include <AP_HAL_MPNG.h>
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_SMACCM.h>
 #include <AP_HAL_PX4.h>
@@ -156,6 +157,8 @@ static void print_flight_mode(AP_HAL::BetterStream *port, uint8_t mode);
 static DataFlash_APM2 DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM1
 static DataFlash_APM1 DataFlash;
+#elif CONFIG_HAL_BOARD == HAL_BOARD_MPNG
+static DataFlash_MPNG DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
 //static DataFlash_File DataFlash("/tmp/APMlogs");
 static DataFlash_SITL DataFlash;
@@ -196,8 +199,10 @@ static AP_Int8 *flight_modes = &g.flight_mode1;
 static AP_ADC_ADS7844 adc;
  #endif
 
- #if CONFIG_IMU_TYPE == CONFIG_IMU_MPU6000
+#if CONFIG_IMU_TYPE == CONFIG_IMU_MPU6000
 static AP_InertialSensor_MPU6000 ins;
+#elif CONFIG_IMU_TYPE == CONFIG_IMU_MPU6000_I2C
+static AP_InertialSensor_MPU6000_I2C ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_OILPAN
 static AP_InertialSensor_Oilpan ins(&adc);
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_SITL
@@ -915,7 +920,7 @@ static void barometer_accumulate(void)
 }
 
 // enable this to get console logging of scheduler performance
-#define SCHEDULER_DEBUG 0
+#define SCHEDULER_DEBUG 1
 
 static void perf_update(void)
 {

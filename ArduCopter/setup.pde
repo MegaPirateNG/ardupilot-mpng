@@ -189,7 +189,9 @@ setup_compassmot(uint8_t argc, const Menu::arg *argv)
     }
 
     // initialise compass
+    hal.scheduler->suspend_timer_procs();
     init_compass();
+    hal.scheduler->resume_timer_procs();
 
     // disable motor compensation
     compass.motor_compensation_type(AP_COMPASS_MOT_COMP_DISABLED);

@@ -161,20 +161,29 @@ test_compass(uint8_t argc, const Menu::arg *argv)
 {
     uint8_t delta_ms_fast_loop;
 
+    cliSerial->println_P(PSTR("-1"));
     if (!g.compass_enabled) {
         cliSerial->printf_P(PSTR("Compass: "));
         print_enabled(false);
         return (0);
     }
 
+    cliSerial->println_P(PSTR("0"));
+    hal.scheduler->suspend_timer_procs();
     if (!compass.init()) {
         cliSerial->println_P(PSTR("Compass initialisation failed!"));
+		    hal.scheduler->resume_timer_procs();
         return 0;
     }
+    hal.scheduler->resume_timer_procs();
 
+    cliSerial->println_P(PSTR("1"));
     ahrs.init();
+    cliSerial->println_P(PSTR("2"));
     ahrs.set_fly_forward(true);
+    cliSerial->println_P(PSTR("3"));
     ahrs.set_compass(&compass);
+    cliSerial->println_P(PSTR("4"));
     report_compass();
 
     // we need the AHRS initialised for this test
@@ -424,7 +433,7 @@ test_radio_pwm(uint8_t argc, const Menu::arg *argv)
                         g.rc_6.radio_in,
                         g.rc_7.radio_in,
                         g.rc_8.radio_in);
-
+                        
         if(cliSerial->available() > 0) {
             return (0);
         }

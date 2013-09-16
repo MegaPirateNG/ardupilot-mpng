@@ -121,6 +121,21 @@
  #  define CONFIG_MS5611_SERIAL AP_BARO_MS5611_SPI
  # endif
  # define CONFIG_COMPASS  AP_COMPASS_HMC5843
+#elif CONFIG_HAL_BOARD == HAL_BOARD_MPNG
+ # define A_LED_PIN        13
+ # define B_LED_PIN        31
+ # define C_LED_PIN        30
+ # define LED_ON           HIGH
+ # define LED_OFF          LOW
+ # define USB_MUX_PIN -1
+ # define BATTERY_VOLT_PIN      0      // Battery voltage on A0
+ # define BATTERY_CURR_PIN      1      // Battery current on A1
+ # define CONFIG_IMU_TYPE   CONFIG_IMU_MPU6000_I2C
+ # define CONFIG_BARO       AP_BARO_MS5611
+ # define CONFIG_MS5611_SERIAL AP_BARO_MS5611_I2C
+ # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
+ # define MAGNETOMETER ENABLED
+ # define CONFIG_COMPASS  AP_COMPASS_HMC5843
 #elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
  # define A_LED_PIN        27
  # define B_LED_PIN        26

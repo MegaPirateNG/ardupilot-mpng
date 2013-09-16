@@ -204,6 +204,7 @@ enum ap_message {
 #define CONFIG_INS_MPU6000 2
 #define CONFIG_INS_STUB    3
 #define CONFIG_INS_PX4     4
+#define CONFIG_INS_MPU6000_I2C 5
 
 // compass driver types
 #define AP_COMPASS_HMC5843   1

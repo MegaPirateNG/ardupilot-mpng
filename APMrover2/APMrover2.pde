@@ -79,6 +79,7 @@ version 2.1 of the License, or (at your option) any later version.
 #include <AP_HAL_AVR.h>
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_PX4.h>
+#include <AP_HAL_MPNG.h>
 #include <AP_HAL_Empty.h>
 #include "compat.h"
 
@@ -129,6 +130,8 @@ static void print_mode(AP_HAL::BetterStream *port, uint8_t mode);
 static DataFlash_APM1 DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
 static DataFlash_APM2 DataFlash;
+#elif CONFIG_HAL_BOARD == HAL_BOARD_MPNG
+static DataFlash_MPNG DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
 //static DataFlash_File DataFlash("/tmp/APMlogs");
 static DataFlash_SITL DataFlash;
@@ -203,6 +206,8 @@ AP_GPS_HIL      g_gps_driver;
 
 #if CONFIG_INS_TYPE == CONFIG_INS_MPU6000
 AP_InertialSensor_MPU6000 ins;
+#elif CONFIG_INS_TYPE == CONFIG_INS_MPU6000_I2C
+AP_InertialSensor_MPU6000_I2C ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_PX4
 AP_InertialSensor_PX4 ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_STUB
