@@ -41,14 +41,20 @@ void failsafe_check(uint32_t tnow)
         return;
     }
 
-    if (failsafe_enabled && tnow - failsafe_last_timestamp > 2000000) {
+    uint32_t dtnow = 0;
+    if (tnow < failsafe_last_timestamp)
+        return;
+    else        
+        dtnow = tnow - failsafe_last_timestamp;
+        
+    if (failsafe_enabled && dtnow > 2000000) {
         // motors are running but we have gone 2 second since the
         // main loop ran. That means we're in trouble and should
         // disarm the motors.
         in_failsafe = true;
     }
 
-    if (failsafe_enabled && in_failsafe && tnow - failsafe_last_timestamp > 1000000) {
+    if (failsafe_enabled && in_failsafe && dtnow > 1000000) {
         // disarm motors every second
         failsafe_last_timestamp = tnow;
         if(motors.armed()) {

@@ -81,6 +81,16 @@
  # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
  # define MAGNETOMETER ENABLED
 #elif CONFIG_HAL_BOARD == HAL_BOARD_MPNG
+ #ifndef MPNG_BOARD_TYPE
+  #define MPNG_BOARD_TYPE MPNG_BOARD_RCTIMER_CRIUS_V2
+ #endif
+
+ #if MPNG_BOARD_TYPE != MPNG_BOARD_RCTIMER_CRIUS_V2
+ 	#define LOGGING_ENABLED DISABLED
+ #endif
+
+ # define PIEZO_PIN AN3
+ 
  # define CONFIG_IMU_TYPE   CONFIG_IMU_MPU6000_I2C
  # define CONFIG_BARO       AP_BARO_MS5611
  # define CONFIG_MS5611_SERIAL AP_BARO_MS5611_I2C
@@ -187,8 +197,8 @@
  # define LED_OFF          LOW
  # define PUSHBUTTON_PIN   (-1)
  # define USB_MUX_PIN      (-1)
- # define BATTERY_VOLT_PIN      0      // Battery voltage on A0
- # define BATTERY_CURR_PIN      1      // Battery current on A1
+ # define BATTERY_VOLT_PIN      1      // Battery voltage on A1
+ # define BATTERY_CURR_PIN      2      // Battery current on A2
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
  # define A_LED_PIN        27
  # define B_LED_PIN        26
@@ -237,7 +247,7 @@
 //
 
 #ifndef COPTER_LEDS
- #define COPTER_LEDS DISABLED
+ #define COPTER_LEDS ENABLED
 #endif
 
 #define COPTER_LED_ON           HIGH
@@ -252,7 +262,7 @@
  #define COPTER_LED_6 AN9       // Motor LED
  #define COPTER_LED_7 AN10      // Motor LED
  #define COPTER_LED_8 AN11      // Motor LED
-#elif CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_MPNG || CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL || CONFIG_HAL_BOARD == HAL_BOARD_PX4 || HAL_BOARD_SMACCM
+#elif CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL || CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_SMACCM
  #define COPTER_LED_1 AN8       // Motor or Aux LED
  #define COPTER_LED_2 AN9       // Motor LED
  #define COPTER_LED_3 AN10      // Motor or GPS LED
@@ -261,6 +271,15 @@
  #define COPTER_LED_6 AN13      // Motor LED
  #define COPTER_LED_7 AN14      // Motor LED
  #define COPTER_LED_8 AN15      // Motor LED
+#elif CONFIG_HAL_BOARD == HAL_BOARD_MPNG
+ #define COPTER_LED_1 AN4         // Motor or Aux LED
+ #define COPTER_LED_2 AN5         // Motor LED
+ #define COPTER_LED_3 AN6         // Motor or GPS LED
+ #define COPTER_LED_4 AN7         // Motor LED
+ #define COPTER_LED_5 -1         // Motor LED
+ #define COPTER_LED_6 -1         // Motor LED
+ #define COPTER_LED_7 -1        // Motor LED
+ #define COPTER_LED_8 -1        // Motor LED
 #endif
 
 

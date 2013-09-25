@@ -255,6 +255,10 @@ enum log_messages {
 #define AP_COMPASS_PX4       2
 #define AP_COMPASS_HIL       3
 
+// MPNG board types
+#define MPNG_BOARD_RCTIMER_CRIUS_V2 1
+#define MPNG_BOARD_CRIUS_V1 2
+
 // altitude control algorithms
 enum {
     ALT_CONTROL_DEFAULT=0,

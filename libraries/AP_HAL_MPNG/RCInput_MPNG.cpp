@@ -14,7 +14,7 @@ using namespace MPNG;
 extern const HAL& hal;
 
 // PPM_SUM(CPPM) or PWM Signal processing
-#define SERIAL_PPM SERIAL_PPM_ENABLED
+#define SERIAL_PPM SERIAL_PPM_DISABLED
 /*
 	SERIAL_PPM_DISABLED				// Separated channel signal (PWM) on A8-A15 pins
 	SERIAL_PPM_ENABLED				// For all boards, PPM_SUM pin is A8
@@ -209,6 +209,7 @@ void MPNGRCInput::_pwm_A8_A15_isr(void)
 	// generic split PPM  
 	// mask is pins [D0-D7] that have changed // the principle is the same on the MEGA for PORTK and [A8-A15] PINs
 	// chan = pin sequence of the port. chan begins at D2 and ends at D7
+	
 	if (mask & 1<<0)
 		if (!(pin & 1<<0)) {
 			dTime = (cTime-edgeTime[0]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[0] = dTime;
@@ -242,8 +243,8 @@ void MPNGRCInput::_pwm_A8_A15_isr(void)
 			dTime = (cTime-edgeTime[7]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[7] = dTime;
 		} else edgeTime[7] = cTime;
 	
-	// failsafe counter must be zero if all ok  
-	if (mask & 1<<pinRcChannel[2]) {    // If pulse present on THROTTLE pin, clear FailSafe counter  - added by MIS fow multiwii (copy by SovGVD to megapirateNG)
+	// If we got pulse on throttle pin, report success  
+	if (mask & 1<<pinRcChannel[2]) {
 		_valid_channels = AVR_RC_INPUT_NUM_CHANNELS;
 	}
 }
@@ -258,7 +259,6 @@ void MPNGRCInput::init(void* _isrregistry) {
 
 	TCCR5A = 0; //standard mode with overflow at A and OC B and C interrupts
 	TCCR5B = (1<<CS11); //Prescaler set to 8, resolution of 0.5us
-	OCR5B = 3000; // Init OCR registers to nil output signal
 
 #if SERIAL_PPM == SERIAL_PPM_DISABLED
 		FireISRRoutine = _pwm_A8_A15_isr;
@@ -270,7 +270,7 @@ void MPNGRCInput::init(void* _isrregistry) {
 		PORTK = (1<<PCINT16); //enable internal pull up on the SERIAL SUM pin A8
 		PCMSK2 |= (1 << PCINT16); // Enable int for pin A8(PCINT16)
 		PCICR |= (1 << PCIE2); // PCINT2 Interrupt enable
-#else
+#elif SERIAL_PPM == SERIAL_PPM_ENABLED_PL1
 		FireISRRoutine = 0;
 		hal.gpio->pinMode(48, GPIO_INPUT); // ICP5 pin (PL1) (PPM input) CRIUS v2
 		ISRRegistry* isrregistry = (ISRRegistry*) _isrregistry;
@@ -278,6 +278,8 @@ void MPNGRCInput::init(void* _isrregistry) {
 		TCCR5B = (1<<CS11) | (1<<ICES5); //Prescaler set to 8, resolution of 0.5us, input capture on rising edge 
 		TIMSK5 |= (1<<ICIE5); // Enable Input Capture interrupt. Timer interrupt mask  
 		PCMSK2 = 0;	// Disable INT for pin A8-A15
+#else
+#error You must check SERIAL_PPM mode, something wrong
 #endif
 }
 

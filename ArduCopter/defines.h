@@ -412,6 +412,11 @@ enum ap_message {
 #define AP_BARO_MS5611_SPI 1
 #define AP_BARO_MS5611_I2C 2
 
+// MPNG board types
+#define MPNG_BOARD_CRIUS_V1  1
+#define MPNG_BOARD_RCTIMER_CRIUS_V2 2
+
+
 // Error message sub systems and error codes
 #define ERROR_SUBSYSTEM_MAIN                1
 #define ERROR_SUBSYSTEM_RADIO               2
@@ -432,7 +437,5 @@ enum ap_message {
 #define ERROR_CODE_FAILSAFE_OCCURRED        1
 // subsystem specific error codes -- compass
 #define ERROR_CODE_COMPASS_FAILED_TO_READ   2
-
-
 
 #endif // _DEFINES_H

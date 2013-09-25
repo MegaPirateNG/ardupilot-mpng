@@ -8,9 +8,9 @@
 #define AVR_RC_INPUT_NUM_CHANNELS 8
 #define AVR_RC_INPUT_MIN_CHANNELS 5     // for ppm sum we allow less than 8 channels to make up a valid packet
 
-#define SERIAL_PPM_DISABLED 0
-#define SERIAL_PPM_ENABLED  1
-#define SERIAL_PPM_ENABLED_PL1 2 
+#define SERIAL_PPM_DISABLED 1
+#define SERIAL_PPM_ENABLED  2
+#define SERIAL_PPM_ENABLED_PL1 3 
 
 class MPNG::MPNGRCInput : public AP_HAL::RCInput {
 public:

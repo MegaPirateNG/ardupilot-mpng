@@ -14,11 +14,13 @@ using namespace AP_HAL;
 using namespace MPNG;
 
 AVRUARTDriverISRs(0);
+AVRUARTDriverISRs(1);
 AVRUARTDriverISRs(2);
 AVRUARTDriverISRs(3);
 
 AVRUARTDriverInstance(avrUart0Driver, 0);
-AVRUARTDriverInstance(avrUart1Driver, 2);
+AVRUARTDriverInstance(avrUart1Driver, 1);
+AVRUARTDriverInstance(avrUart2Driver, 2);
 AVRUARTDriverInstance(avrUart3Driver, 3);
 
 static AVRSemaphore     i2cSemaphore;
@@ -35,11 +37,10 @@ static AVRUtil          avrUtil;
 
 static ISRRegistry isrRegistry;
 
-/* On APM1 the physical UART2 is used for SPI. */
 HAL_MPNG::HAL_MPNG() :
     AP_HAL::HAL(
         &avrUart0Driver, /* phys UART0 -> uartA */
-        &avrUart1Driver, /* phys UART1 -> uartB */
+        &avrUart2Driver, /* phys UART2 -> uartB */
         &avrUart3Driver, /* phys UART3 -> uartC */
         &avrI2CDriver,
         &mpngSPIDriver,
@@ -51,11 +52,12 @@ HAL_MPNG::HAL_MPNG() :
         &mpngRCOutput,
         &avrScheduler,
         &avrUtil )
-{}
+{uartD = &avrUart1Driver;}
 
 void HAL_MPNG::init(int argc, char * const argv[]) const {
 
     scheduler->init((void*)&isrRegistry);
+    
    
     /* uartA is the serial port used for the console, so lets make sure
      * it is initialized at boot */
@@ -75,13 +77,15 @@ void HAL_MPNG::init(int argc, char * const argv[]) const {
      * can cause bytes written to show up as an input. Occasionally this causes
      * us to detect a phantom GPS by seeing our own outgoing config message.
      * PE0 : RX0 (uartA)
-     * PD2 : RX1 (uartB)
+     * PH0 : RX2 (uartB)
      * PJ0 : RX3 (uartC)
+     * PD2 : RX1 (uartD)
      */
 
-    PORTE |= _BV(0);
-    PORTD |= _BV(2);
-    PORTJ |= _BV(0);
+    PORTE |= _BV(0); // S0
+    PORTD |= _BV(2); // S1
+    PORTH |= _BV(0); // S2
+    PORTJ |= _BV(0); // S3
 };
 
 const HAL_MPNG AP_HAL_MPNG;

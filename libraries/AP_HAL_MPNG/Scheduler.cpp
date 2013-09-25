@@ -152,6 +152,7 @@ void AVRScheduler::_run_timer_procs(bool called_from_isr) {
 
     uint32_t tnow = _timer.micros();
     if (_in_timer_proc) {
+	  hal.gpio->write(45,1); 
         // the timer calls took longer than the period of the
         // timer. This is bad, and may indicate a serious
         // driver failure. We can't just call the drivers
@@ -165,6 +166,7 @@ void AVRScheduler::_run_timer_procs(bool called_from_isr) {
         if (_failsafe != NULL) {
             _failsafe(tnow);
         }
+	  hal.gpio->write(45,0); 
         return;
     }
 

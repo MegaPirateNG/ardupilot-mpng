@@ -3,6 +3,8 @@
 #include <AP_HAL.h>
 #include "AP_InertialSensor_MPU6000_I2C.h"
 
+//#define DISABLE_INTERNAL_MAG
+
 extern const AP_HAL::HAL& hal;
 
 // MPU6000 accelerometer scaling
@@ -425,6 +427,7 @@ void AP_InertialSensor_MPU6000_I2C::_read_data_transaction()
 
 void AP_InertialSensor_MPU6000_I2C::hardware_init_i2c_bypass()
 {
+#ifndef DISABLE_INTERNAL_MAG
     _i2c_sem = hal.i2c->get_semaphore();
 
     hal.scheduler->suspend_timer_procs();
@@ -475,6 +478,7 @@ void AP_InertialSensor_MPU6000_I2C::hardware_init_i2c_bypass()
     _i2c_sem->give();
 
     hal.scheduler->resume_timer_procs();
+#endif
 }
 
 bool AP_InertialSensor_MPU6000_I2C::hardware_init(Sample_rate sample_rate)
@@ -563,10 +567,12 @@ bool AP_InertialSensor_MPU6000_I2C::hardware_init(Sample_rate sample_rate)
 			
     hal.scheduler->delay(1);
 
+#ifndef DISABLE_INTERNAL_MAG
     // Enable I2C bypass mode, to work with Magnetometer 5883L
     // Disable I2C Master mode
     hal.i2c->writeRegister(mpu_addr, MPUREG_USER_CTRL, 0);
     hal.i2c->writeRegister(mpu_addr, MPUREG_INT_PIN_CFG, BIT_I2C_BYPASS_EN);
+#endif
     
 /*  Dump MPU6050 registers  
     hal.console->println_P(PSTR("MPU6000 registers"));
