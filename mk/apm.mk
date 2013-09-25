@@ -26,6 +26,10 @@ ifeq ($(HAL_BOARD),HAL_BOARD_APM1)
 include $(MK_DIR)/board_avr.mk
 endif
 
+ifeq ($(HAL_BOARD),HAL_BOARD_MPNG)
+include $(MK_DIR)/board_avr.mk
+endif
+
 ifeq ($(HAL_BOARD),HAL_BOARD_APM2)
 include $(MK_DIR)/board_avr.mk
 endif

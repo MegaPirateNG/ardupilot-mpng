@@ -6,7 +6,7 @@ configure:
 	@echo BOARD = mega2560     >> $(SKETCHBOOK)/config.mk
 	@echo  >> $(SKETCHBOOK)/config.mk
 	@echo \# HAL_BOARD determines default HAL target. >> $(SKETCHBOOK)/config.mk
-	@echo HAL_BOARD ?= HAL_BOARD_APM2 >> $(SKETCHBOOK)/config.mk
+	@echo HAL_BOARD ?= HAL_BOARD_MPNG >> $(SKETCHBOOK)/config.mk
 	@echo  >> $(SKETCHBOOK)/config.mk
 	@echo \# The communication port used to communicate with the APM. >> $(SKETCHBOOK)/config.mk
 ifneq ($(findstring CYGWIN, $(SYSTYPE)),)

@@ -115,6 +115,10 @@ ifneq ($(findstring apm2, $(MAKECMDGOALS)),)
 HAL_BOARD = HAL_BOARD_APM2
 endif
 
+ifneq ($(findstring mpng, $(MAKECMDGOALS)),)
+HAL_BOARD = HAL_BOARD_MPNG
+endif
+
 # default to APM2
 ifeq ($(HAL_BOARD),)
 #$(warning No HAL_BOARD in config.mk - defaulting to HAL_BOARD_APM2)
