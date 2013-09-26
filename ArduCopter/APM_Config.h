@@ -3,10 +3,11 @@
 // User specific config file.  Any items listed in config.h can be overridden here.
 
 // Select Megapirate board type:
-//#define MPNG_BOARD_TYPE   MPNG_BOARD_CRIUS_V1
+//#define MPNG_BOARD_TYPE   CRIUS_V1
 /*
- * MPNG_BOARD_CRIUS_V1            -- Use this define for RCTimer CRIUS V1(1.1) board and all HobbyKing AIOP boards
- * MPNG_BOARD_RCTIMER_CRIUS_V2    -- (DEFAULT!!!) Use only for RCTimer CRIUS V2 board
+ * RCTIMER_CRIUS_V2    -- (DEFAULT!!!) Use ONLY for RCTimer CRIUS V2 board
+ * CRIUS_V1            -- Use this define for RCTimer CRIUS V1(1.1) board and all HobbyKing AIOP boards
+ * HK_RED_MULTIWII_PRO -- HobbyKing MultiWii Pro board with ITG3205 and BMA180, BMP085 sensors
  */
 
 // Currently not supported
@@ -48,7 +49,7 @@
 //#define HIL_MODE              HIL_MODE_ATTITUDE    // build for hardware-in-the-loop simulation
 
 // If Arduino IDE hang while uploading firmware to your board, try to change string below, just enter some random characters
-#define BOOTLOADER_BUGFIX "234fs34567hf"
+#define BOOTLOADER_BUGFIX "234fs34567"
 
 // User Hooks : For User Developed code that you wish to run
 // Put your variable definitions into the UserVariables.h file (or another file name and then change the #define below).

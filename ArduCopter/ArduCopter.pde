@@ -203,6 +203,8 @@ static AP_ADC_ADS7844 adc;
 static AP_InertialSensor_MPU6000 ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_MPU6000_I2C
 static AP_InertialSensor_MPU6000_I2C ins;
+#elif CONFIG_IMU_TYPE == CONFIG_IMU_ITG3200
+static AP_InertialSensor_ITG3200 ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_OILPAN
 static AP_InertialSensor_Oilpan ins(&adc);
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_SITL
@@ -222,6 +224,8 @@ static SITL sitl;
 static AP_Baro_BMP085 barometer;
   #elif CONFIG_BARO == AP_BARO_PX4
 static AP_Baro_PX4 barometer;
+  #elif CONFIG_BARO == AP_BARO_BMP085_MPNG
+      static AP_Baro_BMP085_MPNG barometer;
   #elif CONFIG_BARO == AP_BARO_MS5611
    #if CONFIG_MS5611_SERIAL == AP_BARO_MS5611_SPI
 static AP_Baro_MS5611 barometer(&AP_Baro_MS5611::spi);
