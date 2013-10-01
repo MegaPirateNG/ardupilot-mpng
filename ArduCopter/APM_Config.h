@@ -3,20 +3,21 @@
 // User specific config file.  Any items listed in config.h can be overridden here.
 
 // Select Megapirate board type:
-//#define MPNG_BOARD_TYPE   CRIUS_V1
+#define MPNG_BOARD_TYPE   RCTIMER_CRIUS_V2
 /*
- * RCTIMER_CRIUS_V2    -- (DEFAULT!!!) Use ONLY for RCTimer CRIUS V2 board
- * CRIUS_V1            -- Use this define for RCTimer CRIUS V1(1.1) board and all HobbyKing AIOP boards
- * HK_RED_MULTIWII_PRO -- HobbyKing MultiWii Pro board with ITG3205 and BMA180, BMP085 sensors
+  RCTIMER_CRIUS_V2    -- (DEFAULT!!!) Use ONLY for RCTimer CRIUS V2 board
+  CRIUS_V1            -- Use this define for RCTimer CRIUS V1(1.1) board and all HobbyKing AIOP boards
+  HK_RED_MULTIWII_PRO -- HobbyKing MultiWii Pro board with ITG3205 and BMA180, BMP085 sensors
+  BLACK_VORTEX
  */
 
 // Currently not supported
 #define CONFIG_SONAR DISABLED
 
+//#define COPTER_LEDS DISABLED 
+
 // GPS port speed (Serial2) 38400 by default
 #define SERIAL2_BAUD 38400
-
-//#define COPTER_LEDS DISABLED 
 
 // GPS driver selection
 //#define GPS_PROTOCOL GPS_PROTOCOL_NONE

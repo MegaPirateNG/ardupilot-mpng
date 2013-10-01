@@ -10,11 +10,17 @@
 #include <AP_Progmem.h>
 #include "AP_InertialSensor.h"
 
+// MPNG board types
+#define CRIUS_V1  1
+#define RCTIMER_CRIUS_V2 2
+#define HK_RED_MULTIWII_PRO 3
+#define BLACK_VORTEX 4
+
 class AP_InertialSensor_ITG3200 : public AP_InertialSensor
 {
 public:
 
-  AP_InertialSensor_ITG3200();
+  AP_InertialSensor_ITG3200(uint8_t board_type);
   
   /* Concrete implementation of AP_InertialSensor functions: */
   bool 					update();
@@ -51,11 +57,11 @@ private:
 
   static const float 	_gyro_scale;
 
-  static const uint8_t 		_gyro_data_index[3];
-  static const int8_t 		_gyro_data_sign[3];
+  static uint8_t 		_gyro_data_index[3];
+  static int8_t 		_gyro_data_sign[3];
 
-  static const uint8_t 		_accel_data_index[3];
-  static const int8_t 		_accel_data_sign[3];
+  static uint8_t 		_accel_data_index[3];
+  static int8_t 		_accel_data_sign[3];
 
   static const uint8_t 		_temp_data_index;
   
@@ -64,7 +70,7 @@ private:
   static int16_t _data[7];
   
   static uint8_t _board_Type;
-  static int accel_addr;
+  static int _accel_addr;
   
  // ensure we can't initialise twice
   unsigned _initialised:1; 

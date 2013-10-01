@@ -418,6 +418,7 @@ enum ap_message {
 #define CRIUS_V1  1
 #define RCTIMER_CRIUS_V2 2
 #define HK_RED_MULTIWII_PRO 3
+#define BLACK_VORTEX 4
 
 
 // Error message sub systems and error codes

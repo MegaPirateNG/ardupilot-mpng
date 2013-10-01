@@ -204,7 +204,7 @@ static AP_InertialSensor_MPU6000 ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_MPU6000_I2C
 static AP_InertialSensor_MPU6000_I2C ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_ITG3200
-static AP_InertialSensor_ITG3200 ins;
+static AP_InertialSensor_ITG3200 ins(MPNG_BOARD_TYPE);
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_OILPAN
 static AP_InertialSensor_Oilpan ins(&adc);
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_SITL
