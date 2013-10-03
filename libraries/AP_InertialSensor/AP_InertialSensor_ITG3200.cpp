@@ -292,7 +292,12 @@ void AP_InertialSensor_ITG3200::_read_data_transaction()
 
 bool AP_InertialSensor_ITG3200::hardware_init(Sample_rate sample_rate)
 {
-    // Chip reset
+
+	if (!_i2c_sem->take(100)) {
+		hal.scheduler->panic(PSTR("ITG3200: Unable to get semaphore"));
+	}
+	
+	// Chip reset
 	hal.scheduler->delay(10);
 	hal.i2c->writeRegister(ITG3200_ADDRESS, 0x3E, 0x80);
 	hal.scheduler->delay(5);
@@ -310,5 +315,6 @@ bool AP_InertialSensor_ITG3200::hardware_init(Sample_rate sample_rate)
 	hal.i2c->writeRegister(_accel_addr, 0x20, 0<<4);
 	hal.scheduler->delay(10);
 	
+	_i2c_sem->give();
     return true;
 }
