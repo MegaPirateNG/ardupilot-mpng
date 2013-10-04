@@ -34,6 +34,8 @@ int8_t AP_InertialSensor_ITG3200::_accel_data_sign[3] = { 1, 1, -1 };
 
 const uint8_t AP_InertialSensor_ITG3200::_temp_data_index = 3;
 
+uint8_t AP_InertialSensor_ITG3200::_accel_addr;
+
 /* Static I2C device driver */
 AP_HAL::Semaphore* AP_InertialSensor_ITG3200::_i2c_sem = NULL;
 
@@ -43,7 +45,9 @@ AP_InertialSensor_ITG3200::AP_InertialSensor_ITG3200(uint8_t board_type): AP_Ine
 {
 	_initialised = false;
 
-	if (board_type == HK_RED_MULTIWII_PRO || board_type == BLACK_VORTEX) {
+	// HK MultiWii and BV has default chip configuration
+	// other boards must be described here
+/*	if (board_type == HK_RED_MULTIWII_PRO || board_type == BLACK_VORTEX) {
 		_gyro_data_index[0]  =  1;
 		_gyro_data_index[1]  =  2;
 		_gyro_data_index[2]  =  0;
@@ -57,21 +61,7 @@ AP_InertialSensor_ITG3200::AP_InertialSensor_ITG3200(uint8_t board_type): AP_Ine
 		_accel_data_sign[0]  = 1;
 		_accel_data_sign[1]  = 1;
 		_accel_data_sign[2]  = -1;
-/*	} else if (_board_Type == PIRATES_FFIMU) {
-		_gyro_data_index[0]  =  2;
-		_gyro_data_index[1]  =  1;
-		_gyro_data_index[2]  =  0;
-		_gyro_data_sign[0]   = 1;
-		_gyro_data_sign[1]   = -1;
-		_gyro_data_sign[2]   = -1;
-	
-		_accel_data_index[0] = 5;
-		_accel_data_index[1] = 4;
-		_accel_data_index[2] = 6;
-		_accel_data_sign[0]  = 1;
-		_accel_data_sign[1]  = -1;
-		_accel_data_sign[2]  = -1;*/
-	}
+	}*/
 
 	if (board_type == BLACK_VORTEX) {
 		_accel_addr = 0x41;

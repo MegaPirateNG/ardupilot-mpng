@@ -70,7 +70,7 @@ private:
   static int16_t _data[7];
   
   static uint8_t _board_Type;
-  static int _accel_addr;
+  static uint8_t _accel_addr;
   
  // ensure we can't initialise twice
   unsigned _initialised:1; 
