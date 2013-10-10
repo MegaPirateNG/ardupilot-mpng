@@ -65,12 +65,8 @@ private:
 
   static const uint8_t 		_temp_data_index;
   
-  static bool healthy;
-
-  static int16_t _data[7];
-  
-  static uint8_t _board_Type;
   static uint8_t _accel_addr;
+  static uint16_t _micros_per_sample;
   
  // ensure we can't initialise twice
   unsigned _initialised:1; 

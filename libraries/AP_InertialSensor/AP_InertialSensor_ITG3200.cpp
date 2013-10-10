@@ -34,7 +34,8 @@ int8_t AP_InertialSensor_ITG3200::_accel_data_sign[3] = { 1, 1, -1 };
 
 const uint8_t AP_InertialSensor_ITG3200::_temp_data_index = 3;
 
-uint8_t AP_InertialSensor_ITG3200::_accel_addr;
+uint8_t AP_InertialSensor_ITG3200::_accel_addr = 0x40;
+uint16_t AP_InertialSensor_ITG3200::_micros_per_sample = 5000; // 200Hz
 
 /* Static I2C device driver */
 AP_HAL::Semaphore* AP_InertialSensor_ITG3200::_i2c_sem = NULL;
@@ -45,28 +46,8 @@ AP_InertialSensor_ITG3200::AP_InertialSensor_ITG3200(uint8_t board_type): AP_Ine
 {
 	_initialised = false;
 
-	// HK MultiWii and BV has default chip configuration
-	// other boards must be described here
-/*	if (board_type == HK_RED_MULTIWII_PRO || board_type == BLACK_VORTEX) {
-		_gyro_data_index[0]  =  1;
-		_gyro_data_index[1]  =  2;
-		_gyro_data_index[2]  =  0;
-		_gyro_data_sign[0]   = 1;
-		_gyro_data_sign[1]   = 1;
-		_gyro_data_sign[2]   = -1;
-	
-		_accel_data_index[0] = 4;
-		_accel_data_index[1] = 5;
-		_accel_data_index[2] = 6;
-		_accel_data_sign[0]  = 1;
-		_accel_data_sign[1]  = 1;
-		_accel_data_sign[2]  = -1;
-	}*/
-
 	if (board_type == BLACK_VORTEX) {
 		_accel_addr = 0x41;
-	} else {
-		_accel_addr = 0x40;
 	} 
 }
 
@@ -194,7 +175,7 @@ float AP_InertialSensor_ITG3200::_temp_to_celsius ( uint16_t regval )
 
 void AP_InertialSensor_ITG3200::_poll_data(uint32_t now)
 {
-	if (now - _ins_timer > 5000) {
+	if (now - _ins_timer > _micros_per_sample) {
 		_ins_timer = now;
 	
 	  if (hal.scheduler->in_timerprocess()) {
@@ -255,22 +236,20 @@ void AP_InertialSensor_ITG3200::_read_data_from_timerprocess()
 void AP_InertialSensor_ITG3200::_read_data_transaction()
 {
 	// now read the data
-	uint8_t rawGYR[8];
-	uint8_t rawACL[6];
-	memset(rawGYR,0,8);
-	memset(rawACL,0,6);
-	
-	hal.i2c->readRegisters(ITG3200_ADDRESS, 0X1B, 8, rawGYR);
-	_sum[3] += (int16_t)(((uint16_t)rawGYR[0] << 8) | rawGYR[1]);
-	_sum[0] += (int16_t)(((uint16_t)rawGYR[6] << 8) | rawGYR[7]);
-	_sum[1] += (int16_t)(((uint16_t)rawGYR[4] << 8) | rawGYR[5]);
-	_sum[2] += (int16_t)(((uint16_t)rawGYR[2] << 8) | rawGYR[3]);
+	uint8_t raw[6];
+
+	memset(raw,0,6);
+	hal.i2c->readRegisters(ITG3200_ADDRESS, 0X1D, 6, raw);
+	_sum[0] += (int16_t)(((uint16_t)raw[4] << 8) | raw[5]);
+	_sum[1] += (int16_t)(((uint16_t)raw[2] << 8) | raw[3]);
+	_sum[2] += (int16_t)(((uint16_t)raw[0] << 8) | raw[1]);
 	
 		
-	hal.i2c->readRegisters(_accel_addr, 0x02, 6, rawACL);
-	_sum[4] += (int16_t)(((uint16_t)rawACL[3] << 8) | rawACL[2]) >> 2;
-	_sum[5] += (int16_t)(((uint16_t)rawACL[1] << 8) | rawACL[0]) >> 2;
-	_sum[6] += (int16_t)(((uint16_t)rawACL[5] << 8) | rawACL[4]) >> 2;
+	memset(raw,0,6);
+	hal.i2c->readRegisters(_accel_addr, 0x02, 6, raw);
+	_sum[4] += (int16_t)(((uint16_t)raw[3] << 8) | raw[2]) >> 2;
+	_sum[5] += (int16_t)(((uint16_t)raw[1] << 8) | raw[0]) >> 2;
+	_sum[6] += (int16_t)(((uint16_t)raw[5] << 8) | raw[4]) >> 2;
 	
 	
 	_count++;
@@ -291,9 +270,57 @@ bool AP_InertialSensor_ITG3200::hardware_init(Sample_rate sample_rate)
 	hal.scheduler->delay(10);
 	hal.i2c->writeRegister(ITG3200_ADDRESS, 0x3E, 0x80);
 	hal.scheduler->delay(5);
-	hal.i2c->writeRegister(ITG3200_ADDRESS, 0x15, 4);
+	
+	// sample rate and filtering
+	uint8_t filter, default_filter;
+	
+	// to minimise the effects of aliasing we choose a filter
+	// that is less than half of the sample rate
+	switch (sample_rate) {
+	case RATE_50HZ:
+		hal.i2c->writeRegister(ITG3200_ADDRESS, 0x15, GYRO_SMPLRT_50HZ);
+		default_filter = GYRO_DLPF_CFG_20HZ;
+		_micros_per_sample = 20000;
+		break;
+	case RATE_100HZ:
+		hal.i2c->writeRegister(ITG3200_ADDRESS, 0x15, GYRO_SMPLRT_100HZ);
+		default_filter = GYRO_DLPF_CFG_20HZ;
+		_micros_per_sample = 10000;
+		break;
+	case RATE_200HZ:
+	default:
+		hal.i2c->writeRegister(ITG3200_ADDRESS, 0x15, GYRO_SMPLRT_200HZ);
+		default_filter = GYRO_DLPF_CFG_42HZ;
+		_micros_per_sample = 5000;
+		break;
+	}
 	hal.scheduler->delay(5);
-	hal.i2c->writeRegister(ITG3200_ADDRESS, 0x16, 0x18+3);
+	
+	// choose filtering frequency
+	switch (_mpu6000_filter) {
+	case 5:
+		filter = GYRO_DLPF_CFG_5HZ;
+		break;
+	case 10:
+		filter = GYRO_DLPF_CFG_10HZ;
+		break;
+	case 20:
+		filter = GYRO_DLPF_CFG_20HZ;
+		break;
+	case 42:
+		filter = GYRO_DLPF_CFG_42HZ;
+		break;
+	case 98:
+		filter = GYRO_DLPF_CFG_98HZ;
+		break;
+	case 0:
+	default:
+	    // the user hasn't specified a specific frequency,
+	    // use the default value for the given sample rate
+	    filter = default_filter;
+	}	
+	hal.i2c->writeRegister(ITG3200_ADDRESS, 0x16, 0x18+filter);
+	
 	hal.scheduler->delay(5);
 	hal.i2c->writeRegister(ITG3200_ADDRESS, 0x3E, 0x03);
 	hal.scheduler->delay(10);
@@ -306,5 +333,6 @@ bool AP_InertialSensor_ITG3200::hardware_init(Sample_rate sample_rate)
 	hal.scheduler->delay(10);
 	
 	_i2c_sem->give();
-    return true;
+	
+  return true;
 }
