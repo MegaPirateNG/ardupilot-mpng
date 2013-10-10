@@ -30,6 +30,7 @@ public:
 
 protected:
     uint16_t                    _init_sensor( Sample_rate sample_rate );
+  	float                       _delta_time;
 
 private:
 
@@ -41,7 +42,7 @@ private:
 
     static AP_HAL::Semaphore *_i2c_sem;
 
-    uint16_t					_num_samples;
+    uint16_t					          _num_samples;
 
     float                       _temp;
 
@@ -62,12 +63,11 @@ private:
     bool                        _initialised;
     static int16_t              _mpu6000_product_id;
 
-    // how many hardware samples before we report a sample to the caller
-    uint8_t _sample_shift;
+  	static uint16_t             _micros_per_sample;
 
     // support for updating filter at runtime
-    uint8_t _last_filter_hz;
-
+    uint8_t                     _last_filter_hz;
+  
     void _set_filter_register(uint8_t filter_hz, uint8_t default_filter);
 
 };
