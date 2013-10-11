@@ -250,6 +250,9 @@ enum log_messages {
 #define AP_BARO_PX4      3
 #define AP_BARO_HIL      4
 
+#define AP_BARO_MS5611_SPI 1
+#define AP_BARO_MS5611_I2C 2
+
 // compass driver types
 #define AP_COMPASS_HMC5843   1
 #define AP_COMPASS_PX4       2
