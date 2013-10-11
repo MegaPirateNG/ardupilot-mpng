@@ -242,8 +242,8 @@ enum log_messages {
 #define CONFIG_INS_MPU6000 2
 #define CONFIG_INS_STUB    3
 #define CONFIG_INS_PX4     4
-#define CONFIG_IMU_MPU6000_I2C 5
-#define CONFIG_IMU_ITG3200 6
+#define CONFIG_INS_MPU6000_I2C 5
+#define CONFIG_INS_ITG3200 6
 
 // barometer driver types
 #define AP_BARO_BMP085   1
@@ -261,8 +261,8 @@ enum log_messages {
 #define AP_COMPASS_HIL       3
 
 // MPNG board types
-#define MPNG_BOARD_RCTIMER_CRIUS_V2 1
-#define MPNG_BOARD_CRIUS_V1 2
+#define RCTIMER_CRIUS_V2 1
+#define CRIUS_V1 2
 #define HK_RED_MULTIWII_PRO 3
 #define BLACK_VORTEX 4 
 

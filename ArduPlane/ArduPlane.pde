@@ -210,7 +210,7 @@ AP_GPS_HIL      g_gps_driver;
 AP_InertialSensor_MPU6000 ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_MPU6000_I2C
 AP_InertialSensor_MPU6000_I2C ins;
-#elif CONFIG_IMU_TYPE == CONFIG_IMU_ITG3200
+#elif CONFIG_INS_TYPE == CONFIG_INS_ITG3200
 static AP_InertialSensor_ITG3200 ins(MPNG_BOARD_TYPE);
 #elif CONFIG_INS_TYPE == CONFIG_INS_PX4
 AP_InertialSensor_PX4 ins;
