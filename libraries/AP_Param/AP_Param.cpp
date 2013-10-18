@@ -1,9 +1,20 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
+/*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 //
-// This is free software; you can redistribute it and/or modify it under
-// the terms of the GNU Lesser General Public License as published by the
-// Free Software Foundation; either version 2.1 of the License, or (at
-// your option) any later version.
 //
 
 // total up and check overflow
@@ -67,19 +78,10 @@ uint8_t AP_Param::_num_vars;
 // storage and naming information about all types that can be saved
 const AP_Param::Info *AP_Param::_var_info;
 
-// write to EEPROM, checking each byte to avoid writing
-// bytes that are already correct
+// write to EEPROM
 void AP_Param::eeprom_write_check(const void *ptr, uint16_t ofs, uint8_t size)
 {
-    const uint8_t *b = (const uint8_t *)ptr;
-    while (size--) {
-        uint8_t v = hal.storage->read_byte(ofs);
-        if (v != *b) {
-            hal.storage->write_byte(ofs, *b);
-        }
-        b++;
-        ofs++;
-    }
+    hal.storage->write_block(ofs, ptr, size);
 }
 
 // write a sentinal value at the given offset
@@ -452,7 +454,8 @@ uint8_t AP_Param::type_size(enum ap_var_type type)
 // scan the EEPROM looking for a given variable by header content
 // return true if found, along with the offset in the EEPROM where
 // the variable is stored
-// if not found return the offset of the sentinal, or
+// if not found return the offset of the sentinal
+// if the sentinal isn't found either, the offset is set to 0xFFFF
 bool AP_Param::scan(const AP_Param::Param_header *target, uint16_t *pofs)
 {
     struct Param_header phdr;
@@ -477,29 +480,26 @@ bool AP_Param::scan(const AP_Param::Param_header *target, uint16_t *pofs)
         }
         ofs += type_size((enum ap_var_type)phdr.type) + sizeof(phdr);
     }
-    *pofs = ~0;
+    *pofs = 0xffff;
     serialDebug("scan past end of eeprom");
     return false;
 }
 
-// add a X,Y,Z suffix to the name of a Vector3f element
+/**
+ * add a _X, _Y, _Z suffix to the name of a Vector3f element
+ * @param buffer
+ * @param buffer_size
+ * @param idx Suffix: 0 --> _X; 1 --> _Y; 2 --> _Z; (other --> undefined)
+ */
 void AP_Param::add_vector3f_suffix(char *buffer, size_t buffer_size, uint8_t idx) const
 {
-    uint8_t len = strnlen(buffer, buffer_size);
-    if ((size_t)(len+2) > buffer_size) {
-        // the suffix doesn't fit
-        return;
-    }
-    buffer[len] = '_';
-    if (idx == 0) {
-        buffer[len+1] = 'X';
-    } else if (idx == 1) {
-        buffer[len+1] = 'Y';
-    } else if (idx == 2) {
-        buffer[len+1] = 'Z';
-    }
-    if ((size_t)(len+2) < buffer_size) {
-        buffer[len+2] = 0;
+    const size_t len = strnlen(buffer, buffer_size);
+    if (len + 2 <= buffer_size) {
+        buffer[len] = '_';
+        buffer[len + 1] = static_cast<char>('X' + idx);
+        if (len + 3 <= buffer_size) {
+            buffer[len + 2] = 0;
+        }
     }
 }
 
@@ -931,7 +931,7 @@ AP_Param *AP_Param::next_group(uint8_t vindex, const struct GroupInfo *group_inf
                         *ptype = AP_PARAM_FLOAT;
                     }
                     uintptr_t ofs = (uintptr_t)PGM_POINTER(&_var_info[vindex].ptr) + PGM_UINT16(&group_info[i].offset);
-                    ofs += sizeof(float)*(token->idx-1);
+                    ofs += sizeof(float)*(token->idx - 1u);
                     return (AP_Param *)ofs;
                 }
             }
@@ -959,7 +959,7 @@ AP_Param *AP_Param::next(ParamToken *token, enum ap_var_type *ptype)
         if (ptype != NULL) {
             *ptype = AP_PARAM_FLOAT;
         }
-        return (AP_Param *)(((token->idx-1)*sizeof(float))+(uintptr_t)PGM_POINTER(&_var_info[i].ptr));
+        return (AP_Param *)(((token->idx - 1u)*sizeof(float))+(uintptr_t)PGM_POINTER(&_var_info[i].ptr));
     }
 
     if (type != AP_PARAM_GROUP) {
@@ -1105,7 +1105,7 @@ void AP_Param::convert_old_parameter(const struct ConversionInfo *info)
     }
 
     // see if they are the same type
-    if (ptype == header.type) {
+    if (ptype == (ap_var_type)header.type) {
         // copy the value over only if the new parameter does not already
         // have the old value (via a default).
         if (memcmp(ap2, ap, sizeof(old_value)) != 0) {

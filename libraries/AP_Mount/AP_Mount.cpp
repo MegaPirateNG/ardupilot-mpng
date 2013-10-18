@@ -216,13 +216,11 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
     AP_GROUPEND
 };
 
-extern RC_Channel* rc_ch[8];
-
-AP_Mount::AP_Mount(const struct Location *current_loc, GPS *&gps, AP_AHRS *ahrs, uint8_t id) :
+AP_Mount::AP_Mount(const struct Location *current_loc, GPS *&gps, const AP_AHRS &ahrs, uint8_t id) :
+    _ahrs(ahrs),
     _gps(gps)
 {
 	AP_Param::setup_object_defaults(this, var_info);
-    _ahrs = ahrs;
     _current_loc = current_loc;
 
     // default to zero angles
@@ -341,35 +339,36 @@ void AP_Mount::update_mount_position()
     // RC radio manual angle control, but with stabilization from the AHRS
     case MAV_MOUNT_MODE_RC_TARGETING:
     {
+#define rc_ch(i) RC_Channel::rc_channel(i-1)
 #if MNT_JSTICK_SPD_OPTION == ENABLED
         if (_joystick_speed) {                  // for spring loaded joysticks
             // allow pilot speed position input to come directly from an RC_Channel
-            if (_roll_rc_in && (rc_ch[_roll_rc_in-1])) {
-                _roll_control_angle += rc_ch[_roll_rc_in-1]->norm_input() * 0.0001f * _joystick_speed;
+            if (_roll_rc_in && rc_ch(_roll_rc_in)) {
+                _roll_control_angle += rc_ch(_roll_rc_in)->norm_input() * 0.0001f * _joystick_speed;
                 if (_roll_control_angle < radians(_roll_angle_min*0.01f)) _roll_control_angle = radians(_roll_angle_min*0.01f);
                 if (_roll_control_angle > radians(_roll_angle_max*0.01f)) _roll_control_angle = radians(_roll_angle_max*0.01f);
             }
-            if (_tilt_rc_in && (rc_ch[_tilt_rc_in-1])) {
-                _tilt_control_angle += rc_ch[_tilt_rc_in-1]->norm_input() * 0.0001f * _joystick_speed;
+            if (_tilt_rc_in && (rc_ch(_tilt_rc_in))) {
+                _tilt_control_angle += rc_ch(_tilt_rc_in)->norm_input() * 0.0001f * _joystick_speed;
                 if (_tilt_control_angle < radians(_tilt_angle_min*0.01f)) _tilt_control_angle = radians(_tilt_angle_min*0.01f);
                 if (_tilt_control_angle > radians(_tilt_angle_max*0.01f)) _tilt_control_angle = radians(_tilt_angle_max*0.01f);
             }
-            if (_pan_rc_in && (rc_ch[_pan_rc_in-1])) {
-                _pan_control_angle += rc_ch[_pan_rc_in-1]->norm_input() * 0.0001f * _joystick_speed;
+            if (_pan_rc_in && (rc_ch(_pan_rc_in))) {
+                _pan_control_angle += rc_ch(_pan_rc_in)->norm_input() * 0.0001f * _joystick_speed;
                 if (_pan_control_angle < radians(_pan_angle_min*0.01f)) _pan_control_angle = radians(_pan_angle_min*0.01f);
                 if (_pan_control_angle > radians(_pan_angle_max*0.01f)) _pan_control_angle = radians(_pan_angle_max*0.01f);
             }
         } else {
 #endif
             // allow pilot position input to come directly from an RC_Channel
-            if (_roll_rc_in && (rc_ch[_roll_rc_in-1])) {
-                _roll_control_angle = angle_input_rad(rc_ch[_roll_rc_in-1], _roll_angle_min, _roll_angle_max);
+            if (_roll_rc_in && (rc_ch(_roll_rc_in))) {
+                _roll_control_angle = angle_input_rad(rc_ch(_roll_rc_in), _roll_angle_min, _roll_angle_max);
             }
-            if (_tilt_rc_in && (rc_ch[_tilt_rc_in-1])) {
-                _tilt_control_angle = angle_input_rad(rc_ch[_tilt_rc_in-1], _tilt_angle_min, _tilt_angle_max);
+            if (_tilt_rc_in && (rc_ch(_tilt_rc_in))) {
+                _tilt_control_angle = angle_input_rad(rc_ch(_tilt_rc_in), _tilt_angle_min, _tilt_angle_max);
             }
-            if (_pan_rc_in && (rc_ch[_pan_rc_in-1])) {
-                _pan_control_angle = angle_input_rad(rc_ch[_pan_rc_in-1], _pan_angle_min, _pan_angle_max);
+            if (_pan_rc_in && (rc_ch(_pan_rc_in))) {
+                _pan_control_angle = angle_input_rad(rc_ch(_pan_rc_in), _pan_angle_min, _pan_angle_max);
             }
 #if MNT_JSTICK_SPD_OPTION == ENABLED
         }
@@ -595,39 +594,31 @@ void
 AP_Mount::stabilize()
 {
 #if MNT_STABILIZE_OPTION == ENABLED
-    if (_ahrs) {
-        // only do the full 3D frame transform if we are doing pan control
-        if (_stab_pan) {
-            Matrix3f m;                         ///< holds 3 x 3 matrix, var is used as temp in calcs
-            Matrix3f cam;                       ///< Rotation matrix earth to camera. Desired camera from input.
-            Matrix3f gimbal_target;             ///< Rotation matrix from plane to camera. Then Euler angles to the servos.
-            m = _ahrs->get_dcm_matrix();
-            m.transpose();
-            cam.from_euler(_roll_control_angle, _tilt_control_angle, _pan_control_angle);
-            gimbal_target = m * cam;
-            gimbal_target.to_euler(&_roll_angle, &_tilt_angle, &_pan_angle);
-            _roll_angle  = _stab_roll ? degrees(_roll_angle) : degrees(_roll_control_angle);
-            _tilt_angle  = _stab_tilt ? degrees(_tilt_angle) : degrees(_tilt_control_angle);
-            _pan_angle   = degrees(_pan_angle);
-        } else {
-            // otherwise base mount roll and tilt on the ahrs
-            // roll/tilt attitude, plus any requested angle
-            _roll_angle  = degrees(_roll_control_angle);
-            _tilt_angle  = degrees(_tilt_control_angle);
-            _pan_angle   = degrees(_pan_control_angle);
-            if (_stab_roll) {
-                _roll_angle -= degrees(_ahrs->roll);
-            }
-            if (_stab_tilt) {
-                _tilt_angle -= degrees(_ahrs->pitch);
-            }
-        }
+    // only do the full 3D frame transform if we are doing pan control
+    if (_stab_pan) {
+        Matrix3f m;                         ///< holds 3 x 3 matrix, var is used as temp in calcs
+        Matrix3f cam;                       ///< Rotation matrix earth to camera. Desired camera from input.
+        Matrix3f gimbal_target;             ///< Rotation matrix from plane to camera. Then Euler angles to the servos.
+        m = _ahrs.get_dcm_matrix();
+        m.transpose();
+        cam.from_euler(_roll_control_angle, _tilt_control_angle, _pan_control_angle);
+        gimbal_target = m * cam;
+        gimbal_target.to_euler(&_roll_angle, &_tilt_angle, &_pan_angle);
+        _roll_angle  = _stab_roll ? degrees(_roll_angle) : degrees(_roll_control_angle);
+        _tilt_angle  = _stab_tilt ? degrees(_tilt_angle) : degrees(_tilt_control_angle);
+        _pan_angle   = degrees(_pan_angle);
     } else {
-#endif
+        // otherwise base mount roll and tilt on the ahrs
+        // roll/tilt attitude, plus any requested angle
         _roll_angle  = degrees(_roll_control_angle);
         _tilt_angle  = degrees(_tilt_control_angle);
         _pan_angle   = degrees(_pan_control_angle);
-#if MNT_STABILIZE_OPTION == ENABLED
+        if (_stab_roll) {
+            _roll_angle -= degrees(_ahrs.roll);
+        }
+        if (_stab_tilt) {
+            _tilt_angle -= degrees(_ahrs.pitch);
+        }
     }
 #endif
 }

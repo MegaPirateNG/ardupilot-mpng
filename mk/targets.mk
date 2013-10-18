@@ -17,9 +17,13 @@ apm2: HAL_BOARD = HAL_BOARD_APM2
 apm2: TOOLCHAIN = AVR
 apm2: all
 
-mpng: HAL_BOARD = HAL_BOARD_MPNG
-mpng: TOOLCHAIN = AVR
-mpng: all
+flymaple: HAL_BOARD = HAL_BOARD_FLYMAPLE
+flymaple: TOOLCHAIN = ARM
+flymaple: all
+
+linux: HAL_BOARD = HAL_BOARD_LINUX
+linux: TOOLCHAIN = NATIVE
+linux: all
 
 empty: HAL_BOARD = HAL_BOARD_EMPTY
 empty: TOOLCHAIN = AVR
@@ -54,9 +58,6 @@ apm2-hilsensors: apm2
 
 apm2-nologging: EXTRAFLAGS += "-DLOGGING_ENABLED=DISABLED "
 apm2-nologging: apm2
-
-mpng-nologging: EXTRAFLAGS += "-DLOGGING_ENABLED=DISABLED "
-mpng-nologging: mpng
 
 heli: EXTRAFLAGS += "-DFRAME_CONFIG=HELI_FRAME "
 heli: all
@@ -124,31 +125,6 @@ apm2-heli-hil: EXTRAFLAGS += "-DFRAME_CONFIG=HELI_FRAME "
 apm2-heli-hil: EXTRAFLAGS += "-DHIL_MODE=HIL_MODE_ATTITUDE "
 apm2-heli-hil: apm2
 
-mpng-quad: EXTRAFLAGS += "-DFRAME_CONFIG=QUAD_FRAME "
-mpng-quad: mpng
-
-mpng-quad-hil: EXTRAFLAGS += "-DFRAME_CONFIG=QUAD_FRAME "
-mpng-quad-hil: EXTRAFLAGS += "-DHIL_MODE=HIL_MODE_ATTITUDE "
-mpng-quad-hil: mpng
-
-mpng-tri: EXTRAFLAGS += "-DFRAME_CONFIG=TRI_FRAME "
-mpng-tri: mpng
-
-mpng-hexa: EXTRAFLAGS += "-DFRAME_CONFIG=HEXA_FRAME "
-mpng-hexa: mpng
-
-mpng-y6: EXTRAFLAGS += "-DFRAME_CONFIG=Y6_FRAME "
-mpng-y6: mpng
-
-mpng-octa: EXTRAFLAGS += "-DFRAME_CONFIG=OCTA_FRAME "
-mpng-octa: mpng
-
-mpng-octa-quad: EXTRAFLAGS += "-DFRAME_CONFIG=OCTA_QUAD_FRAME "
-mpng-octa-quad: mpng
-
-mpng-heli: EXTRAFLAGS += "-DFRAME_CONFIG=HELI_FRAME "
-mpng-heli: mpng
-
 
 px4-quad: EXTRAFLAGS += "-DFRAME_CONFIG=QUAD_FRAME "
 px4-quad: px4
@@ -215,3 +191,4 @@ etags:
 
 clean:
 	@rm -fr $(BUILDROOT)
+

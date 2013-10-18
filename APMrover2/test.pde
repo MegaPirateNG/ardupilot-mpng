@@ -9,11 +9,7 @@ static int8_t	test_radio(uint8_t argc, 		const Menu::arg *argv);
 static int8_t	test_passthru(uint8_t argc, 	const Menu::arg *argv);
 static int8_t	test_failsafe(uint8_t argc, 	const Menu::arg *argv);
 static int8_t	test_gps(uint8_t argc, 			const Menu::arg *argv);
-#if CONFIG_ADC == ENABLED
-static int8_t	test_adc(uint8_t argc, 			const Menu::arg *argv);
-#endif
 static int8_t	test_ins(uint8_t argc, 			const Menu::arg *argv);
-static int8_t	test_battery(uint8_t argc, 		const Menu::arg *argv);
 static int8_t	test_relay(uint8_t argc,	 	const Menu::arg *argv);
 static int8_t	test_wp(uint8_t argc, 			const Menu::arg *argv);
 static int8_t	test_sonar(uint8_t argc, 	const Menu::arg *argv);
@@ -33,28 +29,16 @@ static const struct Menu::command test_menu_commands[] PROGMEM = {
 	{"radio",			test_radio},
 	{"passthru",		test_passthru},
 	{"failsafe",		test_failsafe},
-	{"battery",	test_battery},
 	{"relay",			test_relay},
 	{"waypoints",		test_wp},
 	{"modeswitch",		test_modeswitch},
 
 	// Tests below here are for hardware sensors only present
 	// when real sensors are attached or they are emulated
-#if HIL_MODE == HIL_MODE_DISABLED
-#if CONFIG_ADC == ENABLED
-	{"adc", 		test_adc},
-#endif
 	{"gps",			test_gps},
 	{"ins",			test_ins},
 	{"sonartest",	test_sonar},
 	{"compass",		test_mag},
-#elif HIL_MODE == HIL_MODE_SENSORS
-	{"adc", 		test_adc},
-	{"gps",			test_gps},
-	{"ins",			test_ins},
-	{"compass",		test_mag},
-#elif HIL_MODE == HIL_MODE_ATTITUDE
-#endif
 	{"logging",		test_logging},
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
     {"shell", 				test_shell},
@@ -91,9 +75,9 @@ test_radio_pwm(uint8_t argc, const Menu::arg *argv)
 		read_radio();
 
 		cliSerial->printf_P(PSTR("IN:\t1: %d\t2: %d\t3: %d\t4: %d\t5: %d\t6: %d\t7: %d\t8: %d\n"),
-							g.channel_steer.radio_in,
+							channel_steer->radio_in,
 							g.rc_2.radio_in,
-							g.channel_throttle.radio_in,
+							channel_throttle->radio_in,
 							g.rc_4.radio_in,
 							g.rc_5.radio_in,
 							g.rc_6.radio_in,
@@ -147,25 +131,22 @@ test_radio(uint8_t argc, const Menu::arg *argv)
 		delay(20);
 		read_radio();
 
-		g.channel_steer.calc_pwm();
-		g.channel_throttle.calc_pwm();
+		channel_steer->calc_pwm();
+		channel_throttle->calc_pwm();
 
 		// write out the servo PWM values
 		// ------------------------------
 		set_servos();
 
-        tuning_value = constrain_float(((float)(g.rc_7.radio_in - g.rc_7.radio_min) / (float)(g.rc_7.radio_max - g.rc_7.radio_min)),0,1);
-                
-		cliSerial->printf_P(PSTR("IN 1: %d\t2: %d\t3: %d\t4: %d\t5: %d\t6: %d\t7: %d\t8: %d  Tuning = %2.3f\n"),
-							g.channel_steer.control_in,
+		cliSerial->printf_P(PSTR("IN 1: %d\t2: %d\t3: %d\t4: %d\t5: %d\t6: %d\t7: %d\t8: %d\n"),
+							channel_steer->control_in,
 							g.rc_2.control_in,
-							g.channel_throttle.control_in,
+							channel_throttle->control_in,
 							g.rc_4.control_in,
 							g.rc_5.control_in,
 							g.rc_6.control_in,
 							g.rc_7.control_in,
-							g.rc_8.control_in,
-                                                        tuning_value);
+							g.rc_8.control_in);
 
 		if(cliSerial->available() > 0){
 			return (0);
@@ -190,7 +171,7 @@ test_failsafe(uint8_t argc, const Menu::arg *argv)
 	oldSwitchPosition = readSwitch();
 
 	cliSerial->printf_P(PSTR("Unplug battery, throttle in neutral, turn off radio.\n"));
-	while(g.channel_throttle.control_in > 0){
+	while(channel_throttle->control_in > 0){
 		delay(20);
 		read_radio();
 	}
@@ -199,8 +180,8 @@ test_failsafe(uint8_t argc, const Menu::arg *argv)
 		delay(20);
 		read_radio();
 
-		if(g.channel_throttle.control_in > 0){
-			cliSerial->printf_P(PSTR("THROTTLE CHANGED %d \n"), g.channel_throttle.control_in);
+		if(channel_throttle->control_in > 0){
+			cliSerial->printf_P(PSTR("THROTTLE CHANGED %d \n"), channel_throttle->control_in);
 			fail_test++;
 		}
 
@@ -211,8 +192,8 @@ test_failsafe(uint8_t argc, const Menu::arg *argv)
 			fail_test++;
 		}
 
-		if (g.fs_throttle_enabled && g.channel_throttle.get_failsafe()){
-			cliSerial->printf_P(PSTR("THROTTLE FAILSAFE ACTIVATED: %d, "), g.channel_throttle.radio_in);
+		if (g.fs_throttle_enabled && channel_throttle->get_failsafe()){
+			cliSerial->printf_P(PSTR("THROTTLE FAILSAFE ACTIVATED: %d, "), channel_throttle->radio_in);
             print_mode(cliSerial, readSwitch());
             cliSerial->println();
 			fail_test++;
@@ -226,44 +207,6 @@ test_failsafe(uint8_t argc, const Menu::arg *argv)
 			return (0);
 		}
 	}
-}
-
-static int8_t
-test_battery(uint8_t argc, const Menu::arg *argv)
-{
-if (g.battery_monitoring == 3 || g.battery_monitoring == 4) {
-	print_hit_enter();
-	delta_ms_medium_loop = 100;
-
-	while(1){
-		delay(100);
-		read_radio();
-		read_battery();
-		if (g.battery_monitoring == 3){
-			cliSerial->printf_P(PSTR("V: %4.4f\n"),
-						battery_voltage1,
-						current_amps1,
-						current_total1);
-		} else {
-			cliSerial->printf_P(PSTR("V: %4.4f, A: %4.4f, mAh: %4.4f\n"),
-						battery_voltage1,
-						current_amps1,
-						current_total1);
-		}
-
-		// write out the servo PWM values
-		// ------------------------------
-		set_servos();
-
-		if(cliSerial->available() > 0){
-			return (0);
-		}
-	}
-} else {
-	cliSerial->printf_P(PSTR("Not enabled\n"));
-	return (0);
-}
-
 }
 
 static int8_t
@@ -326,7 +269,7 @@ test_modeswitch(uint8_t argc, const Menu::arg *argv)
 
 	cliSerial->printf_P(PSTR("Control CH "));
 
-	cliSerial->println(MODE_CHANNEL, DEC);
+	cliSerial->println(MODE_CHANNEL, BASE_DEC);
 
 	while(1){
 		delay(20);
@@ -356,29 +299,6 @@ test_logging(uint8_t argc, const Menu::arg *argv)
 //-------------------------------------------------------------------------------------------
 // tests in this section are for real sensors or sensors that have been simulated
 
-#if HIL_MODE == HIL_MODE_DISABLED || HIL_MODE == HIL_MODE_SENSORS
-
-#if CONFIG_ADC == ENABLED
-static int8_t
-test_adc(uint8_t argc, const Menu::arg *argv)
-{
-	print_hit_enter();
-	adc.Init();
-	delay(1000);
-	cliSerial->printf_P(PSTR("ADC\n"));
-	delay(1000);
-
-	while(1){
-		for (int i=0;i<9;i++) cliSerial->printf_P(PSTR("%.1f\t"),adc.Ch(i));
-		cliSerial->println();
-		delay(100);
-		if(cliSerial->available() > 0){
-			return (0);
-		}
-	}
-}
-#endif // CONFIG_ADC
-
 static int8_t
 test_gps(uint8_t argc, const Menu::arg *argv)
 {
@@ -388,17 +308,13 @@ test_gps(uint8_t argc, const Menu::arg *argv)
 	while(1){
 		delay(100);
 
-		// Blink GPS LED if we don't have a fix
-		// ------------------------------------
-		update_GPS_light();
-
 		g_gps->update();
 
 		if (g_gps->new_data){
 			cliSerial->printf_P(PSTR("Lat: %ld, Lon %ld, Alt: %ldm, #sats: %d\n"),
 					g_gps->latitude,
 					g_gps->longitude,
-					g_gps->altitude/100,
+					g_gps->altitude_cm/100,
 					g_gps->num_sats);
 		}else{
 			cliSerial->printf_P(PSTR("."));
@@ -416,12 +332,13 @@ test_ins(uint8_t argc, const Menu::arg *argv)
 	ahrs.init();
     ahrs.set_fly_forward(true);
 	ins.init(AP_InertialSensor::COLD_START, 
-             ins_sample_rate, 
-             flash_leds);
+             ins_sample_rate);
     ahrs.reset();
 
 	print_hit_enter();
 	delay(1000);
+
+    uint8_t medium_loopCounter = 0;
 
 	while(1){
 		delay(20);
@@ -436,7 +353,7 @@ test_ins(uint8_t argc, const Menu::arg *argv)
 
 			if(g.compass_enabled) {
 				medium_loopCounter++;
-				if(medium_loopCounter == 5){
+				if(medium_loopCounter >= 5){
 					compass.read();
                     medium_loopCounter = 0;
 				}
@@ -480,14 +397,15 @@ test_mag(uint8_t argc, const Menu::arg *argv)
 
     // we need the AHRS initialised for this test
 	ins.init(AP_InertialSensor::COLD_START, 
-             ins_sample_rate, 
-             flash_leds);
+             ins_sample_rate);
     ahrs.reset();
 
 	int counter = 0;
     float heading = 0;
 
     print_hit_enter();
+
+    uint8_t medium_loopCounter = 0;
 
     while(1) {
 		delay(20);
@@ -501,7 +419,7 @@ test_mag(uint8_t argc, const Menu::arg *argv)
 			ahrs.update();
 
             medium_loopCounter++;
-            if(medium_loopCounter == 5){
+            if(medium_loopCounter >= 5){
                 if (compass.read()) {
                     // Calculate heading
                     Matrix3f m = ahrs.get_dcm_matrix();
@@ -540,8 +458,6 @@ test_mag(uint8_t argc, const Menu::arg *argv)
     compass.save_offsets();
     return (0);
 }
-
-#endif // HIL_MODE == HIL_MODE_DISABLED || HIL_MODE == HIL_MODE_SENSORS
 
 //-------------------------------------------------------------------------------------------
 // real sensors that have not been simulated yet go here

@@ -6,8 +6,7 @@ import pexpect, os, sys, shutil, atexit
 import optparse, fnmatch, time, glob, traceback, signal
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'pysim'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'mavlink', 'pymavlink'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'mavlink', 'pymavlink', 'generator'))
+
 import util
 
 os.environ['PYTHONUNBUFFERED'] = '1'
@@ -28,7 +27,7 @@ def get_default_params(atype):
         mavproxy = util.start_MAVProxy_SIL(atype)
         idx = mavproxy.expect('Saved [0-9]+ parameters to (\S+)')
     parmfile = mavproxy.match.group(1)
-    dest = util.reltopdir('../buildlogs/%s.defaults.txt' % atype)
+    dest = util.reltopdir('../buildlogs/%s-defaults.parm' % atype)
     shutil.copy(parmfile, dest)
     util.pexpect_close(mavproxy)
     util.pexpect_close(sil)
@@ -117,7 +116,7 @@ def convert_gpx():
     import glob
     mavlog = glob.glob(util.reltopdir("../buildlogs/*.tlog"))
     for m in mavlog:
-        util.run_cmd(util.reltopdir("../mavlink/pymavlink/examples/mavtogpx.py") + " --nofixcheck " + m)
+        util.run_cmd(util.reltopdir("../mavlink/pymavlink/tools/mavtogpx.py") + " --nofixcheck " + m)
         gpx = m + '.gpx'
         kml = m + '.kml'
         util.run_cmd('gpsbabel -i gpx -f %s -o kml,units=m,floating=1,extrude=1 -F %s' % (gpx, kml), checkfail=False)
@@ -139,17 +138,7 @@ def alarm_handler(signum, frame):
         results.add('TIMEOUT', '<span class="failed-text">FAILED</span>', opts.timeout)
         util.pexpect_close_all()
         convert_gpx()
-        results.addglob("Google Earth track", '*.kmz')
-        results.addfile('Full Logs', 'autotest-output.txt')
-        results.addglob('DataFlash Log', '*.flashlog')
-        results.addglob("MAVLink log", '*.tlog')
-        results.addfile('ArduPlane build log', 'ArduPlane.txt')
-        results.addfile('ArduPlane defaults', 'ArduPlane.defaults.txt')
-        results.addfile('ArduCopter build log', 'ArduCopter.txt')
-        results.addfile('ArduCopter defaults', 'ArduCopter.defaults.txt')
-        results.addfile('APMrover2 build log', 'APMrover2.txt')
-        results.addfile('APMrover2 defaults', 'APMrover2.defaults.txt')
-        write_webresults(results)
+        write_fullresults()
         os.killpg(0, signal.SIGKILL)
     except Exception:
         pass
@@ -181,7 +170,6 @@ steps = [
     'fly.ArduPlane',
     'logs.ArduPlane',
 
-    'build1280.APMrover2',
     'build2560.APMrover2',
     'build.APMrover2',
     'defaults.APMrover2',
@@ -236,9 +224,6 @@ def run_step(step):
 
     if step == 'build2560.ArduPlane':
         return util.build_AVR('ArduPlane', board='mega2560')
-
-    if step == 'build1280.APMrover2':
-        return util.build_AVR('APMrover2', board='mega')
 
     if step == 'build2560.APMrover2':
         return util.build_AVR('APMrover2', board='mega2560')
@@ -343,8 +328,7 @@ class TestResults(object):
 
 def write_webresults(results):
     '''write webpage results'''
-    sys.path.insert(0, os.path.join(util.reltopdir("../mavlink/pymavlink/generator")))
-    import mavtemplate
+    from pymavlink.generator import mavtemplate
     t = mavtemplate.MAVTemplate()
     for h in glob.glob(util.reltopdir('Tools/autotest/web/*.html')):
         html = util.loadfile(h)
@@ -353,6 +337,34 @@ def write_webresults(results):
         f.close()
     for f in glob.glob(util.reltopdir('Tools/autotest/web/*.png')):
         shutil.copy(f, util.reltopdir('../buildlogs/%s' % os.path.basename(f)))
+
+def write_fullresults():
+    '''write out full results set'''
+    global results
+    results.addglob("Google Earth track", '*.kmz')
+    results.addfile('Full Logs', 'autotest-output.txt')
+    results.addglob('DataFlash Log', '*.flashlog')
+    results.addglob("MAVLink log", '*.tlog')
+    results.addglob("GPX track", '*.gpx')
+    results.addfile('ArduPlane build log', 'ArduPlane.txt')
+    results.addfile('ArduPlane code size', 'ArduPlane.sizes.txt')
+    results.addfile('ArduPlane stack sizes', 'ArduPlane.framesizes.txt')
+    results.addfile('ArduPlane defaults', 'ArduPlane-defaults.parm')
+    results.addfile('ArduCopter build log', 'ArduCopter.txt')
+    results.addfile('ArduCopter code size', 'ArduCopter.sizes.txt')
+    results.addfile('ArduCopter stack sizes', 'ArduCopter.framesizes.txt')
+    results.addfile('ArduCopter defaults', 'ArduCopter-defaults.parm')
+    results.addfile('APMrover2 build log', 'APMrover2.txt')
+    results.addfile('APMrover2 code size', 'APMrover2.sizes.txt')
+    results.addfile('APMrover2 stack sizes', 'APMrover2.framesizes.txt')
+    results.addfile('APMrover2 defaults', 'APMrover2-defaults.parm')
+    results.addglob('APM:Libraries documentation', 'docs/libraries/index.html')
+    results.addglob('APM:Plane documentation', 'docs/ArduPlane/index.html')
+    results.addglob('APM:Copter documentation', 'docs/ArduCopter/index.html')
+    results.addglob('APM:Rover documentation', 'docs/APMrover2/index.html')
+    results.addglobimage("Flight Track", '*.png')
+
+    write_webresults(results)
 
 
 results = TestResults()
@@ -391,26 +403,7 @@ def run_tests(steps):
 
     util.pexpect_close_all()
 
-    results.addglob("Google Earth track", '*.kmz')
-    results.addfile('Full Logs', 'autotest-output.txt')
-    results.addglob('DataFlash Log', '*.flashlog')
-    results.addglob("MAVLink log", '*.tlog')
-    results.addglob("GPX track", '*.gpx')
-    results.addfile('ArduPlane build log', 'ArduPlane.txt')
-    results.addfile('ArduPlane code size', 'ArduPlane.sizes.txt')
-    results.addfile('ArduPlane stack sizes', 'ArduPlane.framesizes.txt')
-    results.addfile('ArduPlane defaults', 'ArduPlane.defaults.txt')
-    results.addfile('ArduCopter build log', 'ArduCopter.txt')
-    results.addfile('ArduCopter code size', 'ArduCopter.sizes.txt')
-    results.addfile('ArduCopter stack sizes', 'ArduCopter.framesizes.txt')
-    results.addfile('ArduCopter defaults', 'ArduCopter.defaults.txt')
-    results.addfile('APMrover2 build log', 'APMrover2.txt')
-    results.addfile('APMrover2 code size', 'APMrover2.sizes.txt')
-    results.addfile('APMrover2 stack sizes', 'APMrover2.framesizes.txt')
-    results.addfile('APMrover2 defaults', 'APMrover2.defaults.txt')
-    results.addglobimage("Flight Track", '*.png')
-
-    write_webresults(results)
+    write_fullresults()
 
     return passed
 

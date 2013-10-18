@@ -10,6 +10,7 @@
 
 #include <inttypes.h>
 #include <AP_Progmem.h>
+#include <AP_Math.h>
 
 /// @class	GPS
 /// @brief	Abstract base class for GPS receiver drivers.
@@ -103,10 +104,10 @@ public:
     uint32_t date;                      ///< GPS date (FORMAT TBD)
     int32_t latitude;                   ///< latitude in degrees * 10,000,000
     int32_t longitude;                  ///< longitude in degrees * 10,000,000
-    int32_t altitude;                   ///< altitude in cm
-    uint32_t ground_speed;      ///< ground speed in cm/sec
-    int32_t ground_course;      ///< ground course in 100ths of a degree
-    int32_t speed_3d;                   ///< 3D speed in cm/sec (not always available)
+    int32_t altitude_cm;                ///< altitude in cm
+    uint32_t ground_speed_cm;           ///< ground speed in cm/sec
+    int32_t ground_course_cd;           ///< ground course in 100ths of a degree
+    int32_t speed_3d_cm;                ///< 3D speed in cm/sec (not always available)
     int16_t hdop;                       ///< horizontal dilution of precision in cm
     uint8_t num_sats;           ///< Number of visible satelites
 
@@ -126,20 +127,25 @@ public:
                         float ground_speed, float ground_course, float speed_3d, uint8_t num_sats);
 
     // components of velocity in 2D, in m/s
-    float velocity_north(void) {
+    float velocity_north(void) const {
         return _status >= GPS_OK_FIX_2D ? _velocity_north : 0;
     }
-    float velocity_east(void)  {
+    float velocity_east(void)  const {
         return _status >= GPS_OK_FIX_2D ? _velocity_east  : 0;
     }
-    float velocity_down(void)  {
+    float velocity_down(void)  const {
         return _status >= GPS_OK_FIX_3D ? _velocity_down  : 0;
+    }
+
+    // GPS velocity vector as NED in m/s
+    Vector3f velocity_vector(void) const {
+        return Vector3f(_velocity_north, _velocity_east, _velocity_down);
     }
 
     // last ground speed in m/s. This can be used when we have no GPS
     // lock to return the last ground speed we had with lock
     float last_ground_speed(void) {
-        return _last_ground_speed_cm * 0.01;
+        return static_cast<float>(_last_ground_speed_cm) * 0.01;
     }
 
     // the expected lag (in seconds) in the position and velocity readings from the gps

@@ -2,7 +2,8 @@
 
 import util, pexpect, sys, time, math, shutil, os
 from common import *
-import mavutil, random
+from pymavlink import mavutil
+import random
 
 # get location of scripts
 testdir=os.path.dirname(os.path.realpath(__file__))
@@ -80,7 +81,7 @@ def drive_APMrover2(viewerip=None, map=False):
     if viewerip:
         options += " --out=%s:14550" % viewerip
     if map:
-        options += ' --map --console'
+        options += ' --map'
 
     sil = util.start_SIL('APMrover2', wipe=True)
     mavproxy = util.start_MAVProxy_SIL('APMrover2', options=options)
@@ -113,7 +114,10 @@ def drive_APMrover2(viewerip=None, map=False):
     print("buildlog=%s" % buildlog)
     if os.path.exists(buildlog):
         os.unlink(buildlog)
-    os.link(logfile, buildlog)
+    try:
+        os.link(logfile, buildlog)
+    except Exception:
+        pass
 
     mavproxy.expect('Received [0-9]+ parameters')
 

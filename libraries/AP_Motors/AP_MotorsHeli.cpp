@@ -1,12 +1,23 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
  *       AP_MotorsHeli.cpp - ArduCopter motors library
  *       Code by RandyMackay. DIYDrones.com
  *
- *       This library is free software; you can redistribute it and/or
- *   modify it under the terms of the GNU Lesser General Public
- *   License as published by the Free Software Foundation; either
- *   version 2.1 of the License, or (at your option) any later version.
  */
 #include <stdlib.h>
 #include <AP_HAL.h>
@@ -532,6 +543,19 @@ static long map(long x, long in_min, long in_max, long out_min, long out_max)
 
 
 void AP_MotorsHeli::rsc_control() {
+
+    if (armed() && (rsc_ramp >= rsc_ramp_up_rate)){                     // rsc_ramp will never increase if rsc_mode = 0
+        if (motor_runup_timer < MOTOR_RUNUP_TIME){                      // therefore motor_runup_complete can never be true
+            motor_runup_timer++;
+        } else {
+            motor_runup_complete = true;
+        }
+    } else {
+        motor_runup_complete = false;                                   // motor_runup_complete will go to false if we
+        motor_runup_timer = 0;                                          // disarm or wind down the motor
+    }
+
+
     switch ( rsc_mode ) {
 
     case AP_MOTORSHELI_RSC_MODE_CH8_PASSTHROUGH:
@@ -570,30 +594,6 @@ void AP_MotorsHeli::rsc_control() {
         }
         hal.rcout->write(AP_MOTORS_HELI_EXT_RSC, rsc_output);
         break;
-
-    //	case 3:																		// Open Loop ESC Control
-    //
-    //	coll_scaled = _motors->coll_out_scaled + 1000;
-    //	if(coll_scaled <= _motors->collective_mid){
-    //		esc_ol_output = map(coll_scaled, _motors->collective_min, _motors->collective_mid, esc_out_low, esc_out_mid);		// Bottom half of V-curve
-    //	} else if (coll_scaled > _motors->collective_mid){
-    //		esc_ol_output = map(coll_scaled, _motors->collective_mid, _motors->collective_max, esc_out_mid, esc_out_high);		// Top half of V-curve
-    //	} else { esc_ol_output = 1000; }																									// Just in case.
-    //
-    //	if(_motors->armed() && _rc_throttle->control_in > 10){
-    //			if (ext_esc_ramp < ext_esc_ramp_up){
-    //				ext_esc_ramp++;
-    //				ext_esc_output = map(ext_esc_ramp, 0, ext_esc_ramp_up, 1000, esc_ol_output);
-    //			} else {
-    //				ext_esc_output = esc_ol_output;
-    //			}
-    //		} else {
-    //			ext_esc_ramp = 0;	//Return ESC Ramp to 0
-    //			ext_esc_output = 1000; //Just to be sure ESC output is 0
-    //}
-    //		hal.rcout->write(AP_MOTORS_HELI_EXT_ESC, ext_esc_output);
-    //	break;
-
 
     default:
         break;

@@ -11,33 +11,12 @@ static void init_sonar(void)
 #endif
 }
 
-// Sensors are not available in HIL_MODE_ATTITUDE
-#if HIL_MODE != HIL_MODE_ATTITUDE
-
-void ReadSCP1000(void) {}
-
-#endif // HIL_MODE != HIL_MODE_ATTITUDE
-
+// read_battery - reads battery voltage and current and invokes failsafe
+// should be called at 10hz
 static void read_battery(void)
 {
-	if(g.battery_monitoring == 0) {
-		battery_voltage1 = 0;
-		return;
-	}
-	
-    if(g.battery_monitoring == 3 || g.battery_monitoring == 4) {
-        // this copes with changing the pin at runtime
-        batt_volt_pin->set_pin(g.battery_volt_pin);
-        battery_voltage1 = BATTERY_VOLTAGE(batt_volt_pin);
-    }
-    if(g.battery_monitoring == 4) {
-        // this copes with changing the pin at runtime
-        batt_curr_pin->set_pin(g.battery_curr_pin);
-        current_amps1    = CURRENT_AMPS(batt_curr_pin);
-        current_total1   += current_amps1 * (float)delta_ms_medium_loop * 0.0002778;                                    // .0002778 is 1/3600 (conversion to hours)
-    }
+    battery.read();
 }
-
 
 // read the receiver RSSI as an 8 bit number for MAVLink
 // RC_CHANNELS_SCALED message

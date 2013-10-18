@@ -5,23 +5,27 @@
 
 #include <AP_AHRS.h>
 #include <AP_Common.h>
-#include <math.h> // for fabs()
+#include <AP_Vehicle.h>
+#include <math.h>
 
 class AP_PitchController {
 public:
-	AP_PitchController() { 
+	AP_PitchController(AP_AHRS &ahrs, const AP_Vehicle::FixedWing &parms) :
+		aparm(parms),
+        _ahrs(ahrs)
+    { 
 		AP_Param::setup_object_defaults(this, var_info);
 	}
 
-	void set_ahrs(AP_AHRS *ahrs) { _ahrs = ahrs; }
-
-	int32_t get_servo_out(int32_t angle, float scaler = 1.0, bool stabilize = false, int16_t aspd_min = 0, int16_t aspd_max = 0);
+	int32_t get_rate_out(float desired_rate, float scaler);
+	int32_t get_servo_out(int32_t angle_err, float scaler, bool disable_integrator);
 
 	void reset_I();
 
 	static const struct AP_Param::GroupInfo var_info[];
 
 private:
+	const AP_Vehicle::FixedWing &aparm;
 	AP_Float _tau;
 	AP_Float _K_P;
 	AP_Float _K_I;
@@ -29,12 +33,16 @@ private:
 	AP_Int16 _max_rate_pos;
 	AP_Int16 _max_rate_neg;
 	AP_Float _roll_ff;
+    AP_Int16  _imax;
 	uint32_t _last_t;
 	float _last_out;
 	
 	float _integrator;
+
+	int32_t _get_rate_out(float desired_rate, float scaler, bool disable_integrator, float aspeed);
+    float   _get_coordination_rate_offset(float &aspeed, bool &inverted) const;
 	
-	AP_AHRS *_ahrs;
+	AP_AHRS &_ahrs;
 	
 };
 

@@ -121,14 +121,8 @@ static void set_next_WP(const struct Location *wp)
     }
 
 	// this is handy for the groundstation
-	wp_totalDistance 	= get_distance(&current_loc, &next_WP);
+	wp_totalDistance 	= get_distance(current_loc, next_WP);
 	wp_distance 		= wp_totalDistance;
-	target_bearing 		= get_bearing_cd(&current_loc, &next_WP);
-	nav_bearing 		= target_bearing;
-
-	// set a new crosstrack bearing
-	// ----------------------------
-	reset_crosstrack();
 }
 
 static void set_guided_WP(void)
@@ -142,13 +136,8 @@ static void set_guided_WP(void)
 	next_WP = guided_WP;
 
 	// this is handy for the groundstation
-	wp_totalDistance 	= get_distance(&current_loc, &next_WP);
+	wp_totalDistance 	= get_distance(current_loc, next_WP);
 	wp_distance 		= wp_totalDistance;
-	target_bearing 		= get_bearing_cd(&current_loc, &next_WP);
-
-	// set a new crosstrack bearing
-	// ----------------------------
-	reset_crosstrack();
 }
 
 // run this at setup on the ground
@@ -166,8 +155,8 @@ void init_home()
 
 	home.lng 	= g_gps->longitude;				// Lon * 10**7
 	home.lat 	= g_gps->latitude;				// Lat * 10**7
-    gps_base_alt    = max(g_gps->altitude, 0);
-    home.alt        = g_gps->altitude;
+    gps_base_alt    = max(g_gps->altitude_cm, 0);
+    home.alt        = g_gps->altitude_cm;
 	home_is_set = true;
 
 	// Save Home to EEPROM - Command 0
@@ -185,7 +174,6 @@ void init_home()
 
 static void restart_nav()
 {  
-    g.pidNavSteer.reset_I();
     g.pidSpeedThrottle.reset_I();
     prev_WP = current_loc;
     nav_command_ID = NO_COMMAND;

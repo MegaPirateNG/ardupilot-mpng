@@ -32,6 +32,8 @@ public:
         k_param_num_resets,
         k_param_reset_switch_chan,
         k_param_initial_mode,
+        k_param_scheduler,
+        k_param_relay,
 
         // IO pins
         k_param_rssi_pin = 20,
@@ -53,13 +55,15 @@ public:
         // 130: Sensor parameters
         //
         k_param_compass_enabled = 130,
+        k_param_steering_learn, // unused
 
         // 140: battery controls
-        k_param_battery_monitoring = 140,
-        k_param_volt_div_ratio,
-        k_param_curr_amp_per_volt,
+        k_param_battery_monitoring = 140,   // deprecated, can be deleted
+        k_param_volt_div_ratio,     // deprecated, can be deleted
+        k_param_curr_amp_per_volt,  // deprecated, can be deleted
         k_param_input_voltage, // deprecated, can be deleted
-        k_param_pack_capacity,
+        k_param_pack_capacity,      // deprecated, can be deleted
+        k_param_battery,
 
         //
         // 150: Navigation parameters
@@ -72,13 +76,15 @@ public:
         k_param_ch7_option,
         k_param_auto_trigger_pin,
         k_param_auto_kickstart,
+        k_param_turn_circle, // unused
+        k_param_turn_max_g,
 
         //
         // 160: Radio settings
         //
-        k_param_channel_steer = 160,
+        k_param_rc_1 = 160,
         k_param_rc_2,
-        k_param_channel_throttle,
+        k_param_rc_3,
         k_param_rc_4,
         k_param_rc_5,
         k_param_rc_6,
@@ -120,6 +126,7 @@ public:
         k_param_mode4,
         k_param_mode5,
         k_param_mode6,
+        k_param_learn_channel,
 
         //
         // 220: Waypoint data
@@ -129,16 +136,32 @@ public:
         k_param_waypoint_radius,
 
         //
+        // 230: camera control
+        //
+        k_param_camera,
+        k_param_camera_mount,
+        k_param_camera_mount2,
+
+        //
         // 240: PID Controllers
         k_param_pidNavSteer = 230,
-        k_param_pidServoSteer,
+        k_param_pidServoSteer, // unused
         k_param_pidSpeedThrottle,
+
+        // high RC channels
+        k_param_rc_9 = 235,
+        k_param_rc_10,
+        k_param_rc_11,
+        k_param_rc_12,
 
         // other objects
         k_param_sitl = 240,
         k_param_ahrs,
         k_param_ins,
         k_param_compass,
+        k_param_rcmap,
+        k_param_L1_controller,
+        k_param_steerController,
 
         // 254,255: reserved
         };
@@ -155,8 +178,6 @@ public:
 
     // IO pins
     AP_Int8     rssi_pin;
-    AP_Int8     battery_volt_pin;
-    AP_Int8     battery_curr_pin;
 
 	// Telemetry control
 	//
@@ -167,34 +188,37 @@ public:
     AP_Int8     telem_delay;
 
     // sensor parameters
-    AP_Int8	    compass_enabled;
-
-    // battery controls
-    AP_Int8	    battery_monitoring;	// 0=disabled, 3=voltage only, 4=voltage and current
-    AP_Float    volt_div_ratio;
-    AP_Float    curr_amp_per_volt;
-    AP_Int16    pack_capacity;		// Battery pack capacity less reserve    
+    AP_Int8	    compass_enabled; 
 
     // navigation parameters
     //
-    AP_Float    crosstrack_gain;
-    AP_Int16    crosstrack_entry_angle;
     AP_Float    speed_cruise;
     AP_Int8     speed_turn_gain;
     AP_Float    speed_turn_dist;    
     AP_Int8	    ch7_option;
     AP_Int8     auto_trigger_pin;
     AP_Float    auto_kickstart;
+    AP_Float    turn_max_g;
 
     // RC channels
-    RC_Channel      channel_steer;
+    RC_Channel      rc_1;
     RC_Channel_aux	rc_2;
-    RC_Channel      channel_throttle;
+    RC_Channel      rc_3;
     RC_Channel_aux  rc_4;
     RC_Channel_aux	rc_5;
     RC_Channel_aux	rc_6;
     RC_Channel_aux	rc_7;
     RC_Channel_aux	rc_8;
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+    RC_Channel_aux rc_9;
+#endif
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4
+    RC_Channel_aux rc_10;
+    RC_Channel_aux rc_11;
+#endif
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+    RC_Channel_aux rc_12;
+#endif
 
     // Throttle
     //
@@ -228,6 +252,7 @@ public:
     AP_Int8     mode4;
     AP_Int8     mode5;
     AP_Int8     mode6;
+    AP_Int8     learn_channel;
     
     // Waypoints
     //
@@ -237,25 +262,31 @@ public:
 
     // PID controllers
     //
-    PID         pidNavSteer;
-    PID         pidServoSteer;
     PID         pidSpeedThrottle;
 
     Parameters() :
         // RC channels
-        channel_steer(CH_1),
+        rc_1(CH_1),
         rc_2(CH_2),
-        channel_throttle(CH_3),
+        rc_3(CH_3),
         rc_4(CH_4),
         rc_5(CH_5),
         rc_6(CH_6),
         rc_7(CH_7),
         rc_8(CH_8),
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+        rc_9                                    (CH_9),
+#endif
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4
+        rc_10                                   (CH_10),
+        rc_11                                   (CH_11),
+#endif
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+        rc_12                                   (CH_12),
+#endif
 
         // PID controller    initial P        initial I        initial D        initial imax
         //-----------------------------------------------------------------------------------
-        pidNavSteer         (0.7,             0.1,             0.2,             2000),
-        pidServoSteer       (0.5,             0.1,             0.2,             2000),
         pidSpeedThrottle    (0.7,             0.2,             0.2,             4000)
         {}
 };

@@ -5,6 +5,7 @@
 #include <AP_Common.h>
 #include <AP_Math.h>
 #include <AP_HAL.h>
+#include <AP_Notify.h>
 #include "GPS.h"
 
 extern const AP_HAL::HAL& hal;
@@ -20,6 +21,14 @@ extern const AP_HAL::HAL& hal;
 GPS::GPS(void) :
 	// ensure all the inherited fields are zeroed
 	time(0),
+    date(0),
+    latitude(0),
+    longitude(0),
+    altitude_cm(0),
+    ground_speed_cm(0),
+    ground_course_cd(0),
+    speed_3d_cm(0),
+    hdop(0),
 	num_sats(0),
 	new_data(false),
 	fix(FIX_NONE),
@@ -74,7 +83,7 @@ GPS::update(void)
 
         if (_status >= GPS_OK_FIX_2D) {
             last_fix_time = _idleTimer;
-            _last_ground_speed_cm = ground_speed;
+            _last_ground_speed_cm = ground_speed_cm;
 
             if (_have_raw_velocity) {
                 // the GPS is able to give us velocity numbers directly
@@ -82,8 +91,8 @@ GPS::update(void)
                 _velocity_east  = _vel_east * 0.01f;
                 _velocity_down  = _vel_down * 0.01f;
             } else {
-                float gps_heading = ToRad(ground_course * 0.01f);
-                float gps_speed   = ground_speed * 0.01f;
+                float gps_heading = ToRad(ground_course_cd * 0.01f);
+                float gps_speed   = ground_speed_cm * 0.01f;
                 float sin_heading, cos_heading;
 
                 cos_heading = cosf(gps_heading);
@@ -97,6 +106,9 @@ GPS::update(void)
             }
         }
     }
+
+    // update notify with gps status
+    AP_Notify::flags.gps_status = _status;
 }
 
 void

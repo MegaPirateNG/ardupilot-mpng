@@ -27,12 +27,14 @@
 # define MAG_BOARD_ORIENTATION ROTATION_YAW_180
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
 # define MAG_BOARD_ORIENTATION ROTATION_NONE
+#elif CONFIG_HAL_BOARD == HAL_BOARD_FLYMAPLE
+# define MAG_BOARD_ORIENTATION ROTATION_NONE
 #elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
 # define MAG_BOARD_ORIENTATION ROTATION_NONE
 #elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
 # define MAG_BOARD_ORIENTATION ROTATION_NONE
-#elif CONFIG_HAL_BOARD == HAL_BOARD_SMACCM
-# define MAG_BOARD_ORIENTATION ROTATION_PITCH_180
+#elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
+# define MAG_BOARD_ORIENTATION ROTATION_YAW_90
 #else
 # error "You must define a default compass orientation for this board"
 #endif
@@ -137,7 +139,7 @@ public:
     /// @param  comp_type           0 = disabled, 1 = enabled use throttle, 2 = enabled use current
     ///
     void motor_compensation_type(const uint8_t comp_type) {
-        if( comp_type >= AP_COMPASS_MOT_COMP_DISABLED && _motor_comp_type <= AP_COMPASS_MOT_COMP_CURRENT && _motor_comp_type != (int8_t)comp_type) {
+        if (_motor_comp_type <= AP_COMPASS_MOT_COMP_CURRENT && _motor_comp_type != (int8_t)comp_type) {
             _motor_comp_type = (int8_t)comp_type;
             _thr_or_curr = 0;                               // set current current or throttle to zero
             set_motor_compensation(Vector3f(0,0,0));        // clear out invalid compensation vector
@@ -199,6 +201,7 @@ protected:
     AP_Float _declination;
     AP_Int8 _use_for_yaw;                       ///<enable use for yaw calculation
     AP_Int8 _auto_declination;                  ///<enable automatic declination code
+    AP_Int8 _external;                          ///<compass is external
 
     bool _null_init_done;                           ///< first-time-around flag used by offset nulling
 
