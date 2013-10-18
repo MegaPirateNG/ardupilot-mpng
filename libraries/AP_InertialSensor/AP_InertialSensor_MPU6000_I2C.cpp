@@ -221,14 +221,15 @@ uint16_t AP_InertialSensor_MPU6000_I2C::_init_sensor(Sample_rate sample_rate )
      * _read_data_transaction requires the spi semaphore to be taken by
      * its caller. */
     _ins_timer = hal.scheduler->micros();
-    
-//		hal.gpio->pinMode(46, GPIO_OUTPUT); // Debug output
-//		hal.gpio->write(46,0); 
-//		hal.gpio->pinMode(45, GPIO_OUTPUT); // Debug output
-//		hal.gpio->write(45,0); 
+
+    _read_data_transaction();    
+		hal.gpio->pinMode(46, GPIO_OUTPUT); // Debug output
+		hal.gpio->write(46,0); 
+		hal.gpio->pinMode(45, GPIO_OUTPUT); // Debug output
+		hal.gpio->write(45,0); 
 
     // start the timer process to read samples
-    hal.scheduler->register_timer_process(_poll_data);
+    hal.scheduler->register_timer_process(AP_HAL_MEMBERPROC(&AP_InertialSensor_MPU6000_I2C::_poll_data));
 	return _mpu6000_product_id;
 }
 
@@ -240,18 +241,19 @@ static volatile int32_t _sum[6];
 static volatile uint16_t _count;
 
 /*================ AP_INERTIALSENSOR PUBLIC INTERFACE ==================== */
-void AP_InertialSensor_MPU6000_I2C::wait_for_sample()
+bool AP_InertialSensor_MPU6000_I2C::wait_for_sample(uint16_t timeout_ms)
 {
-    uint32_t tstart = hal.scheduler->micros();
-    while (num_samples_available() == 0) {
-        uint32_t now = hal.scheduler->micros();
-        uint32_t dt = now - tstart;
-        if (dt > 50000) {
-            hal.scheduler->panic(
-                    PSTR("PANIC: AP_InertialSensor_MPU6000::update "
-                        "waited 50ms for data from interrupt"));
+    if (sample_available()) {
+        return true;
+    }
+    uint32_t start = hal.scheduler->millis();
+    while ((hal.scheduler->millis() - start) < timeout_ms) {
+        hal.scheduler->delay_microseconds(100);
+        if (sample_available()) {
+            return true;
         }
     }
+    return false;
 }
 
 bool AP_InertialSensor_MPU6000_I2C::update( void )
@@ -261,7 +263,9 @@ bool AP_InertialSensor_MPU6000_I2C::update( void )
 	Vector3f accel_scale = _accel_scale.get();
 
     // wait for at least 1 sample
-    wait_for_sample();
+    if (!wait_for_sample(1000)) {
+        return false;
+    }
 
     // disable timer procs for mininum time
     hal.scheduler->suspend_timer_procs();
@@ -319,8 +323,12 @@ float AP_InertialSensor_MPU6000_I2C::_temp_to_celsius ( uint16_t regval )
     return 20.0;
 }
 
-void AP_InertialSensor_MPU6000_I2C::_poll_data(uint32_t now)
+void AP_InertialSensor_MPU6000_I2C::_poll_data(void)
 {
+	hal.gpio->write(46,1); 
+
+	uint32_t now = hal.scheduler->micros();
+	
 	if ( (now - _ins_timer > _micros_per_sample) || (_sens_stage == 1)) {
 //	  hal.gpio->write(46,1); 
 	
@@ -339,7 +347,7 @@ void AP_InertialSensor_MPU6000_I2C::_poll_data(uint32_t now)
 							_ins_timer = now;
 						}
 
-          	_read_data_transaction(); 
+              	_read_data_transaction(); 
 						
 	          _i2c_sem->give();
 	      } else {
@@ -349,7 +357,7 @@ void AP_InertialSensor_MPU6000_I2C::_poll_data(uint32_t now)
 	      }
 	  }
 	}
-//  hal.gpio->write(46,0); 
+  hal.gpio->write(46,0); 
 }
 
 // return the MPU6k gyro drift rate in radian/s/s
@@ -361,30 +369,24 @@ float AP_InertialSensor_MPU6000_I2C::get_gyro_drift_rate(void)
 }
 
 // get number of samples read from the sensors
-uint16_t AP_InertialSensor_MPU6000_I2C::num_samples_available()
+bool AP_InertialSensor_MPU6000_I2C::sample_available()
 {
-    return _count; 
+    return _count > 0; 
 }
 
 /*================ HARDWARE FUNCTIONS ==================== */
 
 void AP_InertialSensor_MPU6000_I2C::_read_data_from_timerprocess()
 {
-    static uint8_t semfail_ctr = 0;
-    bool got = _i2c_sem->take_nonblocking();
-    if (!got) { 
-        semfail_ctr++;
-//	  hal.gpio->write(46,1); 
-        if (semfail_ctr > 100) {
-            hal.scheduler->panic(PSTR("PANIC: failed to take I2C semaphore "
-                        "100 times in AP_InertialSensor_MPU6000::"
-                        "_read_data_from_timerprocess"));
-        }
-//	  hal.gpio->write(46,0); 
+    if (!_i2c_sem->take_nonblocking()) {
+        /*
+          the semaphore being busy is an expected condition when the
+          mainline code is calling sample_available() which will
+          grab the semaphore. We return now and rely on the mainline
+          code grabbing the latest sample.
+         */
         return;
-    } else {
-        semfail_ctr = 0;
-    }   
+    }  
 
     _read_data_transaction();
 
@@ -393,8 +395,10 @@ void AP_InertialSensor_MPU6000_I2C::_read_data_from_timerprocess()
 
 void AP_InertialSensor_MPU6000_I2C::_read_data_transaction()
 {
+//  hal.gpio->write(45,1); 
 	uint8_t rawMPU[6];
 	memset(rawMPU,0,6);
+	hal.i2c->setHighSpeed(true); // Set I2C fast speed
 	// now read the data
 	if (_sens_stage == 0) {
 		// Read Accel
@@ -420,6 +424,7 @@ void AP_InertialSensor_MPU6000_I2C::_read_data_transaction()
 
 		_sens_stage = 0;
 	}
+//	hal.gpio->write(45,0); 
 }
 
 void AP_InertialSensor_MPU6000_I2C::hardware_init_i2c_bypass()

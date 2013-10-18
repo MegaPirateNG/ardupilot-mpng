@@ -87,7 +87,7 @@
  
  #if MPNG_BOARD_TYPE == HK_RED_MULTIWII_PRO || MPNG_BOARD_TYPE == BLACK_VORTEX
 	 # define CONFIG_IMU_TYPE   CONFIG_IMU_ITG3200
-	 # define CONFIG_BARO       AP_BARO_BMP085_MPNG
+	 # define CONFIG_BARO       AP_BARO_BMP085
  #else
 	 # define CONFIG_IMU_TYPE   CONFIG_IMU_MPU6000_I2C
 	 # define CONFIG_BARO       AP_BARO_MS5611
@@ -202,13 +202,8 @@
  # define BATTERY_VOLT_PIN      0      // Battery voltage on A0
  # define BATTERY_CURR_PIN      1      // Battery current on A1
 #elif CONFIG_HAL_BOARD == HAL_BOARD_MPNG
- # define A_LED_PIN        13
- # define B_LED_PIN        31
- # define C_LED_PIN        30
  # define LED_ON           HIGH
  # define LED_OFF          LOW
- # define PUSHBUTTON_PIN   (-1)
- # define USB_MUX_PIN      (-1)
  # define BATTERY_VOLT_PIN      1      // Battery voltage on A1
  # define BATTERY_CURR_PIN      2      // Battery current on A2
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
@@ -279,7 +274,7 @@
 #else
  // not supported yet on this board
  #undef COPTER_LEDS
-
+#endif
 
 
 //////////////////////////////////////////////////////////////////////////////

@@ -265,8 +265,9 @@ void MPNGRCInput::init(void* _isrregistry) {
 //	hal.gpio->pinMode(46, GPIO_OUTPUT); // ICP5 pin (PL1) (PPM input) CRIUS v2
 //	hal.gpio->write(46,0);
 
-	TCCR5A = 0; //standard mode with overflow at A and OC B and C interrupts
-	TCCR5B = (1<<CS11); //Prescaler set to 8, resolution of 0.5us
+	//Timer5 already configured in Scheduler
+	//TCCR5A = 0; //standard mode with overflow at A and OC B and C interrupts
+	//TCCR5B = (1<<CS11); //Prescaler set to 8, resolution of 0.5us
 
 #if SERIAL_PPM == SERIAL_PPM_DISABLED
 		FireISRRoutine = _pwm_A8_A15_isr;
@@ -283,8 +284,8 @@ void MPNGRCInput::init(void* _isrregistry) {
 		hal.gpio->pinMode(48, GPIO_INPUT); // ICP5 pin (PL1) (PPM input) CRIUS v2
 		ISRRegistry* isrregistry = (ISRRegistry*) _isrregistry;
 		isrregistry->register_signal(ISR_REGISTRY_TIMER5_CAPT, _ppmsum_PL1_isr);
-		TCCR5B = (1<<CS11) | (1<<ICES5); //Prescaler set to 8, resolution of 0.5us, input capture on rising edge 
-		TIMSK5 |= (1<<ICIE5); // Enable Input Capture interrupt. Timer interrupt mask  
+		TCCR5B |= (1<<ICES5); // Enable input capture on rising edge 
+		TIMSK5 |= (1<<ICIE5); // Enable input capture interrupt. Timer interrupt mask  
 		PCMSK2 = 0;	// Disable INT for pin A8-A15
 #else
 #error You must check SERIAL_PPM mode, something wrong

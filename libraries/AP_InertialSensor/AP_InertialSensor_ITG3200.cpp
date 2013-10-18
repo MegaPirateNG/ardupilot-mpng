@@ -84,7 +84,7 @@ uint16_t AP_InertialSensor_ITG3200::_init_sensor(Sample_rate sample_rate)
     _ins_timer = hal.scheduler->micros();
 
     // start the timer process to read samples
-    hal.scheduler->register_timer_process(_poll_data);
+    hal.scheduler->register_timer_process(AP_HAL_MEMBERPROC(&AP_InertialSensor_ITG3200::_poll_data));
 	return 1;
 	
 }
@@ -98,17 +98,19 @@ static volatile uint16_t _count;
 
 /*================ AP_INERTIALSENSOR PUBLIC INTERFACE ==================== */
 
-void AP_InertialSensor_ITG3200::wait_for_sample()
+bool AP_InertialSensor_ITG3200::wait_for_sample(uint16_t timeout_ms)
 {
-    uint32_t tstart = hal.scheduler->micros();
-    while (num_samples_available() == 0) {
-        uint32_t now = hal.scheduler->micros();
-        uint32_t dt = now - tstart;
-        if (dt > 50000) {
-            hal.scheduler->panic(
-                    PSTR("PANIC: AP_InertialSensor_ITG3200::update waited 50ms for data from interrupt"));
+    if (sample_available()) {
+        return true;
+    }
+    uint32_t start = hal.scheduler->millis();
+    while ((hal.scheduler->millis() - start) < timeout_ms) {
+        hal.scheduler->delay_microseconds(100);
+        if (sample_available()) {
+            return true;
         }
     }
+    return false;
 }
 
 bool AP_InertialSensor_ITG3200::update( void )
@@ -117,8 +119,10 @@ bool AP_InertialSensor_ITG3200::update( void )
 	float count_scale;
 	Vector3f accel_scale = _accel_scale.get();
 		
-	// wait for at least 1 sample
-	wait_for_sample();
+  // wait for at least 1 sample
+  if (!wait_for_sample(1000)) {
+      return false;
+  }
 
 	// disable interrupts for mininum time
 	hal.scheduler->suspend_timer_procs();
@@ -173,8 +177,9 @@ float AP_InertialSensor_ITG3200::_temp_to_celsius ( uint16_t regval )
     return 20.0;
 }
 
-void AP_InertialSensor_ITG3200::_poll_data(uint32_t now)
+void AP_InertialSensor_ITG3200::_poll_data(void)
 {
+	uint32_t now = hal.scheduler->micros();
 	if (now - _ins_timer > _micros_per_sample) {
 		_ins_timer = now;
 	
@@ -204,29 +209,26 @@ float AP_InertialSensor_ITG3200::get_gyro_drift_rate(void)
 }
 
 // get number of samples read from the sensors
-uint16_t AP_InertialSensor_ITG3200::num_samples_available()
+bool AP_InertialSensor_ITG3200::sample_available()
 {
-    return _count; 
+    return _count > 0; 
 }
+
 
 
 
 /*================ HARDWARE FUNCTIONS ==================== */
 void AP_InertialSensor_ITG3200::_read_data_from_timerprocess()
 {
-    static uint8_t semfail_ctr = 0;
-    bool got = _i2c_sem->take_nonblocking();
-    if (!got) { 
-        semfail_ctr++;
-        if (semfail_ctr > 100) {
-            hal.scheduler->panic(PSTR("PANIC: failed to take I2C semaphore "
-                        "100 times in AP_InertialSensor_ITG3200::"
-                        "_read_data_from_timerprocess"));
-        }
+    if (!_i2c_sem->take_nonblocking()) {
+        /*
+          the semaphore being busy is an expected condition when the
+          mainline code is calling sample_available() which will
+          grab the semaphore. We return now and rely on the mainline
+          code grabbing the latest sample.
+         */
         return;
-    } else {
-        semfail_ctr = 0;
-    }   
+    }
 
     _read_data_transaction();
 

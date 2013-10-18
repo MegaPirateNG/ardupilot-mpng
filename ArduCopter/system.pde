@@ -126,6 +126,15 @@ static void init_ardupilot()
     copter_leds_init();
 #endif
 
+/*		hal.gpio->pinMode(46, GPIO_OUTPUT); // Debug output
+		hal.gpio->write(46,0); 
+		while (true) {
+			hal.gpio->write(46,1);
+			hal.scheduler->delay(100);
+			hal.gpio->write(46,0);
+			hal.scheduler->delay(100);
+		}*/
+
     // load parameters from EEPROM
     load_parameters();
 

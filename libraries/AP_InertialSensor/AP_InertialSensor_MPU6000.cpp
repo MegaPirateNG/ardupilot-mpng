@@ -224,7 +224,6 @@ uint16_t AP_InertialSensor_MPU6000::_init_sensor( Sample_rate sample_rate )
     /* read the first lot of data.
      * _read_data_transaction requires the spi semaphore to be taken by
      * its caller. */
-    _last_sample_time_micros = hal.scheduler->micros();
     _read_data_transaction();
 
     // start the timer process to read samples
@@ -368,7 +367,6 @@ void AP_InertialSensor_MPU6000::_poll_data(void)
             /* Synchronous read - take semaphore */
             bool got = _spi_sem->take(10);
             if (got) {
-                _last_sample_time_micros = hal.scheduler->micros();
                 _read_data_transaction(); 
                 _spi_sem->give();
             } else {
@@ -398,7 +396,6 @@ void AP_InertialSensor_MPU6000::_read_data_from_timerprocess()
         return;
     }   
 
-    _last_sample_time_micros = hal.scheduler->micros();
     _read_data_transaction();
 
     _spi_sem->give();

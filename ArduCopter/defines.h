@@ -424,7 +424,6 @@ enum ap_message {
 #define AP_BARO_BMP085    1
 #define AP_BARO_MS5611    2
 #define AP_BARO_PX4       3
-#define AP_BARO_BMP085_MPNG    4
 
 #define AP_BARO_MS5611_SPI 1
 #define AP_BARO_MS5611_I2C 2

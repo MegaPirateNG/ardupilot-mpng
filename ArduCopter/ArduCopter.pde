@@ -22,11 +22,6 @@
  *  Based on code and ideas from the Arducopter team: Pat Hickey, Jose Julio, Jani Hirvinen, Andrew Tridgell, Justin Beech, Adam Rivera, Jean-Louis Naudin, Roberto Navoni
  *  Thanks to:	Chris Anderson, Mike Smith, Jordi Munoz, Doug Weibel, James Goppert, Benjamin Pelletier, Robert Lefebvre, Marco Robustini
  *
- *  This firmware is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
  *  Special Thanks for Contributors (in alphabetical order by first name):
  *
  *  Adam M Rivera		:Auto Compass Declination
@@ -258,8 +253,6 @@ static SITL sitl;
 static AP_Baro_BMP085 barometer;
   #elif CONFIG_BARO == AP_BARO_PX4
 static AP_Baro_PX4 barometer;
-  #elif CONFIG_BARO == AP_BARO_BMP085_MPNG
-      static AP_Baro_BMP085_MPNG barometer;
   #elif CONFIG_BARO == AP_BARO_MS5611
    #if CONFIG_MS5611_SERIAL == AP_BARO_MS5611_SPI
 static AP_Baro_MS5611 barometer(&AP_Baro_MS5611::spi);
@@ -872,15 +865,15 @@ AP_Param param_loader(var_info, WP_START_BYTE);
  */
 static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { throttle_loop,         2,     450 },
-    { update_navigation,     10,    500 }, // 1
+    { update_GPS,            2,     900 },
     { update_nav_mode,       1,     400 },
     { update_batt_compass,  10,     720 },
     { read_aux_switches,    10,      50 },
     { arm_motors_check,     10,      10 },
     { auto_trim,            10,     140 },
     { update_toy_throttle,  10,      50 },
-    { gcs_send_heartbeat,  100,     700 }, // 8
-    { gcs_send_deferred,     2,    1200 }, // 10
+    { update_altitude,      10,    1000 },
+    { run_nav_updates,      10,     800 },
     { three_hz_loop,        33,      90 },
     { compass_accumulate,    2,     420 },
     { barometer_accumulate,  2,     250 },
@@ -1154,8 +1147,6 @@ static void ten_hz_logging_loop()
         if (g.log_bitmask & MASK_LOG_MOTORS) {
             Log_Write_Motors();
         }
-        // update board leds
-        update_board_leds();
     }
 }
 

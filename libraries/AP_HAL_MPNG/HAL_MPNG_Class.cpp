@@ -28,7 +28,6 @@ static AVRI2CDriver     avrI2CDriver(&i2cSemaphore);
 static MPNGSPIDeviceManager mpngSPIDriver;
 static AVRAnalogIn      avrAnalogIn;
 static AVREEPROMStorage avrEEPROMStorage;
-static AVRConsoleDriver consoleDriver;
 static AVRGPIO          avrGPIO;
 static MPNGRCInput      mpngRCInput;
 static MPNGRCOutput     mpngRCOutput;
@@ -46,7 +45,7 @@ HAL_MPNG::HAL_MPNG() :
         &mpngSPIDriver,
         &avrAnalogIn,
         &avrEEPROMStorage,
-        &consoleDriver,
+        &avrUart0Driver,
         &avrGPIO,
         &mpngRCInput,
         &mpngRCOutput,
@@ -57,12 +56,10 @@ HAL_MPNG::HAL_MPNG() :
 void HAL_MPNG::init(int argc, char * const argv[]) const {
 
     scheduler->init((void*)&isrRegistry);
-    
-   
+
     /* uartA is the serial port used for the console, so lets make sure
      * it is initialized at boot */
     uartA->begin(115200);
-    console->init((void*)uartA);
     /* The AVR RCInput drivers take an AP_HAL_MPNG::ISRRegistry*
      * as the init argument */
     rcin->init((void*)&isrRegistry);

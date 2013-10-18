@@ -3,7 +3,7 @@
 // User specific config file.  Any items listed in config.h can be overridden here.
 
 // Select Megapirate board type:
-#define MPNG_BOARD_TYPE   RCTIMER_CRIUS_V2
+#define MPNG_BOARD_TYPE   CRIUS_V1
 /*
   RCTIMER_CRIUS_V2    -- (DEFAULT!!!) Use ONLY for RCTimer CRIUS V2 board
   CRIUS_V1            -- Use this define for RCTimer CRIUS V1(1.1) board and all HobbyKing AIOP boards
@@ -56,9 +56,6 @@
 //#define THROTTLE_IN_DEADBAND   100
 
 //#define HIL_MODE              HIL_MODE_SENSORS    // build for hardware-in-the-loop simulation
-
-//#define HIL_MODE              HIL_MODE_SENSORS    // build for hardware-in-the-loop simulation
-//#define HIL_MODE              HIL_MODE_ATTITUDE    // build for hardware-in-the-loop simulation
 
 // If Arduino IDE hang while uploading firmware to your board, try to change string below, just enter some random characters
 #define BOOTLOADER_BUGFIX "234fs34567"

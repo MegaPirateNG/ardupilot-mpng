@@ -20,7 +20,9 @@ public:
     float               get_gyro_drift_rate();
 
     // num_samples_available - get number of samples read from the sensors
-    uint16_t            num_samples_available();
+    bool            sample_available();
+    bool                        wait_for_sample(uint16_t timeout_ms);
+    void                 _poll_data(void);
 
     // get_delta_time returns the time period in seconds overwhich the sensor data was collected
     float            	get_delta_time();
@@ -36,8 +38,6 @@ private:
 
     static void                 _read_data_from_timerprocess();
     static void                 _read_data_transaction();
-    static void                 _poll_data(uint32_t now);
-    void                        wait_for_sample();
     bool                        hardware_init(Sample_rate sample_rate);
 
     static AP_HAL::Semaphore *_i2c_sem;
