@@ -149,10 +149,6 @@ void MPNGRCInput::_ppmsum_A8_isr(void)
 				}
 				// Count always even if we will get more then NUM_CHANNELS >> fault detection.
 				curr_ch_number++;
-	
-				if (curr_ch_number > AVR_RC_INPUT_NUM_CHANNELS) {
-					GotFirstSynch = false;						//reset decoder
-				}
 			}
 
 			// Process First SYNCH
