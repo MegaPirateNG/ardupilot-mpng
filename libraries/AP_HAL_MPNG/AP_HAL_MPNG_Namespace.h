@@ -9,12 +9,9 @@ namespace MPNG {
     class AVRI2CDriver;
     class MPNGSPIDeviceManager;
     class AVRSPI0DeviceDriver;
-    class AVRSPI2DeviceDriver;
-    class AVRSPI3DeviceDriver;
     class ADCSource;
     class AVRAnalogIn;
     class AVREEPROMStorage;
-    class AVRConsoleDriver;
     class AVRGPIO;
     class AVRDigitalSource;
     class MPNGRCInput;

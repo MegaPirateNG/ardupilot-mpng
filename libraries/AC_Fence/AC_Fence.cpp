@@ -39,9 +39,17 @@ const AP_Param::GroupInfo AC_Fence::var_info[] PROGMEM = {
     // @DisplayName: Circular Fence Radius
     // @Description: Circle fence radius which when breached will cause an RTL
     // @Units: Meters
-    // @Range: 0 10000
+    // @Range: 30 10000
     // @User: Standard
     AP_GROUPINFO("RADIUS",      4,  AC_Fence,   _circle_radius, AC_FENCE_CIRCLE_RADIUS_DEFAULT),
+
+    // @Param: MARGIN
+    // @DisplayName: Fence Margin
+    // @Description: Distance that autopilot's should maintain from the fence to avoid a breach
+    // @Units: Meters
+    // @Range: 1 10
+    // @User: Standard
+    AP_GROUPINFO("MARGIN",      5,  AC_Fence,   _margin, AC_FENCE_MARGIN_DEFAULT),
     
     AP_GROUPEND
 };

@@ -3,13 +3,10 @@
 /*
  *  ArduPlane parameter definitions
  *
- *  This firmware is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
  */
 
 #define GSCALAR(v, name, def) { g.v.vtype, name, Parameters::k_param_ ## v, &g.v, {def_value : def} }
+#define ASCALAR(v, name, def) { aparm.v.vtype, name, Parameters::k_param_ ## v, &aparm.v, {def_value : def} }
 #define GGROUP(v, name, class) { AP_PARAM_GROUP, name, Parameters::k_param_ ## v, &g.v, {group_info : class::var_info} }
 #define GOBJECT(v, name, class) { AP_PARAM_GROUP, name, Parameters::k_param_ ## v, &v, {group_info : class::var_info} }
 
@@ -62,14 +59,6 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Standard
     GSCALAR(kff_rudder_mix,         "KFF_RDDRMIX",    RUDDER_MIX),
 
-    // @Param: KFF_PTCH2THR
-    // @DisplayName: Pitch to Throttle Mix
-    // @Description: Pitch to throttle feed-forward gain.
-    // @Range: 0 5
-    // @Increment: 0.01
-    // @User: Advanced
-    GSCALAR(kff_pitch_to_throttle,  "KFF_PTCH2THR",   0),
-
     // @Param: KFF_THR2PTCH
     // @DisplayName: Throttle to Pitch Mix
     // @Description: Throttle to pitch feed-forward gain.
@@ -85,9 +74,23 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Advanced
     GSCALAR(stick_mixing,           "STICK_MIXING",   STICK_MIXING_FBW),
 
+    // @Param: SKIP_GYRO_CAL
+    // @DisplayName: Skip gyro calibration
+    // @Description: When enabled this tells the APM to skip the normal gyroscope calibration at startup, and instead use the saved gyro calibration from the last flight. You should only enable this if you are careful to check that your aircraft has good attitude control before flying, as some boards may have significantly different gyro calibration between boots, especially if the temperature changes a lot. If gyro calibration is skipped then APM relies on using the gyro drift detection code to get the right gyro calibration in the few minutes after it boots. This option is mostly useful where the requirement to hold the plane still while it is booting is a significant problem.
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Advanced
+    GSCALAR(skip_gyro_cal,           "SKIP_GYRO_CAL",   0),
+
+    // @Param: AUTO_FBW_STEER
+    // @DisplayName: Use FBWA steering in AUTO
+    // @Description: When enabled this option gives FBWA navigation and steering in AUTO mode. This can be used to allow manual stabilised piloting with waypoint logic for triggering payloads. With this enabled the pilot has the same control over the plane as in FBWA mode, and the normal AUTO navigation is completely disabled. This option is not recommended for normal use.
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Advanced
+    GSCALAR(auto_fbw_steer,          "AUTO_FBW_STEER",   0),
+
     // @Param: TKOFF_THR_MINSPD
     // @DisplayName: Takeoff throttle min speed
-    // @Description: Minimum GPS ground speed in m/s before un-suppressing throttle in auto-takeoff. This is meant to be used for catapult launches where you want the motor to engage only after the plane leaves the catapult. Note that the GPS velocity will lag the real velocity by about 0.5seconds.
+    // @Description: Minimum GPS ground speed in m/s used by the speed check that un-suppresses throttle in auto-takeoff. This can be be used for catapult launches where you want the motor to engage only after the plane leaves the catapult, but it is preferable to use the TKOFF_THR_MINACC and TKOFF_THR_DELAY parameters for cvatapult launches due to the errors associated with GPS measurements. For hand launches with a pusher prop it is strongly advised that this parameter be set to a value no less than 4 m/s to provide additional protection against premature motor start. Note that the GPS velocity will lag the real velocity by about 0.5 seconds. The ground speed check is delayed by the TKOFF_THR_DELAY parameter.
     // @Units: m/s
     // @Range: 0 30
     // @Increment: 0.1
@@ -96,12 +99,21 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: TKOFF_THR_MINACC
     // @DisplayName: Takeoff throttle min acceleration
-    // @Description: Minimum forward acceleration in m/s/s before un-suppressing throttle in auto-takeoff. This is meant to be used for hand launches with a tractor style (front engine) plane. If this is set then the auto takeoff will only trigger if the pitch of the plane is between -30 and +45 degrees, and the roll is less than 30 degrees. This makes it less likely it will trigger due to carrying the plane with the nose down.
+    // @Description: Minimum forward acceleration in m/s/s before arming the ground speed check in auto-takeoff. This is meant to be used for hand launches. Setting this value to 0 disables the acceleration test which means the ground speed check will always be armed which could allow GPS velocity jumps to start the engine. For hand launches this should be set to 15.
     // @Units: m/s/s
     // @Range: 0 30
     // @Increment: 0.1
     // @User: User
     GSCALAR(takeoff_throttle_min_accel,     "TKOFF_THR_MINACC",  0),
+
+    // @Param: TKOFF_THR_DELAY
+    // @DisplayName: Takeoff throttle delay
+    // @Description: This parameter sets the time delay (in 1/10ths of a second) that the ground speed check is delayed after the forward acceleration check controlled by TKOFF_THR_MINACC has passed. For hand launches with pusher propellers it is essential that this is set to a value of no less than 2 (0.2 seconds) to ensure that the aircraft is safely clear of the throwers arm before the motor can start. 
+    // @Units: 0.1 seconds
+    // @Range: 0 15
+    // @Increment: 1
+    // @User: User
+    GSCALAR(takeoff_throttle_delay,     "TKOFF_THR_DELAY",  2),
 
     // @Param: LEVEL_ROLL_LIMIT
     // @DisplayName: Level flight roll limit
@@ -153,14 +165,14 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: ALT_CTRL_ALG
     // @DisplayName: Altitude control algorithm
-    // @Description: This sets what algorithm will be used for altitude control. The default is to select the algorithm based on whether airspeed is enabled. If you set it to 1, then the airspeed based algorithm won't be used for altitude control, but airspeed can be used for other flight control functions
-    // @Values: 0:Default Method,1:non-airspeed
+    // @Description: This sets what algorithm will be used for altitude control. The default is zero, which selects the most appropriate algorithm for your airframe. Currently the default is to use TECS (total energy control system). If you set it to 1 then you will get the old (deprecated) non-airspeed based algorithm. If you set it to 3 then you will get the old (deprecated) airspeed based algorithm. Setting it to 2 selects the new 'TECS' (total energy control system) altitude control, which currently is equivalent to setting 0. Note that TECS is able to handle aircraft both with and without an airspeed sensor.
+    // @Values: 0:Automatic,1:non-airspeed(deprecated),2:TECS,3:airspeed(deprecated)
     // @User: Advanced
     GSCALAR(alt_control_algorithm, "ALT_CTRL_ALG",    ALT_CONTROL_DEFAULT),
 
     // @Param: ALT_OFFSET
     // @DisplayName: Altitude offset
-    // @Description: This is added to the target altitude in automatic flight. It can be used to add a global altitude offset to a mission, or to adjust for barometric pressure changes
+    // @Description: This is added to the target altitude in automatic flight. It can be used to add a global altitude offset to a mission
     // @Units: Meters
     // @Range: -32767 32767
     // @Increment: 1
@@ -183,12 +195,21 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: WP_RADIUS
     // @DisplayName: Waypoint Radius
-    // @Description: Defines the distance from a waypoint, that when crossed indicates the wp has been hit.
+    // @Description: Defines the distance from a waypoint that when crossed indicates the waypoint has been completed. To avoid the aircraft looping around the waypoint in case it misses by more than the WP_RADIUS an additional check is made to see if the aircraft has crossed a "finish line" passing through the waypoint and perpendicular to the flight path from the previous waypoint. If that finish line is crossed then the waypoint is considered complete.
     // @Units: Meters
     // @Range: 1 32767
     // @Increment: 1
     // @User: Standard
     GSCALAR(waypoint_radius,        "WP_RADIUS",      WP_RADIUS_DEFAULT),
+
+    // @Param: WP_MAX_RADIUS
+    // @DisplayName: Waypoint Maximum Radius
+    // @Description: Sets the maximum distance to a waypoint for the waypoint to be considered complete. This overrides the "cross the finish line" logic that is normally used to consider a waypoint complete. For normal AUTO behaviour this parameter should be set to zero. Using a non-zero value is only recommended when it is critical that the aircraft does approach within the given radius, and should loop around until it has done so. This can cause the aircraft to loop forever if its turn radius is greater than the maximum radius set.
+    // @Units: Meters
+    // @Range: 0 32767
+    // @Increment: 1
+    // @User: Standard
+    GSCALAR(waypoint_max_radius,        "WP_MAX_RADIUS",      0),
 
     // @Param: WP_LOITER_RAD
     // @DisplayName: Waypoint Loiter Radius
@@ -202,15 +223,15 @@ const AP_Param::Info var_info[] PROGMEM = {
 #if GEOFENCE_ENABLED == ENABLED
     // @Param: FENCE_ACTION
     // @DisplayName: Action on geofence breach
-    // @Description: What to do on fence breach
-    // @Values: 0:None,1:GuidedMode,2:ReportOnly
+    // @Description: What to do on fence breach. If this is set to 0 then no action is taken, and geofencing is disabled. If this is set to 1 then the plane will enter GUIDED mode, with the target waypoint as the fence return point. If this is set to 2 then the fence breach is reported to the ground station, but no other action is taken. If set to 3 then the plane enters guided mode but the pilot retains manual throttle control.
+    // @Values: 0:None,1:GuidedMode,2:ReportOnly,3:GuidedModeThrPass
     // @User: Standard
     GSCALAR(fence_action,           "FENCE_ACTION",   0),
 
     // @Param: FENCE_TOTAL
     // @DisplayName: Fence Total
     // @Description: Number of geofence points currently loaded
-    // @User: Standard
+    // @User: Advanced
     GSCALAR(fence_total,            "FENCE_TOTAL",    0),
 
     // @Param: FENCE_CHANNEL
@@ -238,34 +259,48 @@ const AP_Param::Info var_info[] PROGMEM = {
     GSCALAR(fence_maxalt,           "FENCE_MAXALT",   0),
 #endif
 
+    // @Param: RALLY_TOTAL
+    // @DisplayName: Rally Total
+    // @Description: Number of rally points currently loaded
+    // @User: Advanced
+    GSCALAR(rally_total,            "RALLY_TOTAL",    0),
+
+    // @Param: RALLY_LIMIT_KM
+    // @DisplayName: Rally Limit
+    // @Description: Maximum distance to rally point. If the closest rally point is more than this number of kilometers from the current position and the home location is closer than any of the rally points from the current position then do RTL to home rather than to the closest rally point. This prevents a leftover rally point from a different airfield being used accidentally. If this is set to 0 then the closest rally point is always used.
+    // @User: Advanced
+    // @Units: kilometers
+    // @Increment: 0.1
+    GSCALAR(rally_limit_km,          "RALLY_LIMIT_KM",    5),
+
     // @Param: ARSPD_FBW_MIN
     // @DisplayName: Fly By Wire Minimum Airspeed
-    // @Description: Airspeed corresponding to minimum throttle in Fly By Wire B mode.
+    // @Description: Airspeed corresponding to minimum throttle in auto throttle modes (FBWB, CRUISE, AUTO, GUIDED, LOITER, CIRCLE and RTL). This is a calibrated (apparent) airspeed.
     // @Units: m/s
     // @Range: 5 50
     // @Increment: 1
     // @User: Standard
-    GSCALAR(flybywire_airspeed_min, "ARSPD_FBW_MIN",  AIRSPEED_FBW_MIN),
+    ASCALAR(airspeed_min, "ARSPD_FBW_MIN",  AIRSPEED_FBW_MIN),
 
     // @Param: ARSPD_FBW_MAX
     // @DisplayName: Fly By Wire Maximum Airspeed
-    // @Description: Airspeed corresponding to maximum throttle in Fly By Wire B mode.
+    // @Description: Airspeed corresponding to maximum throttle in auto throttle modes (FBWB, CRUISE, AUTO, GUIDED, LOITER, CIRCLE and RTL). This is a calibrated (apparent) airspeed.
     // @Units: m/s
     // @Range: 5 50
     // @Increment: 1
     // @User: Standard
-    GSCALAR(flybywire_airspeed_max, "ARSPD_FBW_MAX",  AIRSPEED_FBW_MAX),
+    ASCALAR(airspeed_max, "ARSPD_FBW_MAX",  AIRSPEED_FBW_MAX),
 
     // @Param: FBWB_ELEV_REV
     // @DisplayName: Fly By Wire elevator reverse
-    // @Description: Reverse sense of elevator in FBWB. When set to 0 up elevator (pulling back on the stick) means to lower altitude. When set to 1, up elevator means to raise altitude.
+    // @Description: Reverse sense of elevator in FBWB and CRUISE modes. When set to 0 up elevator (pulling back on the stick) means to lower altitude. When set to 1, up elevator means to raise altitude.
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     GSCALAR(flybywire_elev_reverse, "FBWB_ELEV_REV",  0),
 
     // @Param: FBWB_CLIMB_RATE
     // @DisplayName: Fly By Wire B altitude change rate
-    // @Description: This sets the rate in m/s at which FBWB will change its target altitude for full elevator deflection. Note that the actual climb rate of the aircraft can be lower than this, depending on your airspeed and throttle control settings. If you have this parameter set to the default value of 2.0, then holding the elevator at maximum deflection for 10 seconds would change the target altitude by 20 meters.
+    // @Description: This sets the rate in m/s at which FBWB and CRUISE modes will change its target altitude for full elevator deflection. Note that the actual climb rate of the aircraft can be lower than this, depending on your airspeed and throttle control settings. If you have this parameter set to the default value of 2.0, then holding the elevator at maximum deflection for 10 seconds would change the target altitude by 20 meters.
     // @Range: 1-10
 	// @Increment: 0.1
     // @User: Standard
@@ -278,7 +313,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Range: 0 100
     // @Increment: 1
     // @User: Standard
-    GSCALAR(throttle_min,           "THR_MIN",        THROTTLE_MIN),
+    ASCALAR(throttle_min,           "THR_MIN",        THROTTLE_MIN),
 
     // @Param: THR_MAX
     // @DisplayName: Maximum Throttle
@@ -287,16 +322,16 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Range: 0 100
     // @Increment: 1
     // @User: Standard
-    GSCALAR(throttle_max,           "THR_MAX",        THROTTLE_MAX),
+    ASCALAR(throttle_max,           "THR_MAX",        THROTTLE_MAX),
 
     // @Param: THR_SLEWRATE
     // @DisplayName: Throttle slew rate
-    // @Description: maximum percentage change in throttle per second. A setting of 10 means to not change the throttle by more than 10% of the full throttle range in one second
+    // @Description: maximum percentage change in throttle per second. A setting of 10 means to not change the throttle by more than 10% of the full throttle range in one second.
     // @Units: Percent
     // @Range: 0 100
     // @Increment: 1
     // @User: Standard
-    GSCALAR(throttle_slewrate,      "THR_SLEWRATE",   THROTTLE_SLEW_LIMIT),
+    ASCALAR(throttle_slewrate,      "THR_SLEWRATE",   100),
 
     // @Param: THR_SUPP_MAN
     // @DisplayName: Throttle suppress manual passthru
@@ -307,7 +342,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: THR_PASS_STAB
     // @DisplayName: Throttle passthru in stabilize
-    // @Description: If this is set then when in STABILIZE or FBWA mode the throttle is a direct passthru from the transmitter. This means the THR_MIN and THR_MAX settings are not used in these modes. This is useful for petrol engines where you setup a throttle cut switch that suppresses the throttle below the normal minimum.
+    // @Description: If this is set then when in STABILIZE, FBWA or ACRO modes the throttle is a direct passthru from the transmitter. This means the THR_MIN and THR_MAX settings are not used in these modes. This is useful for petrol engines where you setup a throttle cut switch that suppresses the throttle below the normal minimum.
 	// @Values: 0:Disabled,1:Enabled
     // @User: Advanced
     GSCALAR(throttle_passthru_stabilize,"THR_PASS_STAB",   0),
@@ -323,6 +358,8 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Param: THR_FS_VALUE
     // @DisplayName: Throttle Failsafe Value
     // @Description: The PWM level on channel 3 below which throttle sailsafe triggers
+    // @Range: 925 1100
+    // @Increment: 1
     // @User: Standard
     GSCALAR(throttle_fs_value,      "THR_FS_VALUE",   THROTTLE_FS_VALUE),
 
@@ -333,11 +370,11 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Range: 0 100
     // @Increment: 1
     // @User: Standard
-    GSCALAR(throttle_cruise,        "TRIM_THROTTLE",  THROTTLE_CRUISE),
+    ASCALAR(throttle_cruise,        "TRIM_THROTTLE",  THROTTLE_CRUISE),
 
     // @Param: THROTTLE_NUDGE
     // @DisplayName: Throttle nudge enable
-    // @Description: When enabled, this uses the throttle input in auto-throttle modes to 'nudge' the throttle to higher or lower values
+    // @Description: When enabled, this uses the throttle input in auto-throttle modes to 'nudge' the throttle or airspeed to higher or lower values. When you have an airspeed sensor the nudge affects the target airspeed, so that throttle inputs above 50% will increase the target airspeed from TRIM_ARSPD_CM up to a maximum of ARSPD_FBW_MAX. When no airspeed sensor is enabled the throttle nudge will push up the target throttle for throttle inputs above 50%.
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     // @User: Standard
@@ -345,17 +382,35 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: FS_SHORT_ACTN
     // @DisplayName: Short failsafe action
-    // @Description: The action to take on a short (1 second) failsafe event
-    // @Values: 0:None,1:ReturnToLaunch
+    // @Description: The action to take on a short (FS_SHORT_TIMEOUT) failsafe event in AUTO, GUIDED or LOITER modes. A short failsafe event in stabilization modes will always cause an immediate change to CIRCLE mode. In AUTO mode you can choose whether it will enter CIRCLE mode or continue with the mission. If FS_SHORT_ACTN is 0 then it will continue with the mission, if it is 1 then it will enter CIRCLE mode, and then enter RTL if the failsafe condition persists for FS_LONG_TIMEOUT seconds. If it is set to 2 then the plane will enter FBWA mode with zero throttle and level attitude to glide in.
+    // @Values: 0:Continue,1:Circle/ReturnToLaunch,2:Glide
     // @User: Standard
     GSCALAR(short_fs_action,        "FS_SHORT_ACTN",  SHORT_FAILSAFE_ACTION),
 
+    // @Param: FS_SHORT_TIMEOUT
+    // @DisplayName: Short failsafe timeout
+    // @Description: The time in seconds that a failsafe condition has to persist before a short failsafe event will occor. This defaults to 1.5 seconds
+    // @Units: seconds
+    // @Range: 1 100
+    // @Increment: 0.5
+    // @User: Standard
+    GSCALAR(short_fs_timeout,        "FS_SHORT_TIMEOUT", 1.5f),
+
     // @Param: FS_LONG_ACTN
     // @DisplayName: Long failsafe action
-    // @Description: The action to take on a long (20 second) failsafe event
-    // @Values: 0:None,1:ReturnToLaunch
+    // @Description: The action to take on a long (FS_LONG_TIMEOUT seconds) failsafe event in AUTO, GUIDED or LOITER modes. A long failsafe event in stabilization modes will always cause an RTL (ReturnToLaunch). In AUTO modes you can choose whether it will RTL or continue with the mission. If FS_LONG_ACTN is 0 then it will continue with the mission, if it is 1 then it will enter RTL mode. Note that if FS_SHORT_ACTN is 1, then the aircraft will enter CIRCLE mode after FS_SHORT_TIMEOUT seconds of failsafe, and will always enter RTL after FS_LONG_TIMEOUT seconds of failsafe, regardless of the FS_LONG_ACTN setting. If FS_LONG_ACTN is set to 2 then instead of using RTL it will enter a FBWA glide with zero throttle.
+    // @Values: 0:Continue,1:ReturnToLaunch,2:Glide
     // @User: Standard
     GSCALAR(long_fs_action,         "FS_LONG_ACTN",   LONG_FAILSAFE_ACTION),
+
+    // @Param: FS_LONG_TIMEOUT
+    // @DisplayName: Long failsafe timeout
+    // @Description: The time in seconds that a failsafe condition has to persist before a long failsafe event will occor. This defaults to 20 seconds
+    // @Units: seconds
+    // @Range: 1 300
+    // @Increment: 0.5
+    // @User: Standard
+    GSCALAR(long_fs_timeout,        "FS_LONG_TIMEOUT", 20),
 
     // @Param: FS_BATT_VOLTAGE
     // @DisplayName: Failsafe battery voltage
@@ -386,7 +441,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: FLTMODE1
     // @DisplayName: FlightMode1
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,4:ACRO,5:FBWA,6:FBWB,7:CRUISE,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     // @Description: Flight mode for switch position 1 (910 to 1230 and above 2049)
     GSCALAR(flight_mode1,           "FLTMODE1",       FLIGHT_MODE_1),
@@ -394,35 +449,35 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Param: FLTMODE2
     // @DisplayName: FlightMode2
     // @Description: Flight mode for switch position 2 (1231 to 1360)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,4:ACRO,5:FBWA,6:FBWB,7:CRUISE,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     GSCALAR(flight_mode2,           "FLTMODE2",       FLIGHT_MODE_2),
 
     // @Param: FLTMODE3
     // @DisplayName: FlightMode3
     // @Description: Flight mode for switch position 3 (1361 to 1490)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,4:ACRO,5:FBWA,6:FBWB,7:CRUISE,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     GSCALAR(flight_mode3,           "FLTMODE3",       FLIGHT_MODE_3),
 
     // @Param: FLTMODE4
     // @DisplayName: FlightMode4
     // @Description: Flight mode for switch position 4 (1491 to 1620)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,4:ACRO,5:FBWA,6:FBWB,7:CRUISE,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     GSCALAR(flight_mode4,           "FLTMODE4",       FLIGHT_MODE_4),
 
     // @Param: FLTMODE5
     // @DisplayName: FlightMode5
     // @Description: Flight mode for switch position 5 (1621 to 1749)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,4:ACRO,5:FBWA,6:FBWB,7:CRUISE,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     GSCALAR(flight_mode5,           "FLTMODE5",       FLIGHT_MODE_5),
 
     // @Param: FLTMODE6
     // @DisplayName: FlightMode6
     // @Description: Flight mode for switch position 6 (1750 to 2049)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,4:ACRO,5:FBWA,6:FBWB,7:CRUISE,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     GSCALAR(flight_mode6,           "FLTMODE6",       FLIGHT_MODE_6),
 
@@ -442,7 +497,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Range: 0 9000
     // @Increment: 1
     // @User: Standard
-    GSCALAR(pitch_limit_max_cd,     "LIM_PITCH_MAX",  PITCH_MAX_CENTIDEGREE),
+    ASCALAR(pitch_limit_max_cd,     "LIM_PITCH_MAX",  PITCH_MAX_CENTIDEGREE),
 
     // @Param: LIM_PITCH_MIN
     // @DisplayName: Minimum Pitch Angle
@@ -451,11 +506,54 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Range: -9000 0
     // @Increment: 1
     // @User: Standard
-    GSCALAR(pitch_limit_min_cd,     "LIM_PITCH_MIN",  PITCH_MIN_CENTIDEGREE),
+    ASCALAR(pitch_limit_min_cd,     "LIM_PITCH_MIN",  PITCH_MIN_CENTIDEGREE),
 
-    // @Param: AUTO_TRIM
-    // @DisplayName: Auto trim
-    // @Description: Set RC trim PWM levels to current levels when switching away from manual mode
+    // @Param: ACRO_ROLL_RATE
+    // @DisplayName: ACRO mode roll rate
+    // @Description: The maximum roll rate at full stick deflection in ACRO mode
+    // @Units: degrees/second
+    // @Range: 10 500
+    // @Increment: 1
+    // @User: Standard
+    GSCALAR(acro_roll_rate,          "ACRO_ROLL_RATE",    180),
+
+    // @Param: ACRO_PITCH_RATE
+    // @DisplayName: ACRO mode pitch rate
+    // @Description: The maximum pitch rate at full stick deflection in ACRO mode
+    // @Units: degrees/second
+    // @Range: 10 500
+    // @Increment: 1
+    // @User: Standard
+    GSCALAR(acro_pitch_rate,          "ACRO_PITCH_RATE",  180),
+
+    // @Param: ACRO_LOCKING
+    // @DisplayName: ACRO mode attitude locking
+    // @Description: Enable attitude locking when sticks are released
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Standard
+    GSCALAR(acro_locking,             "ACRO_LOCKING",     0),
+
+    // @Param: GROUND_STEER_ALT
+    // @DisplayName: Ground steer altitude
+    // @Description: Altitude at which to use the ground steering controller on the rudder. If non-zero then the STEER2SRV controller will be used to control the rudder for altitudes within this limit of the home altitude.
+    // @Units: Meters
+    // @Range: -100 100
+    // @Increment: 0.1
+    // @User: Standard
+    GSCALAR(ground_steer_alt,         "GROUND_STEER_ALT",   0),
+
+    // @Param: GROUND_STEER_DPS
+    // @DisplayName: Ground steer rate
+    // @Description: Ground steering rate in degrees per second for full rudder stick deflection
+    // @Units: Meters
+    // @Range: 10 360
+    // @Increment: 1
+    // @User: Advanced
+    GSCALAR(ground_steer_dps,         "GROUND_STEER_DPS",  90),
+
+    // @Param: TRIM_AUTO
+    // @DisplayName: Automatic trim adjustment
+    // @Description: Set RC trim PWM levels to current levels when switching away from manual mode. When this option is enabled and you change from MANUAL to any other mode then the APM will take the current position of the control sticks as the trim values for aileron, elevator and rudder. It will use those to set RC1_TRIM, RC2_TRIM and RC4_TRIM. This option is disabled by default as if a pilot is not aware of this option and changes from MANUAL to another mode while control inputs are not centered then the trim could be changed to a dangerously bad value. You can enable this option to assist with trimming your plane, by enabling it before takeoff then switching briefly to MANUAL in flight, and seeing how the plane reacts. You can then switch back to FBWA, trim the surfaces then again test MANUAL mode. Each time you switch from MANUAL the APM will take your control inputs as the new trim. After you have good trim on your aircraft you can disable TRIM_AUTO for future flights.
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     GSCALAR(auto_trim,              "TRIM_AUTO",      AUTO_TRIM),
@@ -537,7 +635,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: TRIM_ARSPD_CM
     // @DisplayName: Target airspeed
-    // @Description: Airspeed in cm/s to aim for when airspeed is enabled in auto mode
+    // @Description: Airspeed in cm/s to aim for when airspeed is enabled in auto mode. This is a calibrated (apparent) airspeed.
     // @Units: cm/s
     // @User: User
     GSCALAR(airspeed_cruise_cm,     "TRIM_ARSPD_CM",  AIRSPEED_CRUISE_CM),
@@ -572,7 +670,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: ALT_HOLD_FBWCM
     // @DisplayName: Minimum altitude for FBWB mode
-    // @Description: This is the minimum altitude in centimeters that FBWB will allow. If you attempt to descend below this altitude then the plane will level off. A value of zero means no limit.
+    // @Description: This is the minimum altitude in centimeters that FBWB and CRUISE modes will allow. If you attempt to descend below this altitude then the plane will level off. A value of zero means no limit.
     // @Units: centimeters
     // @User: User
     GSCALAR(FBWB_min_altitude_cm,   "ALT_HOLD_FBWCM", ALT_HOLD_FBW_CM),
@@ -618,54 +716,6 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Advanced
     GSCALAR(flap_2_speed,           "FLAP_2_SPEED",   FLAP_2_SPEED),
 
-    // @Param: BATT_MONITOR
-    // @DisplayName: Battery monitoring
-    // @Description: Controls enabling monitoring of the battery's voltage and current
-    // @Values: 0:Disabled,3:Voltage Only,4:Voltage and Current
-    // @User: Standard
-    GSCALAR(battery_monitoring,     "BATT_MONITOR",   0),
-
-    // @Param: VOLT_DIVIDER
-    // @DisplayName: Voltage Divider
-    // @Description: Used to convert the voltage of the voltage sensing pin (BATT_VOLT_PIN) to the actual battery's voltage (pin voltage * INPUT_VOLTS/1024 * VOLT_DIVIDER)
-    // @User: Advanced
-    GSCALAR(volt_div_ratio,         "VOLT_DIVIDER",   VOLT_DIV_RATIO),
-
-    // @Param: APM_PER_VOLT
-    // @DisplayName: Apms per volt
-    // @Description: Number of amps that a 1V reading on the current sensor corresponds to
-    // @Units: A/V
-    // @User: Standard
-    GSCALAR(curr_amp_per_volt,      "AMP_PER_VOLT",   CURR_AMP_PER_VOLT),
-
-    // @Param: AMP_OFFSET
-    // @DisplayName: AMP offset
-    // @Description: Voltage offset at zero current on current sensor
-    // @Units: Volts
-    // @User: Standard
-    GSCALAR(curr_amp_offset,        "AMP_OFFSET",     0),
-
-    // @Param: BATT_CAPACITY
-    // @DisplayName: Battery capacity
-    // @Description: Capacity of the battery in mAh when full
-    // @Units: mAh
-    // @User: Standard
-    GSCALAR(pack_capacity,          "BATT_CAPACITY",  1760),
-
-    // @Param: BATT_VOLT_PIN
-    // @DisplayName: Battery Voltage sensing pin
-    // @Description: Setting this to 0 ~ 13 will enable battery current sensing on pins A0 ~ A13. For the 3DR power brick on APM2.5 it should be set to 13. On the PX4 it should be set to 100.
-    // @Values: -1:Disabled, 0:A0, 1:A1, 13:A13, 100:PX4
-    // @User: Standard
-    GSCALAR(battery_volt_pin,    "BATT_VOLT_PIN",    BATTERY_VOLT_PIN),
-
-    // @Param: BATT_CURR_PIN
-    // @DisplayName: Battery Current sensing pin
-    // @Description: Setting this to 0 ~ 13 will enable battery current sensing on pins A0 ~ A13. For the 3DR power brick on APM2.5 it should be set to 12. On the PX4 it should be set to 101. 
-    // @Values: -1:Disabled, 1:A1, 2:A2, 12:A12, 101:PX4
-    // @User: Standard
-    GSCALAR(battery_curr_pin,    "BATT_CURR_PIN",    BATTERY_CURR_PIN),
-
     // @Param: RSSI_PIN
     // @DisplayName: Receiver RSSI sensing pin
     // @Description: This selects an analog pin for the receiver RSSI voltage. It assumes the voltage is 5V for max rssi, 0V for minimum
@@ -701,80 +751,102 @@ const AP_Param::Info var_info[] PROGMEM = {
     GOBJECT(camera,                  "CAM_", AP_Camera),
 #endif
 
+    // @Group: RELAY_
+    // @Path: ../libraries/AP_Relay/AP_Relay.cpp
+    GOBJECT(relay,                  "RELAY_", AP_Relay),
+
     // RC channel
     //-----------
     // @Group: RC1_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp
-    GGROUP(channel_roll,            "RC1_", RC_Channel),
+    GGROUP(rc_1,                    "RC1_", RC_Channel),
+
     // @Group: RC2_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp
-    GGROUP(channel_pitch,           "RC2_", RC_Channel),
+    GGROUP(rc_2,                    "RC2_", RC_Channel),
+
     // @Group: RC3_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp
-    GGROUP(channel_throttle,        "RC3_", RC_Channel),
+    GGROUP(rc_3,                    "RC3_", RC_Channel),
+
     // @Group: RC4_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp
-    GGROUP(channel_rudder,          "RC4_", RC_Channel),
+    GGROUP(rc_4,                    "RC4_", RC_Channel),
 
     // @Group: RC5_
-    // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_5,                    "RC5_", RC_Channel_aux),
 
     // @Group: RC6_
-    // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_6,                    "RC6_", RC_Channel_aux),
 
     // @Group: RC7_
-    // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_7,                    "RC7_", RC_Channel_aux),
 
     // @Group: RC8_
-    // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_8,                    "RC8_", RC_Channel_aux),
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
     // @Group: RC9_
-    // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_9,                    "RC9_", RC_Channel_aux),
+#endif
 
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4
     // @Group: RC10_
-    // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_10,                    "RC10_", RC_Channel_aux),
 
     // @Group: RC11_
-    // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_11,                    "RC11_", RC_Channel_aux),
 #endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
     // @Group: RC12_
-    // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_12,                    "RC12_", RC_Channel_aux),
 #endif
 
-	GGROUP(pidNavPitchAirspeed,     "ARSP2PTCH_", PID),
-	GGROUP(pidTeThrottle,           "ENRGY2THR_", PID),
-	GGROUP(pidNavPitchAltitude,     "ALT2PTCH_",  PID),
-	GGROUP(pidWheelSteer,           "WHEELSTEER_",PID),
-
     // @Group: RLL2SRV_
     // @Path: ../libraries/APM_Control/AP_RollController.cpp
-	GGROUP(rollController,          "RLL2SRV_",   AP_RollController),
+	GOBJECT(rollController,         "RLL2SRV_",   AP_RollController),
 
     // @Group: PTCH2SRV_
     // @Path: ../libraries/APM_Control/AP_PitchController.cpp
-	GGROUP(pitchController,         "PTCH2SRV_",  AP_PitchController),
+	GOBJECT(pitchController,        "PTCH2SRV_",  AP_PitchController),
 
     // @Group: YAW2SRV_
     // @Path: ../libraries/APM_Control/AP_YawController.cpp
-	GGROUP(yawController,           "YAW2SRV_",   AP_YawController),
+	GOBJECT(yawController,          "YAW2SRV_",   AP_YawController),
+
+    // @Group: STEER2SRV_
+    // @Path: ../libraries/APM_Control/AP_SteerController.cpp
+	GOBJECT(steerController,        "STEER2SRV_",   AP_SteerController),
 
 	// variables not in the g class which contain EEPROM saved variables
 
     // @Group: COMPASS_
     // @Path: ../libraries/AP_Compass/Compass.cpp
     GOBJECT(compass,                "COMPASS_",     Compass),
+
+    // @Group: SCHED_
+    // @Path: ../libraries/AP_Scheduler/AP_Scheduler.cpp
+    GOBJECT(scheduler, "SCHED_", AP_Scheduler),
+
+    // @Group: RCMAP_
+    // @Path: ../libraries/AP_RCMapper/AP_RCMapper.cpp
+    GOBJECT(rcmap,                "RCMAP_",         RCMapper),
+
+    // @Group: SR0_
+    // @Path: GCS_Mavlink.pde
     GOBJECT(gcs0,                                   "SR0_",     GCS_MAVLINK),
+
+    // @Group: SR3_
+    // @Path: GCS_Mavlink.pde
     GOBJECT(gcs3,                                   "SR3_",     GCS_MAVLINK),
 
     // @Group: INS_
@@ -793,6 +865,10 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Path: ../libraries/AP_L1_Control/AP_L1_Control.cpp
     GOBJECT(L1_controller,         "NAVL1_",   AP_L1_Control),
 
+    // @Group: TECS_
+    // @Path: ../libraries/AP_TECS/AP_TECS.cpp
+    GOBJECT(TECS_controller,         "TECS_",   AP_TECS),
+
 #if MOUNT == ENABLED
     // @Group: MNT_
     // @Path: ../libraries/AP_Mount/AP_Mount.cpp
@@ -804,6 +880,10 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Path: ../libraries/AP_Mount/AP_Mount.cpp
     GOBJECT(camera_mount2,           "MNT2_",       AP_Mount),
 #endif
+
+    // @Group: BATT_
+    // @Path: ../libraries/AP_BattMonitor/AP_BattMonitor.cpp
+    GOBJECT(battery,                "BATT_",       AP_BattMonitor),
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
     // @Group: SIM_
@@ -835,10 +915,20 @@ const AP_Param::ConversionInfo conversion_table[] PROGMEM = {
     { Parameters::k_param_pidServoRoll, 0, AP_PARAM_FLOAT, "RLL2SRV_P" },
     { Parameters::k_param_pidServoRoll, 1, AP_PARAM_FLOAT, "RLL2SRV_I" },
     { Parameters::k_param_pidServoRoll, 2, AP_PARAM_FLOAT, "RLL2SRV_D" },
+    { Parameters::k_param_pidServoRoll, 3, AP_PARAM_FLOAT, "RLL2SRV_IMAX" },
 
     { Parameters::k_param_pidServoPitch, 0, AP_PARAM_FLOAT, "PTCH2SRV_P" },
     { Parameters::k_param_pidServoPitch, 1, AP_PARAM_FLOAT, "PTCH2SRV_I" },
     { Parameters::k_param_pidServoPitch, 2, AP_PARAM_FLOAT, "PTCH2SRV_D" },
+    { Parameters::k_param_pidServoPitch, 3, AP_PARAM_FLOAT, "PTCH2SRV_IMAX" },
+
+    { Parameters::k_param_battery_monitoring, 0,      AP_PARAM_INT8,  "BATT_MONITOR" },
+    { Parameters::k_param_battery_volt_pin,   0,      AP_PARAM_INT8,  "BATT_VOLT_PIN" },
+    { Parameters::k_param_battery_curr_pin,   0,      AP_PARAM_INT8,  "BATT_CURR_PIN" },
+    { Parameters::k_param_volt_div_ratio,     0,      AP_PARAM_FLOAT, "BATT_VOLT_MULT" },
+    { Parameters::k_param_curr_amp_per_volt,  0,      AP_PARAM_FLOAT, "BATT_AMP_PERVOLT" },
+    { Parameters::k_param_curr_amp_offset,    0,      AP_PARAM_FLOAT, "BATT_AMP_OFFSET" },
+    { Parameters::k_param_pack_capacity,      0,      AP_PARAM_INT32, "BATT_CAPACITY" },
 };
 
 static void load_parameters(void)

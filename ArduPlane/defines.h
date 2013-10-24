@@ -18,12 +18,12 @@
 
 // failsafe
 // ----------------------
-#define FAILSAFE_NONE   0
-#define FAILSAFE_SHORT  1
-#define FAILSAFE_LONG   2
-#define FAILSAFE_GCS    3
-#define FAILSAFE_SHORT_TIME 1500        // Miliiseconds
-#define FAILSAFE_LONG_TIME  20000       // Miliiseconds
+enum failsafe_state {
+    FAILSAFE_NONE=0,
+    FAILSAFE_SHORT=1,
+    FAILSAFE_LONG=2,
+    FAILSAFE_GCS=3
+};
 
 
 // active altitude sensor
@@ -48,12 +48,6 @@
 #define GPS_PROTOCOL_MTK19      6
 #define GPS_PROTOCOL_AUTO       7
 
-#define CH_ROLL CH_1
-#define CH_PITCH CH_2
-#define CH_THROTTLE CH_3
-#define CH_RUDDER CH_4
-#define CH_YAW CH_4
-
 // HIL enumerations. Note that HIL_MODE_ATTITUDE and HIL_MODE_SENSORS
 // are now the same thing, and are sensors based. The old define is
 // kept to allow old APM_Config.h headers to keep working
@@ -66,8 +60,10 @@ enum FlightMode {
     CIRCLE        = 1,
     STABILIZE     = 2,
     TRAINING      = 3,
+    ACRO          = 4,
     FLY_BY_WIRE_A = 5,
     FLY_BY_WIRE_B = 6,
+    CRUISE        = 7,
     AUTO          = 10,
     RTL           = 11,
     LOITER        = 12,
@@ -163,7 +159,8 @@ enum log_messages {
     LOG_ATTITUDE_MSG,
     LOG_MODE_MSG,
     LOG_COMPASS_MSG,
-    MAX_NUM_LOGS
+    LOG_TECS_MSG,
+    MAX_NUM_LOGS // always at the end
 };
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)
@@ -177,6 +174,8 @@ enum log_messages {
 #define MASK_LOG_CMD                    (1<<8)
 #define MASK_LOG_CURRENT                (1<<9)
 #define MASK_LOG_COMPASS                (1<<10)
+#define MASK_LOG_TECS                   (1<<11)
+#define MASK_LOG_CAMERA                 (1<<12)
 
 // Waypoint Modes
 // ----------------
@@ -200,10 +199,6 @@ enum log_messages {
 #define ALTITUDE_HISTORY_LENGTH 8       //Number of (time,altitude) points to
                                         // regress a climb rate from
 
-
-#define BATTERY_VOLTAGE(x) (x->voltage_average()*g.volt_div_ratio)
-#define CURRENT_AMPS(x) (x->voltage_average()-g.curr_amp_offset)*g.curr_amp_per_volt
-
 #define AN4                     4
 #define AN5                     5
 
@@ -224,7 +219,12 @@ enum log_messages {
 #define FENCE_WP_SIZE sizeof(Vector2l)
 #define FENCE_START_BYTE (EEPROM_MAX_ADDR-(MAX_FENCEPOINTS*FENCE_WP_SIZE))
 
-#define MAX_WAYPOINTS  ((FENCE_START_BYTE - WP_START_BYTE) / WP_SIZE) - 1 // -
+// rally points shoehorned between fence points and waypoints
+#define MAX_RALLYPOINTS 10
+#define RALLY_WP_SIZE 15
+#define RALLY_START_BYTE (FENCE_START_BYTE-(MAX_RALLYPOINTS*RALLY_WP_SIZE))
+
+#define MAX_WAYPOINTS  ((RALLY_START_BYTE - WP_START_BYTE) / WP_SIZE) - 1 // -
                                                                           // 1
                                                                           // to
                                                                           // be
@@ -240,25 +240,41 @@ enum log_messages {
 // InertialSensor driver types
 #define CONFIG_INS_OILPAN  1
 #define CONFIG_INS_MPU6000 2
-#define CONFIG_INS_STUB    3
+#define CONFIG_INS_HIL     3
 #define CONFIG_INS_PX4     4
-#define CONFIG_IMU_MPU6000_I2C 5
+#define CONFIG_INS_FLYMAPLE 5
+#define CONFIG_INS_L3G4200D 6
+#define CONFIG_INS_MPU6000_I2C 7
+#define CONFIG_INS_ITG3200 8
+
 
 // barometer driver types
 #define AP_BARO_BMP085   1
 #define AP_BARO_MS5611   2
 #define AP_BARO_PX4      3
 #define AP_BARO_HIL      4
+#define AP_BARO_BMP085_MPNG    5
+
+#define AP_BARO_MS5611_SPI 1
+#define AP_BARO_MS5611_I2C 2
 
 // compass driver types
 #define AP_COMPASS_HMC5843   1
 #define AP_COMPASS_PX4       2
 #define AP_COMPASS_HIL       3
 
+// MPNG board types
+#define RCTIMER_CRIUS_V2 1
+#define CRIUS_V1 2
+#define HK_RED_MULTIWII_PRO 3
+#define BLACK_VORTEX 4 
+
 // altitude control algorithms
 enum {
-    ALT_CONTROL_DEFAULT=0,
-    ALT_CONTROL_NON_AIRSPEED=1
+    ALT_CONTROL_DEFAULT      = 0,
+    ALT_CONTROL_NON_AIRSPEED = 1,
+    ALT_CONTROL_TECS         = 2,
+    ALT_CONTROL_AIRSPEED     = 3
 };
 
 // attitude controller choice

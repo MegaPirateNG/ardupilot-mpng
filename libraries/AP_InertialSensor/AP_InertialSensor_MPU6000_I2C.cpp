@@ -3,6 +3,8 @@
 #include <AP_HAL.h>
 #include "AP_InertialSensor_MPU6000_I2C.h"
 
+//#define DISABLE_INTERNAL_MAG
+
 extern const AP_HAL::HAL& hal;
 
 // MPU6000 accelerometer scaling
@@ -175,6 +177,7 @@ const uint8_t AP_InertialSensor_MPU6000_I2C::_temp_data_index = 3;
 uint8_t AP_InertialSensor_MPU6000_I2C::mpu_addr = MPU6000_ADDR;
 	
 int16_t AP_InertialSensor_MPU6000_I2C::_mpu6000_product_id=0;
+uint16_t AP_InertialSensor_MPU6000_I2C::_micros_per_sample = 5000;	
 
 /* Static I2C device driver */
 AP_HAL::Semaphore* AP_InertialSensor_MPU6000_I2C::_i2c_sem = NULL;
@@ -218,14 +221,15 @@ uint16_t AP_InertialSensor_MPU6000_I2C::_init_sensor(Sample_rate sample_rate )
      * _read_data_transaction requires the spi semaphore to be taken by
      * its caller. */
     _ins_timer = hal.scheduler->micros();
-    
-//		hal.gpio->pinMode(46, GPIO_OUTPUT); // Debug output
-//		hal.gpio->write(46,0); 
-//		hal.gpio->pinMode(45, GPIO_OUTPUT); // Debug output
-//		hal.gpio->write(45,0); 
+
+    _read_data_transaction();    
+		hal.gpio->pinMode(46, GPIO_OUTPUT); // Debug output
+		hal.gpio->write(46,0); 
+		hal.gpio->pinMode(45, GPIO_OUTPUT); // Debug output
+		hal.gpio->write(45,0); 
 
     // start the timer process to read samples
-    hal.scheduler->register_timer_process(_poll_data);
+    hal.scheduler->register_timer_process(AP_HAL_MEMBERPROC(&AP_InertialSensor_MPU6000_I2C::_poll_data));
 	return _mpu6000_product_id;
 }
 
@@ -237,18 +241,19 @@ static volatile int32_t _sum[6];
 static volatile uint16_t _count;
 
 /*================ AP_INERTIALSENSOR PUBLIC INTERFACE ==================== */
-void AP_InertialSensor_MPU6000_I2C::wait_for_sample()
+bool AP_InertialSensor_MPU6000_I2C::wait_for_sample(uint16_t timeout_ms)
 {
-    uint32_t tstart = hal.scheduler->micros();
-    while (num_samples_available() == 0) {
-        uint32_t now = hal.scheduler->micros();
-        uint32_t dt = now - tstart;
-        if (dt > 50000) {
-            hal.scheduler->panic(
-                    PSTR("PANIC: AP_InertialSensor_MPU6000::update "
-                        "waited 50ms for data from interrupt"));
+    if (sample_available()) {
+        return true;
+    }
+    uint32_t start = hal.scheduler->millis();
+    while ((hal.scheduler->millis() - start) < timeout_ms) {
+        hal.scheduler->delay_microseconds(100);
+        if (sample_available()) {
+            return true;
         }
     }
+    return false;
 }
 
 bool AP_InertialSensor_MPU6000_I2C::update( void )
@@ -258,7 +263,9 @@ bool AP_InertialSensor_MPU6000_I2C::update( void )
 	Vector3f accel_scale = _accel_scale.get();
 
     // wait for at least 1 sample
-    wait_for_sample();
+    if (!wait_for_sample(1000)) {
+        return false;
+    }
 
     // disable timer procs for mininum time
     hal.scheduler->suspend_timer_procs();
@@ -307,7 +314,8 @@ bool AP_InertialSensor_MPU6000_I2C::update( void )
 float AP_InertialSensor_MPU6000_I2C::get_delta_time() 
 {
     // the sensor runs at 200Hz
-    return 0.005 * _num_samples;
+//    return 0.005 * _num_samples;
+    return _delta_time;
 }
 
 float AP_InertialSensor_MPU6000_I2C::_temp_to_celsius ( uint16_t regval )
@@ -315,9 +323,13 @@ float AP_InertialSensor_MPU6000_I2C::_temp_to_celsius ( uint16_t regval )
     return 20.0;
 }
 
-void AP_InertialSensor_MPU6000_I2C::_poll_data(uint32_t now)
+void AP_InertialSensor_MPU6000_I2C::_poll_data(void)
 {
-	if ( (now - _ins_timer > 4900) || (_sens_stage == 1)) {
+	hal.gpio->write(46,1); 
+
+	uint32_t now = hal.scheduler->micros();
+	
+	if ( (now - _ins_timer > _micros_per_sample) || (_sens_stage == 1)) {
 //	  hal.gpio->write(46,1); 
 	
 	  if (hal.scheduler->in_timerprocess()) {
@@ -335,7 +347,7 @@ void AP_InertialSensor_MPU6000_I2C::_poll_data(uint32_t now)
 							_ins_timer = now;
 						}
 
-          	_read_data_transaction(); 
+              	_read_data_transaction(); 
 						
 	          _i2c_sem->give();
 	      } else {
@@ -345,7 +357,7 @@ void AP_InertialSensor_MPU6000_I2C::_poll_data(uint32_t now)
 	      }
 	  }
 	}
-//  hal.gpio->write(46,0); 
+  hal.gpio->write(46,0); 
 }
 
 // return the MPU6k gyro drift rate in radian/s/s
@@ -357,30 +369,24 @@ float AP_InertialSensor_MPU6000_I2C::get_gyro_drift_rate(void)
 }
 
 // get number of samples read from the sensors
-uint16_t AP_InertialSensor_MPU6000_I2C::num_samples_available()
+bool AP_InertialSensor_MPU6000_I2C::sample_available()
 {
-    return _count >> _sample_shift; 
+    return _count > 0; 
 }
 
 /*================ HARDWARE FUNCTIONS ==================== */
 
 void AP_InertialSensor_MPU6000_I2C::_read_data_from_timerprocess()
 {
-    static uint8_t semfail_ctr = 0;
-    bool got = _i2c_sem->take_nonblocking();
-    if (!got) { 
-        semfail_ctr++;
-//	  hal.gpio->write(46,1); 
-        if (semfail_ctr > 100) {
-            hal.scheduler->panic(PSTR("PANIC: failed to take I2C semaphore "
-                        "100 times in AP_InertialSensor_MPU6000::"
-                        "_read_data_from_timerprocess"));
-        }
-//	  hal.gpio->write(46,0); 
+    if (!_i2c_sem->take_nonblocking()) {
+        /*
+          the semaphore being busy is an expected condition when the
+          mainline code is calling sample_available() which will
+          grab the semaphore. We return now and rely on the mainline
+          code grabbing the latest sample.
+         */
         return;
-    } else {
-        semfail_ctr = 0;
-    }   
+    }  
 
     _read_data_transaction();
 
@@ -389,30 +395,27 @@ void AP_InertialSensor_MPU6000_I2C::_read_data_from_timerprocess()
 
 void AP_InertialSensor_MPU6000_I2C::_read_data_transaction()
 {
+//  hal.gpio->write(45,1); 
+	uint8_t rawMPU[6];
+	memset(rawMPU,0,6);
+	hal.i2c->setHighSpeed(true); // Set I2C fast speed
 	// now read the data
 	if (_sens_stage == 0) {
 		// Read Accel
-		uint8_t rawMPU[6];
-		memset(rawMPU,0,6);
-		
-	  hal.i2c->readRegisters(mpu_addr, MPUREG_ACCEL_XOUT_H, sizeof(rawMPU), rawMPU);
-		
-	  for (uint8_t i = 0; i < 3; i++) {
-	    _sum[i] += (int16_t)(((uint16_t)rawMPU[2*i] << 8) | rawMPU[2*i+1]);
-	  }  
-
+	
+	  hal.i2c->readRegisters(mpu_addr, MPUREG_ACCEL_XOUT_H, 6, rawMPU);
+    _sum[0] += (int16_t)(((uint16_t)rawMPU[0] << 8) | rawMPU[1]);
+    _sum[1] += (int16_t)(((uint16_t)rawMPU[2] << 8) | rawMPU[3]);
+    _sum[2] += (int16_t)(((uint16_t)rawMPU[4] << 8) | rawMPU[5]);
+    
 		_sens_stage = 1;
 	} else {
 
-		uint8_t rawMPU[6];
-		memset(rawMPU,0,6);
+	  hal.i2c->readRegisters(mpu_addr, MPUREG_GYRO_XOUT_H, 6, rawMPU);
+    _sum[3] += (int16_t)(((uint16_t)rawMPU[0] << 8) | rawMPU[1]);
+    _sum[4] += (int16_t)(((uint16_t)rawMPU[2] << 8) | rawMPU[3]);
+    _sum[5] += (int16_t)(((uint16_t)rawMPU[4] << 8) | rawMPU[5]);
 		
-	  hal.i2c->readRegisters(mpu_addr, MPUREG_GYRO_XOUT_H, sizeof(rawMPU), rawMPU);
-		
-	  for (uint8_t i = 0; i < 3; i++) {
-	    _sum[i+3] += (int16_t)(((uint16_t)rawMPU[2*i] << 8) | rawMPU[2*i+1]);
-	  }  
-	
 		_count++;
 		if (_count == 0) {
 			// rollover - v unlikely
@@ -421,10 +424,12 @@ void AP_InertialSensor_MPU6000_I2C::_read_data_transaction()
 
 		_sens_stage = 0;
 	}
+//	hal.gpio->write(45,0); 
 }
 
 void AP_InertialSensor_MPU6000_I2C::hardware_init_i2c_bypass()
 {
+#ifndef DISABLE_INTERNAL_MAG
     _i2c_sem = hal.i2c->get_semaphore();
 
     hal.scheduler->suspend_timer_procs();
@@ -475,6 +480,7 @@ void AP_InertialSensor_MPU6000_I2C::hardware_init_i2c_bypass()
     _i2c_sem->give();
 
     hal.scheduler->resume_timer_procs();
+#endif
 }
 
 bool AP_InertialSensor_MPU6000_I2C::hardware_init(Sample_rate sample_rate)
@@ -512,7 +518,7 @@ bool AP_InertialSensor_MPU6000_I2C::hardware_init(Sample_rate sample_rate)
     hal.i2c->writeRegister(mpu_addr, MPUREG_PWR_MGMT_2, 0);
     hal.scheduler->delay(1);
     
-    uint8_t default_filter;
+    uint8_t default_filter, rate;
 
     // sample rate and filtering
     // to minimise the effects of aliasing we choose a filter
@@ -522,17 +528,23 @@ bool AP_InertialSensor_MPU6000_I2C::hardware_init(Sample_rate sample_rate)
         // this is used for plane and rover, where noise resistance is
         // more important than update rate. Tests on an aerobatic plane
         // show that 10Hz is fine, and makes it very noise resistant
+				_micros_per_sample = 19000;
+				_delta_time = 0.02;
+    	  rate = MPUREG_SMPLRT_50HZ;
         default_filter = BITS_DLPF_CFG_10HZ;
-        _sample_shift = 2;
         break;
     case RATE_100HZ:
+				_micros_per_sample = 9900;
+				_delta_time = 0.01;
+    	  rate = MPUREG_SMPLRT_100HZ;
         default_filter = BITS_DLPF_CFG_20HZ;
-        _sample_shift = 1;
         break;
     case RATE_200HZ:
     default:
+				_micros_per_sample = 4900;
+				_delta_time = 0.005;
+    	  rate = MPUREG_SMPLRT_200HZ;
         default_filter = BITS_DLPF_CFG_20HZ;
-        _sample_shift = 0;
         break;
     }
 
@@ -540,7 +552,7 @@ bool AP_InertialSensor_MPU6000_I2C::hardware_init(Sample_rate sample_rate)
 
     // set sample rate to 200Hz, and use _sample_divider to give
     // the requested rate to the application
-    hal.i2c->writeRegister(mpu_addr, MPUREG_SMPLRT_DIV, MPUREG_SMPLRT_200HZ);
+    hal.i2c->writeRegister(mpu_addr, MPUREG_SMPLRT_DIV, rate);
     hal.scheduler->delay(1);
 
     hal.i2c->writeRegister(mpu_addr, MPUREG_GYRO_CONFIG, BITS_GYRO_FS_2000DPS); // Gyro scale 2000?/s
@@ -563,10 +575,12 @@ bool AP_InertialSensor_MPU6000_I2C::hardware_init(Sample_rate sample_rate)
 			
     hal.scheduler->delay(1);
 
+#ifndef DISABLE_INTERNAL_MAG
     // Enable I2C bypass mode, to work with Magnetometer 5883L
     // Disable I2C Master mode
     hal.i2c->writeRegister(mpu_addr, MPUREG_USER_CTRL, 0);
     hal.i2c->writeRegister(mpu_addr, MPUREG_INT_PIN_CFG, BIT_I2C_BYPASS_EN);
+#endif
     
 /*  Dump MPU6050 registers  
     hal.console->println_P(PSTR("MPU6000 registers"));

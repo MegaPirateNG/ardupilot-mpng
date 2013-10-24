@@ -30,6 +30,8 @@
 #include <AP_Relay.h>       // APM relay
 #include <AP_Camera.h>          // Photo or video camera
 #include <AP_Airspeed.h>
+#include <AP_Vehicle.h>
+#include <AP_SpdHgtControl.h>
 #include <memcheck.h>
 
 #include <APM_OBC.h>
@@ -39,6 +41,7 @@
 #include <AP_Declination.h> // ArduPilot Mega Declination Helper Library
 #include <DataFlash.h>
 #include <SITL.h>
+#include <AP_Notify.h>
 
 #include "config.h"
 #include "Parameters.h"

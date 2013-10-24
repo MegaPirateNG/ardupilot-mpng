@@ -17,7 +17,7 @@ void MPNGSPIDeviceManager::init(void* machtnichts) {
     /* dataflash: divide clock by 2 to 8Mhz, set SPI_MODE_3
      * spcr gets 0x0C to set SPI_MODE_3
      * spsr gets bit SPI2X for clock divider */
-    _dataflash = new AVRSPI0DeviceDriver(df_cs, 0x0C, _BV(SPI2X));
+    _dataflash = new AVRSPI0DeviceDriver(df_cs, 0x0C, 0x0C, _BV(SPI2X));
     _dataflash->init();
 
 }

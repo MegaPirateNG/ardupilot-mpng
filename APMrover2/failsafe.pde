@@ -13,11 +13,12 @@
   this failsafe_check function is called from the core timer interrupt
   at 1kHz.
  */
-void failsafe_check(uint32_t tnow)
+static void failsafe_check()
 {
     static uint16_t last_mainLoop_count;
     static uint32_t last_timestamp;
     static bool in_failsafe;
+    uint32_t tnow = hal.scheduler->micros();
 
     if (mainLoop_count != last_mainLoop_count) {
         // the main loop is running, all is OK
@@ -36,7 +37,7 @@ void failsafe_check(uint32_t tnow)
     }
 
     if (in_failsafe && tnow - last_timestamp > 20000 && 
-        hal.rcin->read(CH_3) >= (uint16_t)g.fs_throttle_value) {
+        channel_throttle->read() >= (uint16_t)g.fs_throttle_value) {
         // pass RC inputs to outputs every 20ms        
         last_timestamp = tnow;
         hal.rcin->clear_overrides();

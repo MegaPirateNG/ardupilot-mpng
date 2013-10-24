@@ -19,9 +19,6 @@
 #define SONAR 0
 #define BARO 1
 
-#define SONAR_SOURCE_ADC 1
-#define SONAR_SOURCE_ANALOG_PIN 2
-
 // CH 7 control
 enum ch7_option {
     CH7_DO_NOTHING=0,
@@ -41,9 +38,6 @@ enum ch7_option {
 #define GPS_PROTOCOL_HIL	5
 #define GPS_PROTOCOL_MTK19	6
 #define GPS_PROTOCOL_AUTO	7
-
-#define CH_STEER    CH_1
-#define CH_THROTTLE CH_3
 
 // HIL enumerations
 #define HIL_MODE_DISABLED			0
@@ -129,6 +123,7 @@ enum ap_message {
 #define LOG_ATTITUDE_MSG        0x08
 #define LOG_MODE_MSG            0x09
 #define LOG_COMPASS_MSG         0x0A
+#define LOG_CAMERA_MSG          0x0B
 
 #define TYPE_AIRSTART_MSG		0x00
 #define TYPE_GROUNDSTART_MSG	0x01
@@ -146,6 +141,7 @@ enum ap_message {
 #define MASK_LOG_CURRENT		(1<<9)
 #define MASK_LOG_SONAR   		(1<<10)
 #define MASK_LOG_COMPASS   		(1<<11)
+#define MASK_LOG_CAMERA   		(1<<12)
 
 // Waypoint Modes
 // ----------------
@@ -167,10 +163,6 @@ enum ap_message {
 
 // Climb rate calculations
 #define	ALTITUDE_HISTORY_LENGTH 8	//Number of (time,altitude) points to regress a climb rate from
-
-
-#define BATTERY_VOLTAGE(x) (x->voltage_average()*g.volt_div_ratio)
-#define CURRENT_AMPS(x) (x->voltage_average()-CURR_AMPS_OFFSET)*g.curr_amp_per_volt
 
 #define RELAY_PIN 47
 
@@ -202,9 +194,11 @@ enum ap_message {
 // InertialSensor driver types
 #define CONFIG_INS_OILPAN  1
 #define CONFIG_INS_MPU6000 2
-#define CONFIG_INS_STUB    3
+#define CONFIG_INS_HIL     3
 #define CONFIG_INS_PX4     4
-#define CONFIG_INS_MPU6000_I2C 5
+#define CONFIG_INS_FLYMAPLE 5
+#define CONFIG_INS_L3G4200D 6
+#define CONFIG_INS_MPU6000_I2C 7
 
 // compass driver types
 #define AP_COMPASS_HMC5843   1

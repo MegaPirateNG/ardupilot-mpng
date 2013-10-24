@@ -1,4 +1,5 @@
-import util, pexpect, time, math, mavwp
+import util, pexpect, time, math
+from pymavlink import mavwp
 
 # a list of pexpect objects to read while waiting for
 # messages. This keeps the output to stdout flowing
@@ -83,29 +84,31 @@ def wait_groundspeed(mav, gs_min, gs_max, timeout=30):
 def wait_roll(mav, roll, accuracy, timeout=30):
     '''wait for a given roll in degrees'''
     tstart = time.time()
-    print("Waiting for roll of %u" % roll)
+    print("Waiting for roll of %d at %s" % (roll, time.ctime()))
     while time.time() < tstart + timeout:
         m = mav.recv_match(type='ATTITUDE', blocking=True)
+        p = math.degrees(m.pitch)
         r = math.degrees(m.roll)
-        print("Roll %u" % r)
+        print("Roll %d Pitch %d" % (r, p))
         if math.fabs(r - roll) <= accuracy:
-            print("Attained roll %u" % roll)
+            print("Attained roll %d" % roll)
             return True
-    print("Failed to attain roll %u" % roll)
+    print("Failed to attain roll %d" % roll)
     return False
 
 def wait_pitch(mav, pitch, accuracy, timeout=30):
     '''wait for a given pitch in degrees'''
     tstart = time.time()
-    print("Waiting for pitch of %u" % pitch)
+    print("Waiting for pitch of %u at %s" % (pitch, time.ctime()))
     while time.time() < tstart + timeout:
         m = mav.recv_match(type='ATTITUDE', blocking=True)
-        r = math.degrees(m.pitch)
-        print("Pitch %u" % r)
-        if math.fabs(r - pitch) <= accuracy:
-            print("Attained pitch %u" % pitch)
+        p = math.degrees(m.pitch)
+        r = math.degrees(m.roll)
+        print("Pitch %d Roll %d" % (p, r))
+        if math.fabs(p - pitch) <= accuracy:
+            print("Attained pitch %d" % pitch)
             return True
-    print("Failed to attain pitch %u" % pitch)
+    print("Failed to attain pitch %d" % pitch)
     return False
 
 
@@ -113,6 +116,7 @@ def wait_pitch(mav, pitch, accuracy, timeout=30):
 def wait_heading(mav, heading, accuracy=5, timeout=30):
     '''wait for a given heading'''
     tstart = time.time()
+    print("Waiting for heading %u with accuracy %u" % (heading, accuracy))
     while time.time() < tstart + timeout:
         m = mav.recv_match(type='VFR_HUD', blocking=True)
         print("Heading %u" % m.heading)
@@ -209,9 +213,11 @@ def save_wp(mavproxy, mav):
     mavproxy.send('rc 7 1000\n')
     mav.recv_match(condition='RC_CHANNELS_RAW.chan7_raw==1000', blocking=True)
 
-def wait_mode(mav, mode):
-    '''wait for a flight mode to be engaged'''
-    mav.recv_match(condition='MAV.flightmode=="%s"' % mode, blocking=True)
+def wait_mode(mav, mode, timeout=None):
+    print("Waiting for mode %s" % mode)
+    mav.recv_match(condition='MAV.flightmode.upper()=="%s".upper()' % mode, timeout=timeout, blocking=True)
+    print("Got mode %s" % mode)
+    return mav.flightmode
 
 def mission_count(filename):
     '''load a mission from a file and return number of waypoints'''
@@ -219,3 +225,9 @@ def mission_count(filename):
     wploader.load(filename)
     num_wp = wploader.count()
     return num_wp
+
+def sim_location(mav):
+    '''return current simulator location'''
+    from pymavlink import mavutil
+    m = mav.recv_match(type='SIMSTATE', blocking=True)
+    return mavutil.location(m.lat*1.0e-7, m.lng*1.0e-7, 0, math.degrees(m.yaw))

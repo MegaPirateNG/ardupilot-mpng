@@ -209,41 +209,50 @@ void MPNGRCInput::_pwm_A8_A15_isr(void)
 	// generic split PPM  
 	// mask is pins [D0-D7] that have changed // the principle is the same on the MEGA for PORTK and [A8-A15] PINs
 	// chan = pin sequence of the port. chan begins at D2 and ends at D7
-	if (mask & 1<<0)
+	
+	if (mask & 1<<0) {
 		if (!(pin & 1<<0)) {
 			dTime = (cTime-edgeTime[0]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[0] = dTime;
 		} else edgeTime[0] = cTime;
-	if (mask & 1<<1)
+	}
+	if (mask & 1<<1) {
 		if (!(pin & 1<<1)) {
 			dTime = (cTime-edgeTime[1]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[1] = dTime;
 		} else edgeTime[1] = cTime;
-	if (mask & 1<<2) 
+	}
+	if (mask & 1<<2) {
 		if (!(pin & 1<<2)) {
 			dTime = (cTime-edgeTime[2]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[2] = dTime;
 		} else edgeTime[2] = cTime;
-	if (mask & 1<<3)
+	}
+	if (mask & 1<<3) {
 		if (!(pin & 1<<3)) {
 			dTime = (cTime-edgeTime[3]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[3] = dTime;
 		} else edgeTime[3] = cTime;
-	if (mask & 1<<4) 
+	}
+	if (mask & 1<<4) {
 		if (!(pin & 1<<4)) {
 			dTime = (cTime-edgeTime[4]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[4] = dTime;
 		} else edgeTime[4] = cTime;
-	if (mask & 1<<5)
+	}
+	if (mask & 1<<5) {
 		if (!(pin & 1<<5)) {
 			dTime = (cTime-edgeTime[5]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[5] = dTime;
 		} else edgeTime[5] = cTime;
-	if (mask & 1<<6)
+	}
+	if (mask & 1<<6) {
 		if (!(pin & 1<<6)) {
 			dTime = (cTime-edgeTime[6]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[6] = dTime;
 		} else edgeTime[6] = cTime;
-	if (mask & 1<<7)
+	}
+	if (mask & 1<<7) {
 		if (!(pin & 1<<7)) {
 			dTime = (cTime-edgeTime[7]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[7] = dTime;
 		} else edgeTime[7] = cTime;
+	}
 	
-	// failsafe counter must be zero if all ok  
-	if (mask & 1<<pinRcChannel[2]) {    // If pulse present on THROTTLE pin, clear FailSafe counter  - added by MIS fow multiwii (copy by SovGVD to megapirateNG)
+	// If we got pulse on throttle pin, report success  
+	if (mask & 1<<pinRcChannel[2]) {
 		_valid_channels = AVR_RC_INPUT_NUM_CHANNELS;
 	}
 }
@@ -256,9 +265,9 @@ void MPNGRCInput::init(void* _isrregistry) {
 //	hal.gpio->pinMode(46, GPIO_OUTPUT); // ICP5 pin (PL1) (PPM input) CRIUS v2
 //	hal.gpio->write(46,0);
 
-	TCCR5A = 0; //standard mode with overflow at A and OC B and C interrupts
-	TCCR5B = (1<<CS11); //Prescaler set to 8, resolution of 0.5us
-	OCR5B = 3000; // Init OCR registers to nil output signal
+	//Timer5 already configured in Scheduler
+	//TCCR5A = 0; //standard mode with overflow at A and OC B and C interrupts
+	//TCCR5B = (1<<CS11); //Prescaler set to 8, resolution of 0.5us
 
 #if SERIAL_PPM == SERIAL_PPM_DISABLED
 		FireISRRoutine = _pwm_A8_A15_isr;
@@ -270,14 +279,16 @@ void MPNGRCInput::init(void* _isrregistry) {
 		PORTK = (1<<PCINT16); //enable internal pull up on the SERIAL SUM pin A8
 		PCMSK2 |= (1 << PCINT16); // Enable int for pin A8(PCINT16)
 		PCICR |= (1 << PCIE2); // PCINT2 Interrupt enable
-#else
+#elif SERIAL_PPM == SERIAL_PPM_ENABLED_PL1
 		FireISRRoutine = 0;
 		hal.gpio->pinMode(48, GPIO_INPUT); // ICP5 pin (PL1) (PPM input) CRIUS v2
 		ISRRegistry* isrregistry = (ISRRegistry*) _isrregistry;
 		isrregistry->register_signal(ISR_REGISTRY_TIMER5_CAPT, _ppmsum_PL1_isr);
-		TCCR5B = (1<<CS11) | (1<<ICES5); //Prescaler set to 8, resolution of 0.5us, input capture on rising edge 
-		TIMSK5 |= (1<<ICIE5); // Enable Input Capture interrupt. Timer interrupt mask  
+		TCCR5B |= (1<<ICES5); // Enable input capture on rising edge 
+		TIMSK5 |= (1<<ICIE5); // Enable input capture interrupt. Timer interrupt mask  
 		PCMSK2 = 0;	// Disable INT for pin A8-A15
+#else
+#error You must check SERIAL_PPM mode, something wrong
 #endif
 }
 

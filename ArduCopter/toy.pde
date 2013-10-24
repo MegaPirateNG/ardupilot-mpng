@@ -20,9 +20,15 @@ static const int16_t toy_lookup[] = {
 //called at 10hz
 void update_toy_throttle()
 {
-    // look for a change in throttle position to exit throttle hold
-    if(abs(g.rc_3.control_in - saved_toy_throttle) > 40) {
-        throttle_mode   = THROTTLE_MANUAL;
+    if(control_mode == TOY_A) {
+        // look for a change in throttle position to exit throttle hold
+        if(abs(g.rc_3.control_in - saved_toy_throttle) > 40) {
+            throttle_mode   = THROTTLE_MANUAL;
+        }
+
+        if(throttle_mode == THROTTLE_AUTO) {
+            update_toy_altitude();
+        }
     }
 }
 
@@ -97,15 +103,15 @@ void roll_pitch_toy()
 
     if(g.rc_1.control_in != 0) {    // roll
         get_acro_yaw(yaw_rate/2);
-        ap_system.yaw_stopped = false;
+        ap.yaw_stopped = false;
         yaw_timer = 150;
 
-    }else if (!ap_system.yaw_stopped) {
+    }else if (!ap.yaw_stopped) {
         get_acro_yaw(0);
         yaw_timer--;
 
         if((yaw_timer == 0) || (fabsf(omega.z) < 0.17f)) {
-            ap_system.yaw_stopped = true;
+            ap.yaw_stopped = true;
             nav_yaw = ahrs.yaw_sensor;
         }
     }else{
@@ -144,7 +150,6 @@ void roll_pitch_toy()
 
 #elif TOY_MIXER == TOY_LINEAR_MIXER
     roll_rate = -((int32_t)g.rc_2.control_in * (yaw_rate/100)) /30;
-    //cliSerial->printf("roll_rate: %d\n",roll_rate);
     roll_rate = constrain_int32(roll_rate, -2000, 2000);
 
 #elif TOY_MIXER == TOY_EXTERNAL_MIXER

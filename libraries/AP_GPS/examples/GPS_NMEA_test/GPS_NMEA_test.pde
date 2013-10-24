@@ -13,6 +13,7 @@
 #include <AP_HAL_AVR.h>
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_Empty.h>
+#include <AP_Notify.h>
 
 const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
 
@@ -63,9 +64,9 @@ void loop()
                     "CoG: %d SAT: %d TIM: %lu\r\n"),
                           (float)gps->latitude / T7,
                           (float)gps->longitude / T7,
-                          (float)gps->altitude / 100.0,
-                          (float)gps->ground_speed / 100.0,
-                          (int)gps->ground_course / 100,
+                          (float)gps->altitude_cm / 100.0,
+                          (float)gps->ground_speed_cm / 100.0,
+                          (int)gps->ground_course_cd / 100,
                           gps->num_sats,
                           gps->time);
         } else {
