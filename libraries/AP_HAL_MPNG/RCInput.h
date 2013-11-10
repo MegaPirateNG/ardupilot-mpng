@@ -12,6 +12,13 @@
 #define SERIAL_PPM_ENABLED  2
 #define SERIAL_PPM_ENABLED_PL1 3 
 
+#define RC_MAP_STANDARD 1
+#define RC_MAP_GRAUPNER 2
+#define RC_MAP_HITEC 3
+#define RC_MAP_MULTIWII 4
+#define RC_MAP_JR 5
+
+
 class MPNG::MPNGRCInput : public AP_HAL::RCInput {
 public:
     /**

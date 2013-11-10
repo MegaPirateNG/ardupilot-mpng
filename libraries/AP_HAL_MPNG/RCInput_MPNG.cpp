@@ -21,29 +21,33 @@ extern const HAL& hal;
 	SERIAL_PPM_ENABLED_PL1		// Use for RCTIMER CRIUS AIOP Pro v2 ONLY, connect your receiver into PPM SUM pin
 */   
 
-//*****************  RC pin mapping  *******************************************************
-// To change pinmapping, uncomment ONE line starting with 'static unit8_t...'
+// Uncomment line below in order to use not Standard channel mapping
+//#define RC_MAPPING RC_MAP_STANDARD
+/*
+	RC_MAP_STANDARD 1
+	RC_MAP_GRAUPNER 2
+	RC_MAP_HITEC 3
+	RC_MAP_MULTIWII 4
+	RC_MAP_JR 5
+*/
 
-// Graupner/Spektrum
-// PITCH,YAW,THROTTLE,ROLL,AUX1,AUX2,CAMPITCH,CAMROLL
-//static uint8_t pinRcChannel[8] = {1, 3, 2, 0, 4, 5, 6, 7}; 
+#ifndef RC_MAPPING
+# define RC_MAPPING RC_MAP_STANDARD
+#endif
 
-// Standard (Default)
-// ROLL,PITCH,THROTTLE,YAW,MODE,AUX2,CAMPITCH,CAMROLL
-static uint8_t pinRcChannel[8] = {0, 1, 2, 3, 4, 5, 6, 7}; 
-
-// some Hitec/Sanwa/others
-// PITCH,ROLL,THROTTLE,YAW,AUX1,AUX2,CAMPITCH,CAMROLL
-//static uint8_t pinRcChannel[8] = {1, 0, 2, 3, 4, 5, 6, 7};
-
-// Multiwii
-// ROLL,THROTTLE,PITCH,YAW,AUX1,AUX2,CAMPITCH,CAMROLL
-//static uint8_t pinRcChannel[8] = {1, 2, 0, 3, 4, 5, 6, 7};
-
-// JR
-// FLAPS:MODE, GEAR:SAVE TRIMM = apm ch7
-//static uint8_t pinRcChannel[8] = {1, 2, 0, 3, 5, 6, 4, 7};
-//*****************  End of RC pin mapping  ************************************************
+#if RC_MAPPING == RC_MAP_STANDARD
+	static uint8_t pinRcChannel[8] = {0, 1, 2, 3, 4, 5, 6, 7}; // ROLL,PITCH,THROTTLE,YAW,MODE,AUX2,CAMPITCH,CAMROLL
+#elif RC_MAPPING == RC_MAP_GRAUPNER
+	static uint8_t pinRcChannel[8] = {1, 3, 2, 0, 4, 5, 6, 7}; // PITCH,YAW,THROTTLE,ROLL,AUX1,AUX2,CAMPITCH,CAMROLL
+#elif RC_MAPPING == RC_MAP_HITEC
+	static uint8_t pinRcChannel[8] = {1, 0, 2, 3, 4, 5, 6, 7}; // PITCH,ROLL,THROTTLE,YAW,AUX1,AUX2,CAMPITCH,CAMROLL
+#elif RC_MAPPING == RC_MAP_MULTIWII
+	static uint8_t pinRcChannel[8] = {1, 2, 0, 3, 4, 5, 6, 7}; // ROLL,THROTTLE,PITCH,YAW,AUX1,AUX2,CAMPITCH,CAMROLL
+#elif RC_MAPPING == RC_MAP_JR
+	static uint8_t pinRcChannel[8] = {1, 2, 0, 3, 5, 6, 4, 7}; // FLAPS:MODE, GEAR:SAVE TRIMM = apm ch7
+#else
+# error Wrong RC_MAPPING
+#endif
 
 // PPM_SUM filtering
 #define FILTER FILTER_DISABLED
