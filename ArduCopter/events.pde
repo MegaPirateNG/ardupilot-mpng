@@ -141,10 +141,12 @@ static void failsafe_gps_check()
     if(mode_requires_GPS(control_mode))
         set_mode(LAND);
 
+#if AC_FENCE == ENABLED
     // land if circular fence is enabled
     if((fence.get_enabled_fences() & AC_FENCE_TYPE_CIRCLE) != 0) {
         set_mode(LAND);
     }
+#endif
 }
 
 // failsafe_gps_off_event - actions to take when GPS contact is restored
