@@ -853,23 +853,22 @@ AP_Param param_loader(var_info, WP_START_BYTE);
   microseconds)
  */
 static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
-    { update_GPS,            2,     900 }, // 0
-    { update_navigation,     10,    500 }, // 1
+    { update_GPS,            2,    1150 }, // 0
+    { update_navigation,    10,     500 }, // 1
     { medium_loop,           2,     700 }, // 2
     { update_altitude,      10,    1000 }, // 3
-    { fifty_hz_loop,         2,     950 }, // 4
-    { run_nav_updates,      10,     800 }, // 5
-    { slow_loop,            10,     500 }, // 6
-    { gcs_check_input,	     2,     700 }, // 7
+    { fifty_hz_loop,         2,    1300 }, // 4
+    { run_nav_updates,      10,    1150 }, // 5
+    { slow_loop,            10,     550 }, // 6
+    { gcs_check_input,	     2,    1300 }, // 7
     { gcs_send_heartbeat,  100,     700 }, // 8
     { gcs_data_stream_send,  2,    1500 }, // 9
     { gcs_send_deferred,     2,    1200 }, // 10
-    { compass_accumulate,    2,     700 }, // 11
-    { barometer_accumulate,  2,     900 }, // 12
+    { compass_accumulate,    2,    1200 }, // 11
+    { barometer_accumulate,  2,     800 }, // 12
     { super_slow_loop,     100,    1100 }, // 13
-    { perf_update,        1000,     500 }  // 14 
+    { perf_update,        1000,     550 }  // 14 
 };
-
 
 void setup() {
     // this needs to be the first call, as it fills memory with
@@ -968,7 +967,7 @@ void loop()
         // the first call to the scheduler they won't run on a later
         // call until scheduler.tick() is called again
         uint32_t time_available = (timer + 10000) - micros();
-        scheduler.run(time_available - 500);
+       	scheduler.run(time_available);
     }
 }
 
@@ -978,11 +977,11 @@ static void fast_loop()
 {
     // IMU DCM Algorithm
     // --------------------
-    read_AHRS();
+    read_AHRS();  // ~3300us
 
     // reads all of the necessary trig functions for cameras, throttle, etc.
     // --------------------------------------------------------------------
-    update_trig();
+    update_trig();  // 430us
 
 	// Acrobatic control
     if (ap.do_flip) {
@@ -997,7 +996,7 @@ static void fast_loop()
     }
 
     // run low level rate controllers that only require IMU data
-    run_rate_controllers();
+    run_rate_controllers();  // 536us / 680us 
 
     // write out the servo PWM values
     // ------------------------------
