@@ -37,7 +37,7 @@ public:
   
 protected:
 	uint16_t 			_init_sensor( Sample_rate sample_rate );
-	
+ 	float         _delta_time; 	
 private:
   static bool read(uint32_t);
     

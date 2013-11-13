@@ -35,7 +35,7 @@ int8_t AP_InertialSensor_ITG3200::_accel_data_sign[3] = { 1, 1, -1 };
 const uint8_t AP_InertialSensor_ITG3200::_temp_data_index = 3;
 
 uint8_t AP_InertialSensor_ITG3200::_accel_addr = 0x40;
-uint16_t AP_InertialSensor_ITG3200::_micros_per_sample = 5000; // 200Hz
+uint16_t AP_InertialSensor_ITG3200::_micros_per_sample = 9500; // 100Hz
 
 /* Static I2C device driver */
 AP_HAL::Semaphore* AP_InertialSensor_ITG3200::_i2c_sem = NULL;
@@ -164,8 +164,7 @@ bool AP_InertialSensor_ITG3200::update( void )
 // get_delta_time returns the time period in seconds overwhich the sensor data was collected
 float AP_InertialSensor_ITG3200::get_delta_time() 
 {
-    // the sensor runs at 200Hz
-    return 0.005 * _num_samples;
+    return _delta_time;
 }
 
 float AP_InertialSensor_ITG3200::_temp_to_celsius ( uint16_t regval )
@@ -280,18 +279,21 @@ bool AP_InertialSensor_ITG3200::hardware_init(Sample_rate sample_rate)
 	case RATE_50HZ:
 		hal.i2c->writeRegister(ITG3200_ADDRESS, 0x15, GYRO_SMPLRT_50HZ);
 		default_filter = GYRO_DLPF_CFG_20HZ;
-		_micros_per_sample = 20000;
+		_micros_per_sample = 19500;
+		_delta_time = 0.02;
 		break;
 	case RATE_100HZ:
 		hal.i2c->writeRegister(ITG3200_ADDRESS, 0x15, GYRO_SMPLRT_100HZ);
 		default_filter = GYRO_DLPF_CFG_20HZ;
-		_micros_per_sample = 10000;
+		_micros_per_sample = 9500;
+		_delta_time = 0.01;
 		break;
 	case RATE_200HZ:
 	default:
 		hal.i2c->writeRegister(ITG3200_ADDRESS, 0x15, GYRO_SMPLRT_200HZ);
 		default_filter = GYRO_DLPF_CFG_42HZ;
-		_micros_per_sample = 5000;
+		_micros_per_sample = 4500;
+		_delta_time = 0.005;
 		break;
 	}
 	hal.scheduler->delay(5);
