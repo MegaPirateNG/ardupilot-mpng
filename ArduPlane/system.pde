@@ -165,6 +165,9 @@ static void init_ardupilot()
 
     if (g.compass_enabled==true) {
         if (!compass.init() || !compass.read()) {
+            #if CONFIG_INS_TYPE == CONFIG_INS_MPU6000_I2C && HIL_MODE == HIL_MODE_DISABLED
+                ins.hardware_init_i2c_bypass();
+            #endif
             cliSerial->println_P(PSTR("Compass initialisation failed!"));
             g.compass_enabled = false;
         } else {
