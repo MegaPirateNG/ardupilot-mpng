@@ -14,12 +14,15 @@ using namespace MPNG;
 extern const HAL& hal;
 
 // PPM_SUM(CPPM) or PWM Signal processing
-#define SERIAL_PPM SERIAL_PPM_ENABLED
+//#define SERIAL_PPM SERIAL_PPM_ENABLED
 /*
 	SERIAL_PPM_DISABLED				// Separated channel signal (PWM) on A8-A15 pins
 	SERIAL_PPM_ENABLED				// For all boards, PPM_SUM pin is A8
 	SERIAL_PPM_ENABLED_PL1		// Use for RCTIMER CRIUS AIOP Pro v2 ONLY, connect your receiver into PPM SUM pin
 */   
+#ifndef SERIAL_PPM
+# define SERIAL_PPM SERIAL_PPM_ENABLED
+#endif
 
 // Uncomment line below in order to use not Standard channel mapping
 //#define RC_MAPPING RC_MAP_STANDARD
