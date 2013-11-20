@@ -98,7 +98,7 @@ static void init_ardupilot()
     // GPS serial port.
     //
     // standard gps running
-    hal.uartB->begin(38400, 256, 16);
+    hal.uartB->begin(SERIAL2_BAUD, 256, 16);
 
     cliSerial->printf_P(PSTR("\n\nInit " THISFIRMWARE
                          "\n\nFree RAM: %u\n"),
