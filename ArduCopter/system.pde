@@ -115,8 +115,8 @@ static void init_ardupilot()
 #endif
 
     cliSerial->printf_P(PSTR("\n\nInit " THISFIRMWARE
-                         "\n\nFree RAM: %u\n"),
-                    memcheck_available_memory());
+                             "\n\nFree RAM: %u\nBoard Type: %d\n" ),
+                        (unsigned) memcheck_available_memory(), MPNG_BOARD_TYPE); 
 
     //
     // Report firmware version code expect on console (check of actual EEPROM format version is done in load_parameters function)
