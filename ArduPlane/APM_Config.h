@@ -12,7 +12,7 @@
 // simulation. Remove the leading "/* and trailing "*/" to enable:
 
 // Select Megapirate board type:
-#define MPNG_BOARD_TYPE   RCTIMER_CRIUS_V2
+//#define MPNG_BOARD_TYPE   CRIUS_V1
 /*
   RCTIMER_CRIUS_V2    -- (DEFAULT!!!) Use ONLY for RCTimer CRIUS V2 board
   CRIUS_V1            -- Use this define for RCTimer CRIUS V1(1.1) board and all HobbyKing AIOP boards

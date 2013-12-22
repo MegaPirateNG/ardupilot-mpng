@@ -101,9 +101,8 @@ static void init_ardupilot()
     hal.uartB->begin(SERIAL2_BAUD, 256, 16);
 
     cliSerial->printf_P(PSTR("\n\nInit " THISFIRMWARE
-                         "\n\nFree RAM: %u\n"),
-                    memcheck_available_memory());
-
+                            "\n\nFree RAM: %u\nBoard Type: %d\n" ),
+                            (unsigned) memcheck_available_memory(), MPNG_BOARD_TYPE); 
 
     //
     // Check the EEPROM format version before loading any parameters from EEPROM
