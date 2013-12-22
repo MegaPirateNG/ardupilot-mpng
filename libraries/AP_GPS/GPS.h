@@ -210,7 +210,7 @@ protected:
     bool _have_raw_velocity;
 
 	// detected baudrate
-	uint16_t _baudrate;
+	uint32_t _baudrate;
 
 private:
 
