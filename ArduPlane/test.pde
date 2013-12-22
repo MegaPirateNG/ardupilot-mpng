@@ -527,10 +527,13 @@ test_mag(uint8_t argc, const Menu::arg *argv)
         return (0);
     }
 
+    hal.scheduler->suspend_timer_procs(); 
     if (!compass.init()) {
         cliSerial->println_P(PSTR("Compass initialisation failed!"));
         return 0;
     }
+    hal.scheduler->resume_timer_procs();
+
     ahrs.init();
     ahrs.set_fly_forward(true);
     ahrs.set_wind_estimation(true);

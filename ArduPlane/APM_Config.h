@@ -18,6 +18,7 @@
   CRIUS_V1            -- Use this define for RCTimer CRIUS V1(1.1) board and all HobbyKing AIOP boards
   HK_RED_MULTIWII_PRO -- HobbyKing MultiWii Pro board with ITG3205 and BMA180, BMP085 sensors
   BLACK_VORTEX
+  MULTIWII_PRO_EZ3_BLACK  -- ReadyToFlyQuads - MultiWii PRO Ez3.0 Blacked MAG Editon Flight Controller w/ GPS Option (NO COMPASS) 
  */
  
  // GPS port speed (Serial2) 38400 by default

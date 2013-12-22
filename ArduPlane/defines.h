@@ -264,7 +264,8 @@ enum log_messages {
 #define RCTIMER_CRIUS_V2 1
 #define CRIUS_V1 2
 #define HK_RED_MULTIWII_PRO 3
-#define BLACK_VORTEX 4 
+#define BLACK_VORTEX 4
+#define MULTIWII_PRO_EZ3_BLACK 5
 
 // altitude control algorithms
 enum {
