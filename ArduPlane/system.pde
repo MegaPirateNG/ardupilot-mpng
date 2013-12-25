@@ -80,12 +80,11 @@ static void init_ardupilot()
     // GPS serial port.
     //
     // standard gps running
-    hal.uartB->begin(38400, 256, 16);
+    hal.uartB->begin(SERIAL2_BAUD, 256, 16);
 
     cliSerial->printf_P(PSTR("\n\nInit " THISFIRMWARE
-                         "\n\nFree RAM: %u\n"),
-                    memcheck_available_memory());
-
+                            "\n\nFree RAM: %u\nBoard Type: %d\n" ),
+                            (unsigned) memcheck_available_memory(), MPNG_BOARD_TYPE); 
 
     //
     // Check the EEPROM format version before loading any parameters from EEPROM
@@ -94,6 +93,11 @@ static void init_ardupilot()
 
     set_control_channels();
 
+    // Ensure all data (firmware version) printed out
+    while (hal.uartA->tx_pending()) {
+       hal.scheduler->delay(1);
+    }
+    
     // reset the uartA baud rate after parameter load
     hal.uartA->begin(map_baudrate(g.serial0_baud, SERIAL0_BAUD));
 
@@ -146,6 +150,9 @@ static void init_ardupilot()
 
     if (g.compass_enabled==true) {
         if (!compass.init() || !compass.read()) {
+            #if CONFIG_INS_TYPE == CONFIG_INS_MPU6000_I2C && HIL_MODE == HIL_MODE_DISABLED
+                ins.hardware_init_i2c_bypass();
+            #endif
             cliSerial->println_P(PSTR("Compass initialisation failed!"));
             g.compass_enabled = false;
         } else {

@@ -1,7 +1,7 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-
+#ifndef THISFIRMWARE
 #define THISFIRMWARE "ArduCopter V3.1-rc4 MPNG-R1b"
-/*
+#endif
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
@@ -253,6 +253,8 @@ static SITL sitl;
 static AP_Baro_BMP085 barometer;
   #elif CONFIG_BARO == AP_BARO_PX4
 static AP_Baro_PX4 barometer;
+  #elif CONFIG_BARO == AP_BARO_BMP085_MPNG
+      static AP_Baro_BMP085_MPNG barometer;
   #elif CONFIG_BARO == AP_BARO_MS5611
    #if CONFIG_MS5611_SERIAL == AP_BARO_MS5611_SPI
 static AP_Baro_MS5611 barometer(&AP_Baro_MS5611::spi);
@@ -908,7 +910,6 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
 #endif
 };
 
-
 void setup() {
     // this needs to be the first call, as it fills memory with
     // sentinel values
@@ -1012,7 +1013,7 @@ void loop()
     // the first call to the scheduler they won't run on a later
     // call until scheduler.tick() is called again
     uint32_t time_available = (timer + 10000) - micros();
-    scheduler.run(time_available - 300);
+    scheduler.run(time_available);
 }
 
 
@@ -1021,11 +1022,11 @@ static void fast_loop()
 {
     // IMU DCM Algorithm
     // --------------------
-    read_AHRS();
+    read_AHRS();  // ~3300us
 
     // reads all of the necessary trig functions for cameras, throttle, etc.
     // --------------------------------------------------------------------
-    update_trig();
+    update_trig();  // 430us
 
 	// Acrobatic control
     if (ap.do_flip) {
@@ -1040,7 +1041,7 @@ static void fast_loop()
     }
 
     // run low level rate controllers that only require IMU data
-    run_rate_controllers();
+    run_rate_controllers();  // 536us / 680us 
 
     // write out the servo PWM values
     // ------------------------------

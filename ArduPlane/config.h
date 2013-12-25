@@ -141,6 +141,12 @@
  # define CONFIG_COMPASS  AP_COMPASS_HMC5843
 #endif
 
+//////////////////////////////////////////////////////////////////////////////
+// GPS Port speed
+#ifndef SERIAL2_BAUD
+	#define SERIAL2_BAUD 38400
+#endif 
+
 
 #ifndef CONFIG_BARO
  # error "CONFIG_BARO not set"

@@ -411,12 +411,18 @@ static int8_t
 setup_compass(uint8_t argc, const Menu::arg *argv)
 {
     if (!strcmp_P(argv[1].str, PSTR("on"))) {
+        // initialise compass
+        hal.scheduler->suspend_timer_procs();
+        #if CONFIG_INS_TYPE == CONFIG_INS_MPU6000_I2C && HIL_MODE == HIL_MODE_DISABLED
+            ins.hardware_init_i2c_bypass();
+        #endif
         if (!compass.init()) {
             cliSerial->println_P(PSTR("Compass initialisation failed!"));
             g.compass_enabled = false;
         } else {
             g.compass_enabled = true;
         }
+        hal.scheduler->resume_timer_procs(); 
     } else if (!strcmp_P(argv[1].str, PSTR("off"))) {
         g.compass_enabled = false;
 
