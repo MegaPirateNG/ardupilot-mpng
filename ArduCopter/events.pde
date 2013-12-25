@@ -170,7 +170,6 @@ static void failsafe_gps_check()
     if(mode_requires_GPS(control_mode))
         set_mode(LAND);
 
-#if AC_FENCE == ENABLED
     // land if circular fence is enabled
 #if AC_FENCE == ENABLED
     if((fence.get_enabled_fences() & AC_FENCE_TYPE_CIRCLE) != 0) {
