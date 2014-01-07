@@ -85,7 +85,7 @@ uint16_t MPNGRCOutput::get_freq(uint8_t ch) {
         case CH_2:
         case CH_7:
         case CH_8:
-            icr = ICR5;
+            icr = ICR4;
             break;
         default:
             return 0;
