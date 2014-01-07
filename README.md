@@ -1,8 +1,8 @@
-# Release Notes for MegaPirateNG 3.1 R1 (based on ArduPilot 3.1-rc4)
+# Release Notes for MegaPirateNG 3.1 (based on ArduPilot 3.1, ArduPlane 2.76)
 
 ## How to compile and configure MegaPirateNG
 Follow instructions at: http://docs.megapirateng.com
-Notice! Serial1 currently not supported!
+
 
 ## Sonar
 Currently sonar is not supported

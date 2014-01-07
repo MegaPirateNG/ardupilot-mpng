@@ -82,7 +82,7 @@ static void init_ardupilot()
     // standard gps running
     hal.uartB->begin(SERIAL2_BAUD, 256, 16);
 
-    cliSerial->printf_P(PSTR("\n\nInit " THISFIRMWARE
+    cliSerial->printf_P(PSTR("\n\nInit " FIRMWARE_STRING
                             "\n\nFree RAM: %u\nBoard Type: %d\n" ),
                             (unsigned) memcheck_available_memory(), MPNG_BOARD_TYPE); 
 
@@ -426,15 +426,8 @@ static void startup_INS_ground(bool do_accel_init)
     }
 
     if (style == AP_InertialSensor::COLD_START) {
-        gcs_send_text_P(SEVERITY_MEDIUM, PSTR("Warming up ADC..."));
-        mavlink_delay(500);
-
-        // Makes the servos wiggle twice - about to begin INS calibration - HOLD LEVEL AND STILL!!
-        // -----------------------
-        demo_servos(2);
-
         gcs_send_text_P(SEVERITY_MEDIUM, PSTR("Beginning INS calibration; do not move plane"));
-        mavlink_delay(1000);
+        mavlink_delay(100);
     }
 
     ahrs.init();

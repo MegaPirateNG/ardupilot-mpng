@@ -19,7 +19,7 @@ public:
     bool                update();
     float               get_gyro_drift_rate();
 
-    // num_samples_available - get number of samples read from the sensors
+    // sample_available - true when a new sample is available
     bool            sample_available();
     bool                        wait_for_sample(uint16_t timeout_ms);
     void                 _poll_data(void);
@@ -36,11 +36,10 @@ protected:
 
 private:
 
-    static void                 _read_data_from_timerprocess();
-    static void                 _read_data_transaction();
+    void                 _read_data_transaction();
     bool                        hardware_init(Sample_rate sample_rate);
 
-    static AP_HAL::Semaphore *_i2c_sem;
+    AP_HAL::Semaphore *_i2c_sem;
 
     uint16_t					          _num_samples;
 
@@ -50,26 +49,24 @@ private:
 
     static const float          _gyro_scale;
 
-    static const uint8_t        _gyro_data_index[3];
-    static const int8_t         _gyro_data_sign[3];
-
-    static const uint8_t        _accel_data_index[3];
-    static const int8_t         _accel_data_sign[3];
-
-    static const uint8_t        _temp_data_index;
-    static uint8_t              mpu_addr; 
+    uint8_t              mpu_addr; 
 
     // ensure we can't initialise twice
     bool                        _initialised;
-    static int16_t              _mpu6000_product_id;
+    int16_t              _mpu6000_product_id;
 
-  	static uint16_t             _micros_per_sample;
+    uint16_t             _micros_per_sample;
 
     // support for updating filter at runtime
     uint8_t                     _last_filter_hz;
   
     void _set_filter_register(uint8_t filter_hz, uint8_t default_filter);
 
+    // accumulation in timer - must be read with timer disabled
+    // the sum of the values since last read
+    Vector3l _accel_sum;
+    Vector3l _gyro_sum;
+    volatile int16_t _sum_count;
 };
 
 #endif // __AP_INERTIAL_SENSOR_MPU6000_I2C_H__

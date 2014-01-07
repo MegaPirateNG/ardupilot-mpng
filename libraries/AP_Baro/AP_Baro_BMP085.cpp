@@ -210,6 +210,7 @@ void AP_Baro_BMP085::ReadPress()
 
     if (hal.i2c->readRegisters(BMP085_ADDRESS, 0xF6, 3, buf) != 0) {
         _retry_time = hal.scheduler->millis() + 1000;
+        hal.i2c->setHighSpeed(false);
         healthy = false;
         return;
     }
@@ -240,6 +241,7 @@ void AP_Baro_BMP085::ReadTemp()
 
     if (hal.i2c->readRegisters(BMP085_ADDRESS, 0xF6, 2, buf) != 0) {
         _retry_time = hal.scheduler->millis() + 1000;
+        hal.i2c->setHighSpeed(false);
         healthy = false;
         return;
     }

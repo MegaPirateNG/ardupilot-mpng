@@ -162,32 +162,13 @@ extern const AP_HAL::HAL& hal;
  */
 const float AP_InertialSensor_MPU6000_I2C::_gyro_scale = (0.0174532 / 16.4);
 
-/* pch: I believe the accel and gyro indicies are correct
- *      but somone else should please confirm.
- *
- * jamesjb: Y and Z axes are flipped on the PX4FMU
- */
-const uint8_t AP_InertialSensor_MPU6000_I2C::_gyro_data_index[3]  = { 4, 3, 5 };
-const uint8_t AP_InertialSensor_MPU6000_I2C::_accel_data_index[3] = { 1, 0, 2 };
-const int8_t AP_InertialSensor_MPU6000_I2C::_gyro_data_sign[3]   = { 1, 1, -1 };
-const int8_t AP_InertialSensor_MPU6000_I2C::_accel_data_sign[3]  = { 1, 1, -1 };
-	
-const uint8_t AP_InertialSensor_MPU6000_I2C::_temp_data_index = 3; 
-
-uint8_t AP_InertialSensor_MPU6000_I2C::mpu_addr = MPU6000_ADDR;
-	
-int16_t AP_InertialSensor_MPU6000_I2C::_mpu6000_product_id=0;
-uint16_t AP_InertialSensor_MPU6000_I2C::_micros_per_sample = 5000;	
-
-/* Static I2C device driver */
-AP_HAL::Semaphore* AP_InertialSensor_MPU6000_I2C::_i2c_sem = NULL;
-
 static volatile uint32_t _ins_timer = 0;
 static volatile bool _sens_stage = 0;
 
 AP_InertialSensor_MPU6000_I2C::AP_InertialSensor_MPU6000_I2C(): AP_InertialSensor()
 {
-	_initialised = false;
+   _initialised = false;
+   mpu_addr = MPU6000_ADDR;
 }
 
 uint16_t AP_InertialSensor_MPU6000_I2C::_init_sensor(Sample_rate sample_rate )
@@ -207,7 +188,7 @@ uint16_t AP_InertialSensor_MPU6000_I2C::_init_sensor(Sample_rate sample_rate )
         } else {
             hal.scheduler->delay(50); // delay for 50ms
                 hal.console->println_P(
-                        PSTR("MPU6000 init failed"));
+                        PSTR("MPU6000 startup failed: no data ready"));
         }
         if (tries++ > 5) {
             hal.scheduler->panic(PSTR("PANIC: failed to boot MPU6000 5 times")); 
@@ -233,13 +214,6 @@ uint16_t AP_InertialSensor_MPU6000_I2C::_init_sensor(Sample_rate sample_rate )
 	return _mpu6000_product_id;
 }
 
-// accumulation in ISR - must be read with interrupts disabled
-// the sum of the values since last read
-static volatile int32_t _sum[6];
-
-// how many values we've accumulated since last read
-static volatile uint16_t _count;
-
 /*================ AP_INERTIALSENSOR PUBLIC INTERFACE ==================== */
 bool AP_InertialSensor_MPU6000_I2C::wait_for_sample(uint16_t timeout_ms)
 {
@@ -258,43 +232,31 @@ bool AP_InertialSensor_MPU6000_I2C::wait_for_sample(uint16_t timeout_ms)
 
 bool AP_InertialSensor_MPU6000_I2C::update( void )
 {
-	int32_t sum[7];
-	float count_scale;
-	Vector3f accel_scale = _accel_scale.get();
-
     // wait for at least 1 sample
     if (!wait_for_sample(1000)) {
         return false;
     }
 
+    _previous_accel = _accel;
+
     // disable timer procs for mininum time
     hal.scheduler->suspend_timer_procs();
-    /** ATOMIC SECTION w/r/t TIMER PROCESS */
-    {
-        for (int i=0; i<6; i++) {
-            sum[i] = _sum[i];
-            _sum[i] = 0;
-        }
-
-        _num_samples = _count;
-        _count = 0;
-    }
+    _gyro  = Vector3f(_gyro_sum.x, _gyro_sum.y, _gyro_sum.z);
+    _accel = Vector3f(_accel_sum.x, _accel_sum.y, _accel_sum.z);
+    _num_samples = _sum_count;
+    _accel_sum.zero();
+    _gyro_sum.zero();
+    _sum_count = 0;
     hal.scheduler->resume_timer_procs();
 
-    count_scale = 1.0f / _num_samples;
-
-    _gyro  = Vector3f(_gyro_data_sign[0] * sum[_gyro_data_index[0]],
-                      _gyro_data_sign[1] * sum[_gyro_data_index[1]],
-                      _gyro_data_sign[2] * sum[_gyro_data_index[2]]);
     _gyro.rotate(_board_orientation);
-    _gyro *= _gyro_scale * count_scale;
+    _gyro *= _gyro_scale / _num_samples;
     _gyro -= _gyro_offset;
 
-    _accel   = Vector3f(_accel_data_sign[0] * sum[_accel_data_index[0]],
-                        _accel_data_sign[1] * sum[_accel_data_index[1]],
-                        _accel_data_sign[2] * sum[_accel_data_index[2]]);
     _accel.rotate(_board_orientation);
-    _accel *= count_scale * MPU6000_ACCEL_SCALE_1G;
+    _accel *= MPU6000_ACCEL_SCALE_1G / _num_samples;
+
+    Vector3f accel_scale = _accel_scale.get();
     _accel.x *= accel_scale.x;
     _accel.y *= accel_scale.y;
     _accel.z *= accel_scale.z;
@@ -330,26 +292,22 @@ void AP_InertialSensor_MPU6000_I2C::_poll_data(void)
 	uint32_t now = hal.scheduler->micros();
 	
 	if ( (now - _ins_timer > _micros_per_sample) || (_sens_stage == 1)) {
-//	  hal.gpio->write(46,1); 
-	
-	  if (hal.scheduler->in_timerprocess()) {
-	  		bool _stage = _sens_stage;
-	      _read_data_from_timerprocess();
-				if (_stage != _sens_stage && _stage == 0) {
+		if (hal.scheduler->in_timerprocess()) {
+			if (_i2c_sem->take_nonblocking()) {
+				_read_data_transaction();
+				if (_sens_stage == 0) {
 					_ins_timer = now;
 				}
-	      
+				_i2c_sem->give();
+			}
 	  } else {
 	      /* Synchronous read - take semaphore */
-	      bool got = _i2c_sem->take(10);
-	      if (got) {
+	      if (_i2c_sem->take(10)) {
 					  if (_sens_stage == 0) {
 							_ins_timer = now;
 						}
-
-              	_read_data_transaction(); 
-						
-	          _i2c_sem->give();
+						_read_data_transaction(); 
+						_i2c_sem->give();
 	      } else {
 	          hal.scheduler->panic(
 	                  PSTR("PANIC: AP_InertialSensor_MPU6000::_poll_data "
@@ -371,31 +329,16 @@ float AP_InertialSensor_MPU6000_I2C::get_gyro_drift_rate(void)
 // get number of samples read from the sensors
 bool AP_InertialSensor_MPU6000_I2C::sample_available()
 {
-    return _count > 0; 
+    return _sum_count > 0; 
 }
 
 /*================ HARDWARE FUNCTIONS ==================== */
 
-void AP_InertialSensor_MPU6000_I2C::_read_data_from_timerprocess()
-{
-    if (!_i2c_sem->take_nonblocking()) {
-        /*
-          the semaphore being busy is an expected condition when the
-          mainline code is calling sample_available() which will
-          grab the semaphore. We return now and rely on the mainline
-          code grabbing the latest sample.
-         */
-        return;
-    }  
-
-    _read_data_transaction();
-
-    _i2c_sem->give();
-}
-
 void AP_InertialSensor_MPU6000_I2C::_read_data_transaction()
 {
-//  hal.gpio->write(45,1); 
+#define int16_val(v, idx) ((int16_t)(((uint16_t)v[2*idx] << 8) | v[2*idx+1]))
+
+  hal.gpio->write(45,1); 
 	uint8_t rawMPU[6];
 	memset(rawMPU,0,6);
 	hal.i2c->setHighSpeed(true); // Set I2C fast speed
@@ -404,27 +347,28 @@ void AP_InertialSensor_MPU6000_I2C::_read_data_transaction()
 		// Read Accel
 	
 	  hal.i2c->readRegisters(mpu_addr, MPUREG_ACCEL_XOUT_H, 6, rawMPU);
-    _sum[0] += (int16_t)(((uint16_t)rawMPU[0] << 8) | rawMPU[1]);
-    _sum[1] += (int16_t)(((uint16_t)rawMPU[2] << 8) | rawMPU[3]);
-    _sum[2] += (int16_t)(((uint16_t)rawMPU[4] << 8) | rawMPU[5]);
+    _accel_sum.x += int16_val(rawMPU, 1);
+    _accel_sum.y += int16_val(rawMPU, 0);
+    _accel_sum.z -= int16_val(rawMPU, 2);
     
 		_sens_stage = 1;
 	} else {
 
 	  hal.i2c->readRegisters(mpu_addr, MPUREG_GYRO_XOUT_H, 6, rawMPU);
-    _sum[3] += (int16_t)(((uint16_t)rawMPU[0] << 8) | rawMPU[1]);
-    _sum[4] += (int16_t)(((uint16_t)rawMPU[2] << 8) | rawMPU[3]);
-    _sum[5] += (int16_t)(((uint16_t)rawMPU[4] << 8) | rawMPU[5]);
+    _gyro_sum.x += int16_val(rawMPU, 1);
+    _gyro_sum.y += int16_val(rawMPU, 0);
+    _gyro_sum.z -= int16_val(rawMPU, 2);
+    _sens_stage = 0;
 		
-		_count++;
-		if (_count == 0) {
-			// rollover - v unlikely
-			memset((void*)_sum, 0, sizeof(_sum));
-		}
+		_sum_count++;
 
-		_sens_stage = 0;
+    if (_sum_count == 0) {
+        // rollover - v unlikely
+        _accel_sum.zero();
+        _gyro_sum.zero();
 	}
-//	hal.gpio->write(45,0); 
+   }
+	hal.gpio->write(45,0); 
 }
 
 void AP_InertialSensor_MPU6000_I2C::hardware_init_i2c_bypass()

@@ -68,7 +68,7 @@ const AP_Param::GroupInfo AC_WPNav::var_info[] PROGMEM = {
 // Note that the Vector/Matrix constructors already implicitly zero
 // their values.
 //
-AC_WPNav::AC_WPNav(AP_InertialNav* inav, AP_AHRS* ahrs, APM_PI* pid_pos_lat, APM_PI* pid_pos_lon, AC_PID* pid_rate_lat, AC_PID* pid_rate_lon) :
+AC_WPNav::AC_WPNav(const AP_InertialNav* inav, const AP_AHRS* ahrs, APM_PI* pid_pos_lat, APM_PI* pid_pos_lon, AC_PID* pid_rate_lat, AC_PID* pid_rate_lon) :
     _inav(inav),
     _ahrs(ahrs),
     _pid_pos_lat(pid_pos_lat),
@@ -102,7 +102,8 @@ AC_WPNav::AC_WPNav(AP_InertialNav* inav, AP_AHRS* ahrs, APM_PI* pid_pos_lat, APM
 {
     AP_Param::setup_object_defaults(this, var_info);
 
-    // calculate loiter leash
+    // initialise leash lengths
+    calculate_wp_leash_length(true);
     calculate_loiter_leash_length();
 }
 
@@ -138,7 +139,7 @@ void AC_WPNav::get_stopping_point(const Vector3f& position, const Vector3f& velo
         linear_distance = _wp_accel_cms/(2.0f*kP*kP);
         target_dist = linear_distance + (vel_total*vel_total)/(2.0f*_wp_accel_cms);
     }
-    target_dist = constrain_float(target_dist, 0, _wp_leash_xy*2.0f);
+    target_dist = constrain_float(target_dist, 0, _wp_leash_xy);
 
     target.x = position.x + (target_dist * velocity.x / vel_total);
     target.y = position.y + (target_dist * velocity.y / vel_total);
@@ -386,7 +387,7 @@ void AC_WPNav::set_origin_and_destination(const Vector3f& origin, const Vector3f
     _flags.reached_destination = false;
 
     // initialise the limited speed to current speed along the track
-    Vector3f curr_vel = _inav->get_velocity();
+    const Vector3f &curr_vel = _inav->get_velocity();
     // get speed along track (note: we convert vertical speed into horizontal speed equivalent)
     float speed_along_track = curr_vel.x * _pos_delta_unit.x + curr_vel.y * _pos_delta_unit.y + curr_vel.z * _pos_delta_unit.z;
     _limited_speed_xy_cms = constrain_float(speed_along_track,0,_wp_speed_cms);
@@ -437,7 +438,7 @@ void AC_WPNav::advance_target_along_track(float dt)
     }
 
     // get current velocity
-    Vector3f curr_vel = _inav->get_velocity();
+    const Vector3f &curr_vel = _inav->get_velocity();
     // get speed along track
     float speed_along_track = curr_vel.x * _pos_delta_unit.x + curr_vel.y * _pos_delta_unit.y + curr_vel.z * _pos_delta_unit.z;
 
@@ -619,7 +620,7 @@ void AC_WPNav::get_loiter_position_to_velocity(float dt, float max_speed_cms)
 ///    converts desired velocities in lat/lon directions to accelerations in lat/lon frame
 void AC_WPNav::get_loiter_velocity_to_acceleration(float vel_lat, float vel_lon, float dt)
 {
-    Vector3f vel_curr = _inav->get_velocity();  // current velocity in cm/s
+    const Vector3f &vel_curr = _inav->get_velocity();  // current velocity in cm/s
     Vector3f vel_error;                         // The velocity error in cm/s.
     float accel_total;                          // total acceleration in cm/s/s
 
