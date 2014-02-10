@@ -1,4 +1,4 @@
-# Release Notes for MegaPirateNG 3.0.1 R3 BETA (based on ArduPilot 3.0.1)
+# Release Notes for MegaPirateNG 3.0.1 R4 (based on ArduPilot 3.0.1)
 
 ## How to compile and configure MegaPirateNG
 Follow instructions at: http://docs.megapirateng.com

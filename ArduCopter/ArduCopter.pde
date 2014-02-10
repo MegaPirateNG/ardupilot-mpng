@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 #ifndef THISFIRMWARE
-#  define THISFIRMWARE "ArduCopter-MPNG V3.0.1 R3b"
+#  define THISFIRMWARE "ArduCopter-MPNG V3.0.1 R4"
 #endif
 /*
  *  ArduCopter Version 3.0
