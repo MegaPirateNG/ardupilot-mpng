@@ -42,11 +42,11 @@ static const struct {
 } pin_scaling[] = {
 #ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
     // PX4 has 4 FMU analog input pins
-    { 10, (5.7*3.3)/4096 }, // FMU battery on multi-connector pin 5,
+    { 13, (5.7*3.3)/4096 }, // FMU battery on multi-connector pin 5,
                             // 5.7:1 scaling
     { 11,  6.6f/4096  }, // analog airspeed input, 2:1 scaling
     { 12,  3.3f/4096  }, // analog2, on SPI port pin 3
-    { 13, 16.8f/4096  }, // analog3, on SPI port pin 4
+    { 10, 16.8f/4096  }, // analog3, on SPI port pin 4
 #elif defined(CONFIG_ARCH_BOARD_PX4FMU_V2)
     { 2,   3.3f/4096  },    // 3DR Brick voltage, usually 10.1:1
                             // scaled from battery voltage

@@ -65,16 +65,16 @@ fi
 
 if [ $BOARD == FMUv1 ]
 then
-   set deviceC /dev/ttyS2
+   set deviceC /dev/ttyS1
    if [ -f /fs/microsd/APM/AUXPWM.en ]
    then
       set deviceD /dev/null
    else
-      set deviceD /dev/ttyS1
+      set deviceD /dev/ttyS3
    fi
 else
    set deviceC /dev/ttyS1
-   set deviceD /dev/ttyS2
+   set deviceD /dev/ttyS3
 fi
 
 if uorb start
