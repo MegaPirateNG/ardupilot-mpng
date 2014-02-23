@@ -30,7 +30,7 @@
 #include <drivers/drv_pwm_output.h>
 
 #ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
-#define BOARD_PWM_COUNT_DEFAULT 2
+#define BOARD_PWM_COUNT_DEFAULT 8
 #define BOARD_SER1_RTSCTS_DEFAULT 0 // no flow control on UART5 on FMUv1
 #else
 #define BOARD_PWM_COUNT_DEFAULT 4
@@ -77,11 +77,12 @@ void AP_BoardConfig::init()
     /* configurre the FMU driver for the right number of PWMs */
 
     // ensure only valid values are set, rounding up
-    if (_pwm_count > 6) _pwm_count.set(6);
+    if (_pwm_count > 8) _pwm_count.set(8);
     if (_pwm_count < 0) _pwm_count.set(0);
     if (_pwm_count == 1) _pwm_count.set(2);
     if (_pwm_count == 3) _pwm_count.set(4);
     if (_pwm_count == 5) _pwm_count.set(6);
+    if (_pwm_count == 7) _pwm_count.set(8);
 
     int fd = open("/dev/px4fmu", 0);
     if (fd == -1) {
