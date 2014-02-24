@@ -22,9 +22,7 @@ extern const AP_HAL::HAL& hal;
 
 // ITG-3200 14.375 LSB/degree/s
 float AP_InertialSensor_ITG3200::_gyro_scale = 0.0012141421; // ToRad(1/14.375)
-float AP_InertialSensor_ITG3200::_accel_scale_1G = (GRAVITY_MSS / 2730.0f); // 2730 LSB = 1G
-	
-	
+float AP_InertialSensor_ITG3200::_accel_scale_1G = (GRAVITY_MSS / 1024.0f); // 1024 LSB = 1G
 
 uint8_t AP_InertialSensor_ITG3200::_gyro_data_index[3] = { 1, 2, 0 };
 uint8_t AP_InertialSensor_ITG3200::_accel_data_index[3] = { 4, 5, 6 };
@@ -49,11 +47,9 @@ AP_InertialSensor_ITG3200::AP_InertialSensor_ITG3200(uint8_t board_type): AP_Ine
 
 	if (_board_type == BLACK_VORTEX) {
 		_accel_addr = 0x41;
-		_accel_scale_1G = (GRAVITY_MSS / 1024.0f); // BMA280 - 1024 LSB = 1G
 	} else if (_board_type == PARIS_V5_OSD) {
 		_accel_addr = 0x18;
 		_gyro_scale = 0.0010642251536551; // ITG3050 - 16.4 LSB/degree/s = ToRad(1/16.4)
-		_accel_scale_1G = (GRAVITY_MSS / 1024.0f); // BMA280 - 1024 LSB = 1G
 		_gyro_data_index[0] = 2; _gyro_data_index[1] = 1; _gyro_data_index[2] = 0;
 		_accel_data_index[0] = 4; _accel_data_index[1] = 5; _accel_data_index[2] = 6;
 		_gyro_data_sign[0] = -1; _gyro_data_sign[1] = 1; _gyro_data_sign[2] = -1;
@@ -344,7 +340,7 @@ bool AP_InertialSensor_ITG3200::hardware_init(Sample_rate sample_rate)
 	} else {
 		hal.i2c->writeRegister(_accel_addr, 0x0D, 1<<4);
 		hal.scheduler->delay(1);
-		hal.i2c->writeRegister(_accel_addr, 0x35, 3<<1); // range = 8G
+		hal.i2c->writeRegister(_accel_addr, 0x35, 5<<1); // range = 8G
 		hal.scheduler->delay(1);
 		hal.i2c->writeRegister(_accel_addr, 0x20, 0<<4);
   }
