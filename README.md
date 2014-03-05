@@ -68,7 +68,7 @@ Groups](https://groups.google.com/forum/?fromgroups#!forum/drones-discuss). Note
 that the Google Groups mailing lists are NOT for user tech support,
 and are moderated for new users to prevent off-topic discussion.
 
-<script src="paypal-button.min.js?merchant=RMC4D7C3Y64GJ"
+<script src="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=RMC4D7C3Y64GJ"
     data-button="donate"
     data-name="My product"
     data-amount="1.00"
