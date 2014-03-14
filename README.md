@@ -1,66 +1,4 @@
-# ArduPilot Project
-
-You can find lots of development information at the [ArduPilot development site](http://dev.ardupilot.com)
-
-#### To compile APM2.x Ardupilot after version 3.1 please follow the instructions found at 
-
-[Dev.Ardupilot] (http://dev.ardupilot.com/wiki/building-ardupilot-with-arduino-windows/) 
-
-
-## Getting the source
-
-You can either download the source using the "ZIP" button at the top
-of the github page, or you can make a clone using git:
-
-```
-git clone git://github.com/diydrones/ardupilot.git
-```
-
-## Prerequisites
-
-### Ubuntu Linux
-
-The following packages are required to build ardupilot for the
-APM1/APM2 (Arduino) platform in Ubuntu: `gawk make git arduino-core
-g++`
-
-To build ardupilot for the PX4 platform, you'll first need to install
-the PX4 toolchain and download the PX4 source code.  See the [PX4
-toolchain installation
-page](https://pixhawk.ethz.ch/px4/dev/toolchain_installation_lin).
-
-The easiest way to install all these prerequisites is to run the
-`ardupilot/Tools/scripts/install-prereqs-ubuntu.sh` script, which will
-install all the required packages and download all the required
-software.
-
-
-## Building using the Arduino IDE
-
-ArduPilot is no longer compatible with the standard Arduino
-distribution.  You need to use a patched Arduino IDE to build
-ArduPilot.
-
-Do not try to use the Arduino IDE to build in Linux--you should follow
-the instructions in the "Building using make" section.
-
-1. The patched ArduPilot Arduino IDE is available for Mac and Windows
-   from the [downloads
-   page](http://firmware.diydrones.com).
-
-2. Unpack and launch the ArduPilot Arduino IDE. In the preferences
-   menu, set your sketchbook location to your downloaded or cloned
-   `ardupilot` directory.
-
-3. In the ArduPilot Arduino IDE, select your ArduPilot type (APM1 or
-   APM2) from the ArduPilot menu (in the top menubar).
-
-4. Restart the ArduPilot Arduino IDE. You should now be able to build
-   ArduPlane or ArduCopter from source.
-
-5. Remember that, after changing ArduPilot type (APM1 or APM2) in the
-   IDE, you'll need to close and restart the IDE before continuing.
-
+# ArduPilot Project for F4BY
 
 ## Building using make
 
@@ -129,3 +67,5 @@ join the [development discussion on Google
 Groups](https://groups.google.com/forum/?fromgroups#!forum/drones-discuss). Note
 that the Google Groups mailing lists are NOT for user tech support,
 and are moderated for new users to prevent off-topic discussion.
+
+
