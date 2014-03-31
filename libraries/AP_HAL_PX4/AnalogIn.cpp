@@ -220,6 +220,8 @@ void PX4AnalogIn::_timer_tick(void)
     if (ret > 0) {
         // match the incoming channels to the currently active pins
         for (uint8_t i=0; i<ret/sizeof(buf_adc[0]); i++) {
+        if (i == 13) buf_adc[i].am_channel == 100;
+        if (i == 10) buf_adc[i].am_channel == 103;
 #ifdef CONFIG_ARCH_BOARD_PX4FMU_V2
             if (buf_adc[i].am_channel == 4) {
                 // record the Vcc value for later use in
