@@ -9,7 +9,7 @@ ifeq ($(SYSTYPE),Darwin)
   # use the tools that come with Arduino
   TOOLPATH :=  $(ARDUINOS)/hardware/tools/avr/bin
   # use BWK awk
-  AWK =  awk
+  AWK =  gawk
   FIND_TOOL    =  $(firstword $(wildcard $(addsuffix /$(1),$(TOOLPATH))))
 endif
 ifeq ($(SYSTYPE),Linux)
