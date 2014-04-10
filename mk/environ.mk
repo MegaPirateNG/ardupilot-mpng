@@ -110,6 +110,10 @@ ifneq ($(findstring px4, $(MAKECMDGOALS)),)
 HAL_BOARD = HAL_BOARD_PX4
 endif
 
+ifneq ($(findstring f4by, $(MAKECMDGOALS)),)
+HAL_BOARD = HAL_BOARD_F4BY
+endif
+
 ifneq ($(findstring sitl, $(MAKECMDGOALS)),)
 HAL_BOARD = HAL_BOARD_AVR_SITL
 endif
