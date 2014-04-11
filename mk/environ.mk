@@ -71,9 +71,15 @@ TMPDIR			?=	/tmp
 ifneq ($(findstring px4, $(MAKECMDGOALS)),)
 # when building px4 we need all sources to be inside the sketchbook directory
 # as the NuttX build system relies on it
-BUILDROOT		:=	$(SKETCHBOOK)/Build.$(SKETCH)
+	BUILDROOT		:=	$(SKETCHBOOK)/Build.$(SKETCH)
 else
-BUILDROOT		:=	$(abspath $(TMPDIR)/$(SKETCH).build)
+	ifneq ($(findstring f4by, $(MAKECMDGOALS)),)
+	# when building f4by we need all sources to be inside the sketchbook directory
+	# as the NuttX build system relies on it
+		BUILDROOT		:=	$(SKETCHBOOK)/Build.$(SKETCH)
+	else
+		BUILDROOT		:=	$(abspath $(TMPDIR)/$(SKETCH).build)
+	endif
 endif
 
 ifneq ($(findstring CYGWIN, $(SYSTYPE)),)
