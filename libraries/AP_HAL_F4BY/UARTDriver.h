@@ -1,14 +1,14 @@
 
-#ifndef __AP_HAL_PX4_UARTDRIVER_H__
-#define __AP_HAL_PX4_UARTDRIVER_H__
+#ifndef __AP_HAL_F4BY_UARTDRIVER_H__
+#define __AP_HAL_F4BY_UARTDRIVER_H__
 
-#include <AP_HAL_PX4.h>
+#include <AP_HAL_F4BY.h>
 #include <systemlib/perf_counter.h>
 
-class PX4::PX4UARTDriver : public AP_HAL::UARTDriver {
+class F4BY::F4BYUARTDriver : public AP_HAL::UARTDriver {
 public:
-    PX4UARTDriver(const char *devpath, const char *perf_name);
-    /* PX4 implementations of UARTDriver virtual methods */
+    F4BYUARTDriver(const char *devpath, const char *perf_name);
+    /* F4BY implementations of UARTDriver virtual methods */
     void begin(uint32_t b);
     void begin(uint32_t b, uint16_t rxS, uint16_t txS);
     void end();
@@ -17,12 +17,12 @@ public:
     void set_blocking_writes(bool blocking);
     bool tx_pending();
 
-    /* PX4 implementations of Stream virtual methods */
+    /* F4BY implementations of Stream virtual methods */
     int16_t available();
     int16_t txspace();
     int16_t read();
 
-    /* PX4 implementations of Print virtual methods */
+    /* F4BY implementations of Print virtual methods */
     size_t write(uint8_t c);
     size_t write(const uint8_t *buffer, size_t size);
 
@@ -77,4 +77,4 @@ private:
     enum flow_control _flow_control;
 };
 
-#endif // __AP_HAL_PX4_UARTDRIVER_H__
+#endif // __AP_HAL_F4BY_UARTDRIVER_H__

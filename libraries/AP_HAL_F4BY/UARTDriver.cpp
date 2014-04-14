@@ -2,7 +2,7 @@
 
 #include <AP_HAL.h>
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 #include "UARTDriver.h"
 
 #include <stdio.h>
@@ -17,11 +17,11 @@
 #include <drivers/drv_hrt.h>
 #include <assert.h>
 
-using namespace PX4;
+using namespace F4BY;
 
 extern const AP_HAL::HAL& hal;
 
-PX4UARTDriver::PX4UARTDriver(const char *devpath, const char *perf_name) :
+F4BYUARTDriver::F4BYUARTDriver(const char *devpath, const char *perf_name) :
 	_devpath(devpath),
     _fd(-1),
     _baudrate(57600),
@@ -39,7 +39,7 @@ extern const AP_HAL::HAL& hal;
   this UART driver maps to a serial device in /dev
  */
 
-void PX4UARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS) 
+void F4BYUARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS) 
 {
     if (strcmp(_devpath, "/dev/null") == 0) {
         // leave uninitialised
@@ -52,7 +52,7 @@ void PX4UARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS)
         min_tx_buffer = 16384;
         min_rx_buffer = 1024;
     }
-    // on PX4 we have enough memory to have a larger transmit and
+    // on F4BY we have enough memory to have a larger transmit and
     // receive buffer for all ports. This means we don't get delays
     // while waiting to write GPS config packets
     if (txS < min_tx_buffer) {
@@ -149,7 +149,7 @@ void PX4UARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS)
     }
 }
 
-void PX4UARTDriver::set_flow_control(enum flow_control flow_control)
+void F4BYUARTDriver::set_flow_control(enum flow_control flow_control)
 {
 	if (_fd == -1) {
         return;
@@ -166,7 +166,7 @@ void PX4UARTDriver::set_flow_control(enum flow_control flow_control)
     _flow_control = flow_control;
 }
 
-void PX4UARTDriver::begin(uint32_t b) 
+void F4BYUARTDriver::begin(uint32_t b) 
 {
 	begin(b, 0, 0);
 }
@@ -178,7 +178,7 @@ void PX4UARTDriver::begin(uint32_t b)
   boot, but cannot be opened until a USB cable is connected and the
   host starts the CDCACM communication.
  */
-void PX4UARTDriver::try_initialise(void)
+void F4BYUARTDriver::try_initialise(void)
 {
     if (_initialised) {
         return;
@@ -193,7 +193,7 @@ void PX4UARTDriver::try_initialise(void)
 }
 
 
-void PX4UARTDriver::end() 
+void F4BYUARTDriver::end() 
 {
     _initialised = false;
     while (_in_timer) hal.scheduler->delay(1);
@@ -216,20 +216,20 @@ void PX4UARTDriver::end()
     _readbuf_tail = 0;
 }
 
-void PX4UARTDriver::flush() {}
+void F4BYUARTDriver::flush() {}
 
-bool PX4UARTDriver::is_initialized() 
+bool F4BYUARTDriver::is_initialized() 
 { 
     try_initialise();
     return _initialised; 
 }
 
-void PX4UARTDriver::set_blocking_writes(bool blocking) 
+void F4BYUARTDriver::set_blocking_writes(bool blocking) 
 {
     _nonblocking_writes = !blocking;
 }
 
-bool PX4UARTDriver::tx_pending() { return false; }
+bool F4BYUARTDriver::tx_pending() { return false; }
 
 /*
   buffer handling macros
@@ -243,7 +243,7 @@ bool PX4UARTDriver::tx_pending() { return false; }
 /*
   return number of bytes available to be read from the buffer
  */
-int16_t PX4UARTDriver::available() 
+int16_t F4BYUARTDriver::available() 
 { 
 	if (!_initialised) {
         try_initialise();
@@ -256,7 +256,7 @@ int16_t PX4UARTDriver::available()
 /*
   return number of bytes that can be added to the write buffer
  */
-int16_t PX4UARTDriver::txspace() 
+int16_t F4BYUARTDriver::txspace() 
 { 
 	if (!_initialised) {
         try_initialise();
@@ -269,7 +269,7 @@ int16_t PX4UARTDriver::txspace()
 /*
   read one byte from the read buffer
  */
-int16_t PX4UARTDriver::read() 
+int16_t F4BYUARTDriver::read() 
 { 
 	uint8_t c;
     if (!_initialised) {
@@ -290,7 +290,7 @@ int16_t PX4UARTDriver::read()
 /* 
    write one byte to the buffer
  */
-size_t PX4UARTDriver::write(uint8_t c) 
+size_t F4BYUARTDriver::write(uint8_t c) 
 { 
     if (!_initialised) {
         try_initialise();
@@ -316,7 +316,7 @@ size_t PX4UARTDriver::write(uint8_t c)
 /*
   write size bytes to the write buffer
  */
-size_t PX4UARTDriver::write(const uint8_t *buffer, size_t size)
+size_t F4BYUARTDriver::write(const uint8_t *buffer, size_t size)
 {
 	if (!_initialised) {
         try_initialise();
@@ -374,7 +374,7 @@ size_t PX4UARTDriver::write(const uint8_t *buffer, size_t size)
 /*
   try writing n bytes, handling an unresponsive port
  */
-int PX4UARTDriver::_write_fd(const uint8_t *buf, uint16_t n)
+int F4BYUARTDriver::_write_fd(const uint8_t *buf, uint16_t n)
 {
     int ret = 0;
 
@@ -447,7 +447,7 @@ int PX4UARTDriver::_write_fd(const uint8_t *buf, uint16_t n)
 /*
   try reading n bytes, handling an unresponsive port
  */
-int PX4UARTDriver::_read_fd(uint8_t *buf, uint16_t n)
+int F4BYUARTDriver::_read_fd(uint8_t *buf, uint16_t n)
 {
     int ret = 0;
 
@@ -475,7 +475,7 @@ int PX4UARTDriver::_read_fd(uint8_t *buf, uint16_t n)
   1kHz in the timer thread. Doing it this way reduces the system call
   overhead in the main task enormously. 
  */
-void PX4UARTDriver::_timer_tick(void)
+void F4BYUARTDriver::_timer_tick(void)
 {
     uint16_t n;
 

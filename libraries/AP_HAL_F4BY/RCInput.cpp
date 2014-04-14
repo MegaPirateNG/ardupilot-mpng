@@ -1,15 +1,15 @@
 #include <AP_HAL.h>
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 #include "RCInput.h"
 #include <drivers/drv_hrt.h>
 #include <uORB/uORB.h>
 
-using namespace PX4;
+using namespace F4BY;
 
 extern const AP_HAL::HAL& hal;
 
-void PX4RCInput::init(void* unused)
+void F4BYRCInput::init(void* unused)
 {
 	_perf_rcin = perf_alloc(PC_ELAPSED, "APM_rcin");
 	_rc_sub = orb_subscribe(ORB_ID(input_rc));
@@ -20,7 +20,7 @@ void PX4RCInput::init(void* unused)
         pthread_mutex_init(&rcin_mutex, NULL);
 }
 
-uint8_t PX4RCInput::valid_channels() 
+uint8_t F4BYRCInput::valid_channels() 
 {
     pthread_mutex_lock(&rcin_mutex);
     bool valid = _rcin.timestamp != _last_read || _override_valid;
@@ -28,7 +28,7 @@ uint8_t PX4RCInput::valid_channels()
     return valid;
 }
 
-uint16_t PX4RCInput::read(uint8_t ch) 
+uint16_t F4BYRCInput::read(uint8_t ch) 
 {
 	if (ch >= RC_INPUT_MAX_CHANNELS) {
 		return 0;
@@ -50,7 +50,7 @@ uint16_t PX4RCInput::read(uint8_t ch)
         return v;
 }
 
-uint8_t PX4RCInput::read(uint16_t* periods, uint8_t len) 
+uint8_t F4BYRCInput::read(uint16_t* periods, uint8_t len) 
 {
 	if (len > RC_INPUT_MAX_CHANNELS) {
 		len = RC_INPUT_MAX_CHANNELS;
@@ -61,7 +61,7 @@ uint8_t PX4RCInput::read(uint16_t* periods, uint8_t len)
 	return len;
 }
 
-bool PX4RCInput::set_overrides(int16_t *overrides, uint8_t len) 
+bool F4BYRCInput::set_overrides(int16_t *overrides, uint8_t len) 
 {
 	bool res = false;
 	for (uint8_t i = 0; i < len; i++) {
@@ -70,7 +70,7 @@ bool PX4RCInput::set_overrides(int16_t *overrides, uint8_t len)
 	return res;
 }
 
-bool PX4RCInput::set_override(uint8_t channel, int16_t override) {
+bool F4BYRCInput::set_override(uint8_t channel, int16_t override) {
 	if (override < 0) {
 		return false; /* -1: no change. */
 	}
@@ -85,14 +85,14 @@ bool PX4RCInput::set_override(uint8_t channel, int16_t override) {
 	return false;
 }
 
-void PX4RCInput::clear_overrides()
+void F4BYRCInput::clear_overrides()
 {
 	for (uint8_t i = 0; i < RC_INPUT_MAX_CHANNELS; i++) {
 		set_override(i, 0);
 	}
 }
 
-void PX4RCInput::_timer_tick(void)
+void F4BYRCInput::_timer_tick(void)
 {
 	perf_begin(_perf_rcin);
 	bool rc_updated = false;

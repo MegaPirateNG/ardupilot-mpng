@@ -1,13 +1,13 @@
 
-#ifndef __AP_HAL_PX4_UTIL_H__
-#define __AP_HAL_PX4_UTIL_H__
+#ifndef __AP_HAL_F4BY_UTIL_H__
+#define __AP_HAL_F4BY_UTIL_H__
 
 #include <AP_HAL.h>
-#include "AP_HAL_PX4_Namespace.h"
+#include "AP_HAL_F4BY_Namespace.h"
 
-class PX4::PX4Util : public AP_HAL::Util {
+class F4BY::F4BYUtil : public AP_HAL::Util {
 public:
-    PX4Util(void);
+    F4BYUtil(void);
     bool run_debug_shell(AP_HAL::BetterStream *stream);
 
     enum safety_state safety_switch_state(void);
@@ -28,4 +28,4 @@ private:
     int _safety_handle;
 };
 
-#endif // __AP_HAL_PX4_UTIL_H__
+#endif // __AP_HAL_F4BY_UTIL_H__

@@ -2,7 +2,7 @@
 
 #include <AP_HAL.h>
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 #include "AnalogIn.h"
 #include <drivers/drv_adc.h>
 #include <stdio.h>
@@ -22,7 +22,7 @@
 #define ANLOGIN_DEBUGGING 0
 
 // base voltage scaling for 12 bit 3.3V ADC
-#define PX4_VOLTAGE_SCALING (3.3f/4096.0f)
+#define F4BY_VOLTAGE_SCALING (3.3f/4096.0f)
 
 #if ANLOGIN_DEBUGGING
  # define Debug(fmt, args ...)  do {printf("%s:%d: " fmt "\n", __FUNCTION__, __LINE__, ## args); } while(0)
@@ -40,33 +40,21 @@ static const struct {
     uint8_t pin;
     float scaling;
 } pin_scaling[] = {
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
-    // PX4 has 4 FMU analog input pins
+#ifdef CONFIG_ARCH_BOARD_F4BY
+    // F4BY has 4 FMU analog input pins
     
     { 10, 16.8f/4096  }, // analog3, on SPI port pin 4                       // 5.7:1 scaling
     { 11,  6.6f/4096  }, // analog airspeed input, 2:1 scaling
     { 12,  3.3f/4096  }, // analog2, on SPI port pin 3
     { 13, (5.7*3.3)/4096 }, // FMU battery on multi-connector pin 5,
-#elif defined(CONFIG_ARCH_BOARD_PX4FMU_V2)
-    { 2,   3.3f/4096  },    // 3DR Brick voltage, usually 10.1:1
-                            // scaled from battery voltage
-    { 3,   3.3f/4096  },    // 3DR Brick current, usually 17:1 scaled
-                            // for APM_PER_VOLT
-    { 4,   6.6f/4096  },    // VCC 5V rail sense
-    { 10,  3.3f/4096  },    // spare ADC
-    { 11,  3.3f/4096  },    // spare ADC
-    { 12,  3.3f/4096  },    // spare ADC
-    { 13,  3.3f/4096  },    // AUX ADC pin 4
-    { 14,  3.3f/4096  },    // AUX ADC pin 3
-    { 15,  6.6f/4096  },    // analog airspeed sensor, 2:1 scaling
 #else
 #error "Unknown board type for AnalogIn scaling"
 #endif
 };
 
-using namespace PX4;
+using namespace F4BY;
 
-PX4AnalogSource::PX4AnalogSource(int16_t pin, float initial_value) :
+F4BYAnalogSource::F4BYAnalogSource(int16_t pin, float initial_value) :
 	_pin(pin),
     _value(initial_value),
     _value_ratiometric(initial_value),
@@ -75,14 +63,14 @@ PX4AnalogSource::PX4AnalogSource(int16_t pin, float initial_value) :
     _sum_value(0),
     _sum_ratiometric(0)
 {
-#ifdef PX4_ANALOG_VCC_5V_PIN
+#ifdef F4BY_ANALOG_VCC_5V_PIN
     if (_pin == ANALOG_INPUT_BOARD_VCC) {
-        _pin = PX4_ANALOG_VCC_5V_PIN;
+        _pin = F4BY_ANALOG_VCC_5V_PIN;
     }
 #endif
 }
 
-float PX4AnalogSource::read_average() 
+float F4BYAnalogSource::read_average() 
 {
     if (_sum_count == 0) {
         return _value;
@@ -97,7 +85,7 @@ float PX4AnalogSource::read_average()
     return _value;
 }
 
-float PX4AnalogSource::read_latest() 
+float F4BYAnalogSource::read_latest() 
 {
     return _latest_value;
 }
@@ -105,9 +93,9 @@ float PX4AnalogSource::read_latest()
 /*
   return scaling from ADC count to Volts
  */
-float PX4AnalogSource::_pin_scaler(void)
+float F4BYAnalogSource::_pin_scaler(void)
 {
-    float scaling = PX4_VOLTAGE_SCALING;
+    float scaling = F4BY_VOLTAGE_SCALING;
     uint8_t num_scalings = sizeof(pin_scaling)/sizeof(pin_scaling[0]);
     for (uint8_t i=0; i<num_scalings; i++) {
         if (pin_scaling[i].pin == _pin) {
@@ -121,7 +109,7 @@ float PX4AnalogSource::_pin_scaler(void)
 /*
   return voltage in Volts
  */
-float PX4AnalogSource::voltage_average()
+float F4BYAnalogSource::voltage_average()
 {
     return _pin_scaler() * read_average();
 }
@@ -130,7 +118,7 @@ float PX4AnalogSource::voltage_average()
   return voltage in Volts, assuming a ratiometric sensor powered by
   the 5V rail
  */
-float PX4AnalogSource::voltage_average_ratiometric()
+float F4BYAnalogSource::voltage_average_ratiometric()
 {
     voltage_average();
     return _pin_scaler() * _value_ratiometric;
@@ -139,12 +127,12 @@ float PX4AnalogSource::voltage_average_ratiometric()
 /*
   return voltage in Volts
  */
-float PX4AnalogSource::voltage_latest()
+float F4BYAnalogSource::voltage_latest()
 {
     return _pin_scaler() * read_latest();
 }
 
-void PX4AnalogSource::set_pin(uint8_t pin)
+void F4BYAnalogSource::set_pin(uint8_t pin)
 {
     if (_pin == pin) {
         return;
@@ -163,7 +151,7 @@ void PX4AnalogSource::set_pin(uint8_t pin)
 /*
   apply a reading in ADC counts
  */
-void PX4AnalogSource::_add_value(float v, float vcc5V)
+void F4BYAnalogSource::_add_value(float v, float vcc5V)
 {
     _latest_value = v;
     _sum_value += v;
@@ -183,13 +171,13 @@ void PX4AnalogSource::_add_value(float v, float vcc5V)
 }
 
 
-PX4AnalogIn::PX4AnalogIn() :
+F4BYAnalogIn::F4BYAnalogIn() :
 	_board_voltage(0),
     _servorail_voltage(0),
     _power_flags(0)    
 {}
 
-void PX4AnalogIn::init(void* machtnichts)
+void F4BYAnalogIn::init(void* machtnichts)
 {
 	_adc_fd = open(ADC_DEVICE_PATH, O_RDONLY | O_NONBLOCK);
     if (_adc_fd == -1) {
@@ -203,7 +191,7 @@ void PX4AnalogIn::init(void* machtnichts)
 /*
   called at 1kHz
  */
-void PX4AnalogIn::_timer_tick(void)
+void F4BYAnalogIn::_timer_tick(void)
 {
     // read adc at 100Hz
     uint32_t now = hal.scheduler->micros();
@@ -213,7 +201,7 @@ void PX4AnalogIn::_timer_tick(void)
     }
     _last_run = now;
 
-    struct adc_msg_s buf_adc[PX4_ANALOG_MAX_CHANNELS];
+    struct adc_msg_s buf_adc[F4BY_ANALOG_MAX_CHANNELS];
 
     /* read all channels available */
     int ret = read(_adc_fd, &buf_adc, sizeof(buf_adc));
@@ -222,7 +210,7 @@ void PX4AnalogIn::_timer_tick(void)
         for (uint8_t i=0; i<ret/sizeof(buf_adc[0]); i++) {
         if (i == 13) buf_adc[i].am_channel == 100;
         if (i == 10) buf_adc[i].am_channel == 103;
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V2
+#ifdef CONFIG_ARCH_BOARD_F4BYFMU_V2
             if (buf_adc[i].am_channel == 4) {
                 // record the Vcc value for later use in
                 // voltage_average_ratiometric()
@@ -234,8 +222,8 @@ void PX4AnalogIn::_timer_tick(void)
             Debug("chan %u value=%u\n",
                   (unsigned)buf_adc[i].am_channel,
                   (unsigned)buf_adc[i].am_data);
-            for (uint8_t j=0; j<PX4_ANALOG_MAX_CHANNELS; j++) {
-                PX4::PX4AnalogSource *c = _channels[j];
+            for (uint8_t j=0; j<F4BY_ANALOG_MAX_CHANNELS; j++) {
+                F4BY::F4BYAnalogSource *c = _channels[j];
                 if (c != NULL && buf_adc[i].am_channel == c->_pin) {
                     c->_add_value(buf_adc[i].am_data, _board_voltage);
                 }
@@ -243,7 +231,7 @@ void PX4AnalogIn::_timer_tick(void)
         }
     }
 
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
+#ifdef CONFIG_ARCH_BOARD_F4BYFMU_V1
     // check for new battery data on FMUv1
     if (_battery_handle != -1) {
         struct battery_status_s battery;
@@ -252,16 +240,16 @@ void PX4AnalogIn::_timer_tick(void)
             orb_copy(ORB_ID(battery_status), _battery_handle, &battery);
             if (battery.timestamp != _battery_timestamp) {
                 _battery_timestamp = battery.timestamp;
-                for (uint8_t j=0; j<PX4_ANALOG_MAX_CHANNELS; j++) {
-                    PX4::PX4AnalogSource *c = _channels[j];
+                for (uint8_t j=0; j<F4BY_ANALOG_MAX_CHANNELS; j++) {
+                    F4BY::F4BYAnalogSource *c = _channels[j];
                     if (c == NULL) continue;
-                    if (c->_pin == PX4_ANALOG_ORB_BATTERY_VOLTAGE_PIN) {
-                        c->_add_value(battery.voltage_v / PX4_VOLTAGE_SCALING, 0);
+                    if (c->_pin == F4BY_ANALOG_ORB_BATTERY_VOLTAGE_PIN) {
+                        c->_add_value(battery.voltage_v / F4BY_VOLTAGE_SCALING, 0);
                     }
-                    if (c->_pin == PX4_ANALOG_ORB_BATTERY_CURRENT_PIN) {
+                    if (c->_pin == F4BY_ANALOG_ORB_BATTERY_CURRENT_PIN) {
                         // scale it back to voltage, knowing that the
                         // px4io code scales by 90.0/5.0
-                        c->_add_value(battery.current_a * (5.0f/90.0f) / PX4_VOLTAGE_SCALING, 0);
+                        c->_add_value(battery.current_a * (5.0f/90.0f) / F4BY_VOLTAGE_SCALING, 0);
                     }
                 }
             }
@@ -269,7 +257,7 @@ void PX4AnalogIn::_timer_tick(void)
     }
 #endif
 
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V2
+#ifdef CONFIG_ARCH_BOARD_F4BYFMU_V2
     // check for new servorail data on FMUv2
     if (_servorail_handle != -1) {
         struct servorail_status_s servorail;
@@ -279,14 +267,14 @@ void PX4AnalogIn::_timer_tick(void)
             if (servorail.timestamp != _servorail_timestamp) {
                 _servorail_timestamp = servorail.timestamp;
                 _servorail_voltage = servorail.voltage_v;
-                for (uint8_t j=0; j<PX4_ANALOG_MAX_CHANNELS; j++) {
-                    PX4::PX4AnalogSource *c = _channels[j];
+                for (uint8_t j=0; j<F4BY_ANALOG_MAX_CHANNELS; j++) {
+                    F4BY::F4BYAnalogSource *c = _channels[j];
                     if (c == NULL) continue;
-                    if (c->_pin == PX4_ANALOG_ORB_SERVO_VOLTAGE_PIN) {
-                        c->_add_value(servorail.voltage_v / PX4_VOLTAGE_SCALING, 0);
+                    if (c->_pin == F4BY_ANALOG_ORB_SERVO_VOLTAGE_PIN) {
+                        c->_add_value(servorail.voltage_v / F4BY_VOLTAGE_SCALING, 0);
                     }
-                    if (c->_pin == PX4_ANALOG_ORB_SERVO_VRSSI_PIN) {
-                        c->_add_value(servorail.rssi_v / PX4_VOLTAGE_SCALING, 0);
+                    if (c->_pin == F4BY_ANALOG_ORB_SERVO_VRSSI_PIN) {
+                        c->_add_value(servorail.rssi_v / F4BY_VOLTAGE_SCALING, 0);
                     }
                 }
             }
@@ -314,11 +302,11 @@ void PX4AnalogIn::_timer_tick(void)
 
 }
 
-AP_HAL::AnalogSource* PX4AnalogIn::channel(int16_t pin) 
+AP_HAL::AnalogSource* F4BYAnalogIn::channel(int16_t pin) 
 {
-    for (uint8_t j=0; j<PX4_ANALOG_MAX_CHANNELS; j++) {
+    for (uint8_t j=0; j<F4BY_ANALOG_MAX_CHANNELS; j++) {
         if (_channels[j] == NULL) {
-            _channels[j] = new PX4AnalogSource(pin, 0.0);
+            _channels[j] = new F4BYAnalogSource(pin, 0.0);
             return _channels[j];
         }
     }
