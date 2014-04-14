@@ -22,15 +22,17 @@
 #include <AP_Common.h>
 #include <AP_BoardConfig.h>
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_F4BY 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <drivers/drv_pwm_output.h>
 
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
+#if defined(CONFIG_ARCH_BOARD_PX4FMU_V1)
 #define BOARD_PWM_COUNT_DEFAULT 2
+#elif defined(CONFIG_ARCH_BOARD_F4BY)
+#define BOARD_PWM_COUNT_DEFAULT 8
 #else
 #define BOARD_PWM_COUNT_DEFAULT 4
 #endif
@@ -40,7 +42,7 @@ extern const AP_HAL::HAL& hal;
 
 // table of user settable parameters
 const AP_Param::GroupInfo AP_BoardConfig::var_info[] PROGMEM = {
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
     // @Param: PWM_COUNT
     // @DisplayName: PWM Count
     // @Description: Number of auxillary PWMs to enable. On PX4v1 only 0 or 2 is valid. On Pixhawk 0, 2, 4 or 6 is valid.
@@ -54,15 +56,17 @@ const AP_Param::GroupInfo AP_BoardConfig::var_info[] PROGMEM = {
 
 void AP_BoardConfig::init()
 {
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
     /* configurre the FMU driver for the right number of PWMs */
 
     // ensure only valid values are set, rounding up
+    if (_pwm_count > 8) _pwm_count.set(8);
     if (_pwm_count > 6) _pwm_count.set(6);
     if (_pwm_count < 0) _pwm_count.set(0);
     if (_pwm_count == 1) _pwm_count.set(2);
     if (_pwm_count == 3) _pwm_count.set(4);
     if (_pwm_count == 5) _pwm_count.set(6);
+    if (_pwm_count == 7) _pwm_count.set(8);
 
     int fd = open("/dev/px4fmu", 0);
     if (fd == -1) {
