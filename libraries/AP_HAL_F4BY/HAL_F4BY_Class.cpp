@@ -2,11 +2,11 @@
 
 #include <AP_HAL.h>
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 
-#include <AP_HAL_PX4.h>
-#include "AP_HAL_PX4_Namespace.h"
-#include "HAL_PX4_Class.h"
+#include <AP_HAL_F4BY.h>
+#include "AP_HAL_F4BY_Namespace.h"
+#include "HAL_F4BY_Class.h"
 #include "Scheduler.h"
 #include "UARTDriver.h"
 #include "Storage.h"
@@ -28,20 +28,20 @@
 #include <poll.h>
 #include <drivers/drv_hrt.h>
 
-using namespace PX4;
+using namespace F4BY;
 
 static Empty::EmptySemaphore  i2cSemaphore;
 static Empty::EmptyI2CDriver  i2cDriver(&i2cSemaphore);
 static Empty::EmptySPIDeviceManager spiDeviceManager;
 //static Empty::EmptyGPIO gpioDriver;
 
-static PX4Scheduler schedulerInstance;
-static PX4Storage storageDriver;
-static PX4RCInput rcinDriver;
-static PX4RCOutput rcoutDriver;
-static PX4AnalogIn analogIn;
-static PX4Util utilInstance;
-static PX4GPIO gpioDriver;
+static F4BYScheduler schedulerInstance;
+static F4BYStorage storageDriver;
+static F4BYRCInput rcinDriver;
+static F4BYRCOutput rcoutDriver;
+static F4BYAnalogIn analogIn;
+static F4BYUtil utilInstance;
+static F4BYGPIO gpioDriver;
 
 #define UARTA_DEFAULT_DEVICE "/dev/ttyACM0"
 #define UARTB_DEFAULT_DEVICE "/dev/ttyS2"
@@ -49,12 +49,12 @@ static PX4GPIO gpioDriver;
 #define UARTD_DEFAULT_DEVICE "/dev/null"
 
 // 3 UART drivers, for GPS plus two mavlink-enabled devices
-static PX4UARTDriver uartADriver(UARTA_DEFAULT_DEVICE, "APM_uartA");
-static PX4UARTDriver uartBDriver(UARTB_DEFAULT_DEVICE, "APM_uartB");
-static PX4UARTDriver uartCDriver(UARTC_DEFAULT_DEVICE, "APM_uartC");
-static PX4UARTDriver uartDDriver(UARTD_DEFAULT_DEVICE, "APM_uartD");
+static F4BYUARTDriver uartADriver(UARTA_DEFAULT_DEVICE, "APM_uartA");
+static F4BYUARTDriver uartBDriver(UARTB_DEFAULT_DEVICE, "APM_uartB");
+static F4BYUARTDriver uartCDriver(UARTC_DEFAULT_DEVICE, "APM_uartC");
+static F4BYUARTDriver uartDDriver(UARTD_DEFAULT_DEVICE, "APM_uartD");
 
-HAL_PX4::HAL_PX4() :
+HAL_F4BY::HAL_F4BY() :
     AP_HAL::HAL(
         &uartADriver,  /* uartA */
         &uartBDriver,  /* uartB */
@@ -72,7 +72,7 @@ HAL_PX4::HAL_PX4() :
         &utilInstance) /* util */
 {}
 
-bool _px4_thread_should_exit = false;        /**< Daemon exit flag */
+bool _f4by_thread_should_exit = false;        /**< Daemon exit flag */
 static bool thread_running = false;        /**< Daemon status flag */
 static int daemon_task;                /**< Handle of daemon task / thread */
 static bool ran_overtime;
@@ -140,7 +140,7 @@ static int main_loop(int argc, char **argv)
      */
     set_priority(APM_MAIN_PRIORITY);
 
-    while (!_px4_thread_should_exit) {
+    while (!_f4by_thread_should_exit) {
         perf_begin(perf_loop);
         
         /*
@@ -186,7 +186,7 @@ static void usage(void)
 }
 
 
-void HAL_PX4::init(int argc, char * const argv[]) const 
+void HAL_F4BY::init(int argc, char * const argv[]) const 
 {
     int i;
     const char *deviceA = UARTA_DEFAULT_DEVICE;
@@ -214,7 +214,7 @@ void HAL_PX4::init(int argc, char * const argv[]) const
             printf("Starting %s uartA=%s uartC=%s uartD=%s\n", 
                    SKETCHNAME, deviceA, deviceC, deviceD);
 
-            _px4_thread_should_exit = false;
+            _f4by_thread_should_exit = false;
             daemon_task = task_spawn_cmd(SKETCHNAME,
                                      SCHED_FIFO,
                                      APM_MAIN_PRIORITY,
@@ -225,12 +225,12 @@ void HAL_PX4::init(int argc, char * const argv[]) const
         }
 
         if (strcmp(argv[i], "stop") == 0) {
-            _px4_thread_should_exit = true;
+            _f4by_thread_should_exit = true;
             exit(0);
         }
  
         if (strcmp(argv[i], "status") == 0) {
-            if (_px4_thread_should_exit && thread_running) {
+            if (_f4by_thread_should_exit && thread_running) {
                 printf("\t%s is exiting\n", SKETCHNAME);
             } else if (thread_running) {
                 printf("\t%s is running\n", SKETCHNAME);
@@ -278,7 +278,7 @@ void HAL_PX4::init(int argc, char * const argv[]) const
     exit(1);
 }
 
-const HAL_PX4 AP_HAL_PX4;
+const HAL_F4BY AP_HAL_F4BY;
 
-#endif // CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#endif // CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 

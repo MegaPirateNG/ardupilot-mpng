@@ -1,16 +1,16 @@
 
-#ifndef __AP_HAL_PX4_SCHEDULER_H__
-#define __AP_HAL_PX4_SCHEDULER_H__
+#ifndef __AP_HAL_F4BY_SCHEDULER_H__
+#define __AP_HAL_F4BY_SCHEDULER_H__
 
 #include <AP_HAL.h>
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
-#include "AP_HAL_PX4_Namespace.h"
+#if CONFIG_HAL_BOARD == HAL_BOARD_F4BY
+#include "AP_HAL_F4BY_Namespace.h"
 #include <sys/time.h>
 #include <signal.h>
 #include <pthread.h>
 #include <systemlib/perf_counter.h>
 
-#define PX4_SCHEDULER_MAX_TIMER_PROCS 8
+#define F4BY_SCHEDULER_MAX_TIMER_PROCS 8
 
 #define APM_MAIN_PRIORITY    180
 #define APM_TIMER_PRIORITY   181
@@ -20,9 +20,9 @@
 #define APM_STARTUP_PRIORITY  10
 
 /* Scheduler implementation: */
-class PX4::PX4Scheduler : public AP_HAL::Scheduler {
+class F4BY::F4BYScheduler : public AP_HAL::Scheduler {
 public:
-    PX4Scheduler();
+    F4BYScheduler();
     /* AP_HAL::Scheduler methods */
 
     void     init(void *unused);
@@ -55,11 +55,11 @@ private:
 
     volatile bool _timer_suspended;
 
-    AP_HAL::MemberProc _timer_proc[PX4_SCHEDULER_MAX_TIMER_PROCS];
+    AP_HAL::MemberProc _timer_proc[F4BY_SCHEDULER_MAX_TIMER_PROCS];
     uint8_t _num_timer_procs;
     volatile bool _in_timer_proc;
 
-    AP_HAL::MemberProc _io_proc[PX4_SCHEDULER_MAX_TIMER_PROCS];
+    AP_HAL::MemberProc _io_proc[F4BY_SCHEDULER_MAX_TIMER_PROCS];
     uint8_t _num_io_procs;
     volatile bool _in_io_proc;
 
@@ -84,6 +84,6 @@ private:
     perf_counter_t  _perf_delay;
 };
 #endif
-#endif // __AP_HAL_PX4_SCHEDULER_H__
+#endif // __AP_HAL_F4BY_SCHEDULER_H__
 
 

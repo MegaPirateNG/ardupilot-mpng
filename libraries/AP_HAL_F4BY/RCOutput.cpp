@@ -2,7 +2,7 @@
 
 #include <AP_HAL.h>
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 #include "RCOutput.h"
 
 #include <sys/types.h>
@@ -14,9 +14,9 @@
 
 extern const AP_HAL::HAL& hal;
 
-using namespace PX4;
+using namespace F4BY;
 
-void PX4RCOutput::init(void* unused) 
+void F4BYRCOutput::init(void* unused) 
 {
     _perf_rcout = perf_alloc(PC_ELAPSED, "APM_rcout");
     _pwm_fd = open(PWM_OUTPUT_DEVICE_PATH, O_RDWR);
@@ -47,7 +47,7 @@ void PX4RCOutput::init(void* unused)
 }
 
 
-void PX4RCOutput::_init_alt_channels(void) 
+void F4BYRCOutput::_init_alt_channels(void) 
 {
     if (_alt_fd == -1) {
         return;
@@ -65,7 +65,7 @@ void PX4RCOutput::_init_alt_channels(void)
     }
 }
 
-void PX4RCOutput::set_freq(uint32_t chmask, uint16_t freq_hz) 
+void F4BYRCOutput::set_freq(uint32_t chmask, uint16_t freq_hz) 
 {
     // we can't set this per channel yet
     if (freq_hz > 50) {
@@ -77,7 +77,7 @@ void PX4RCOutput::set_freq(uint32_t chmask, uint16_t freq_hz)
         _freq_hz = freq_hz;
     }
 
-    /* work out the new rate mask. The PX4IO board has 3 groups of servos. 
+    /* work out the new rate mask. The F4BYIO board has 3 groups of servos. 
 
        Group 0: channels 0 1
        Group 1: channels 4 5 6 7
@@ -118,7 +118,7 @@ void PX4RCOutput::set_freq(uint32_t chmask, uint16_t freq_hz)
     }
 }
 
-uint16_t PX4RCOutput::get_freq(uint8_t ch) 
+uint16_t F4BYRCOutput::get_freq(uint8_t ch) 
 {
     if (_rate_mask & (1U<<ch)) {
         return _freq_hz;
@@ -126,7 +126,7 @@ uint16_t PX4RCOutput::get_freq(uint8_t ch)
     return 50;
 }
 
-void PX4RCOutput::enable_ch(uint8_t ch)
+void F4BYRCOutput::enable_ch(uint8_t ch)
 {
     if (ch >= 8 && !(_enabled_channels & (1U<<ch))) {
         // this is the first enable of an auxillary channel - setup
@@ -137,12 +137,12 @@ void PX4RCOutput::enable_ch(uint8_t ch)
     _enabled_channels |= (1U<<ch);
 }
 
-void PX4RCOutput::disable_ch(uint8_t ch)
+void F4BYRCOutput::disable_ch(uint8_t ch)
 {
     _enabled_channels &= ~(1U<<ch);
 }
 
-void PX4RCOutput::set_safety_pwm(uint32_t chmask, uint16_t period_us)
+void F4BYRCOutput::set_safety_pwm(uint32_t chmask, uint16_t period_us)
 {
     struct pwm_output_values pwm_values;
     memset(&pwm_values, 0, sizeof(pwm_values));
@@ -158,7 +158,7 @@ void PX4RCOutput::set_safety_pwm(uint32_t chmask, uint16_t period_us)
     }
 }
 
-void PX4RCOutput::force_safety_off(void)
+void F4BYRCOutput::force_safety_off(void)
 {
     int ret = ioctl(_pwm_fd, PWM_SERVO_SET_FORCE_SAFETY_OFF, 0);
     if (ret != OK) {
@@ -166,7 +166,7 @@ void PX4RCOutput::force_safety_off(void)
     }
 }
 
-void PX4RCOutput::write(uint8_t ch, uint16_t period_us)
+void F4BYRCOutput::write(uint8_t ch, uint16_t period_us)
 {
     if (ch >= _servo_count + _alt_servo_count) {
         return;
@@ -184,29 +184,29 @@ void PX4RCOutput::write(uint8_t ch, uint16_t period_us)
     }
 }
 
-void PX4RCOutput::write(uint8_t ch, uint16_t* period_us, uint8_t len)
+void F4BYRCOutput::write(uint8_t ch, uint16_t* period_us, uint8_t len)
 {
     for (uint8_t i=0; i<len; i++) {
         write(i, period_us[i]);
     }
 }
 
-uint16_t PX4RCOutput::read(uint8_t ch) 
+uint16_t F4BYRCOutput::read(uint8_t ch) 
 {
-    if (ch >= PX4_NUM_OUTPUT_CHANNELS) {
+    if (ch >= F4BY_NUM_OUTPUT_CHANNELS) {
         return 0;
     }
     return _period[ch];
 }
 
-void PX4RCOutput::read(uint16_t* period_us, uint8_t len)
+void F4BYRCOutput::read(uint16_t* period_us, uint8_t len)
 {
     for (uint8_t i=0; i<len; i++) {
         period_us[i] = read(i);
     }
 }
 
-void PX4RCOutput::_timer_tick(void)
+void F4BYRCOutput::_timer_tick(void)
 {
     uint32_t now = hal.scheduler->micros();
 

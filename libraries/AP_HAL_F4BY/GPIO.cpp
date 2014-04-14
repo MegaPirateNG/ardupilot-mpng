@@ -2,7 +2,7 @@
 
 #include <AP_HAL.h>
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 
 #include "GPIO.h"
 
@@ -11,7 +11,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-/* PX4 headers */
+/* F4BY headers */
 #include <drivers/drv_led.h>
 #include <drivers/drv_tone_alarm.h>
 #include <drivers/drv_gpio.h>
@@ -24,14 +24,14 @@
 
 extern const AP_HAL::HAL& hal;
 
-using namespace PX4;
+using namespace F4BY;
 
-PX4GPIO::PX4GPIO()
+F4BYGPIO::F4BYGPIO()
 {}
 
-void PX4GPIO::init()
+void F4BYGPIO::init()
 {
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
+#ifdef CONFIG_ARCH_BOARD_F4BY
     _led_fd = open(LED_DEVICE_PATH, O_RDWR);
     if (_led_fd == -1) {
         hal.scheduler->panic("Unable to open " LED_DEVICE_PATH);
@@ -48,93 +48,93 @@ void PX4GPIO::init()
         hal.scheduler->panic("Unable to open /dev/tone_alarm");
     }
 
-    _gpio_fmu_fd = open(PX4FMU_DEVICE_PATH, 0);
+    _gpio_fmu_fd = open(F4BY_DEVICE_PATH, 0);
     if (_gpio_fmu_fd == -1) {
         hal.scheduler->panic("Unable to open GPIO");
     }
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
+#ifdef CONFIG_ARCH_BOARD_F4BY
     if (ioctl(_gpio_fmu_fd, GPIO_CLEAR, GPIO_EXT_1) != 0) {
         hal.console->printf("GPIO: Unable to setup GPIO_1\n");
     }
 #endif
 
     // also try to setup for the relay pins on the IO board
-    _gpio_io_fd = open(PX4IO_DEVICE_PATH, O_RDWR);
+    _gpio_io_fd = open(F4BY_DEVICE_PATH, O_RDWR);
     if (_gpio_io_fd == -1) {
         hal.console->printf("GPIO: Unable to open px4io\n");
     }
 }
 
-void PX4GPIO::pinMode(uint8_t pin, uint8_t output)
+void F4BYGPIO::pinMode(uint8_t pin, uint8_t output)
 {
     switch (pin) {
-    case PX4_GPIO_FMU_SERVO_PIN(0) ... PX4_GPIO_FMU_SERVO_PIN(7):
-        ioctl(_gpio_fmu_fd, output?GPIO_SET_OUTPUT:GPIO_SET_INPUT, 1U<<(pin-PX4_GPIO_FMU_SERVO_PIN(0)));
+    case F4BY_GPIO_FMU_SERVO_PIN(0) ... F4BY_GPIO_FMU_SERVO_PIN(7):
+        ioctl(_gpio_fmu_fd, output?GPIO_SET_OUTPUT:GPIO_SET_INPUT, 1U<<(pin-F4BY_GPIO_FMU_SERVO_PIN(0)));
         break;
     }
 }
 
-int8_t PX4GPIO::analogPinToDigitalPin(uint8_t pin)
+int8_t F4BYGPIO::analogPinToDigitalPin(uint8_t pin)
 {
     return -1;
 }
 
 
-uint8_t PX4GPIO::read(uint8_t pin) {
+uint8_t F4BYGPIO::read(uint8_t pin) {
     uint32_t relays = 0;
     switch (pin) {
 
 #ifdef GPIO_EXT_1
-        case PX4_GPIO_EXT_FMU_RELAY1_PIN:
+        case F4BY_GPIO_EXT_FMU_RELAY1_PIN:
             ioctl(_gpio_fmu_fd, GPIO_GET, (unsigned long)&relays);
             return (relays & GPIO_EXT_1)?HIGH:LOW;
 #endif
 
 #ifdef GPIO_EXT_2
-        case PX4_GPIO_EXT_FMU_RELAY2_PIN:
+        case F4BY_GPIO_EXT_FMU_RELAY2_PIN:
             ioctl(_gpio_fmu_fd, GPIO_GET, (unsigned long)&relays);
             return (relays & GPIO_EXT_2)?HIGH:LOW;
             break;
 #endif
 
-#ifdef PX4IO_P_SETUP_RELAYS_POWER1
-        case PX4_GPIO_EXT_IO_RELAY1_PIN:
+#ifdef F4BYIO_P_SETUP_RELAYS_POWER1
+        case F4BY_GPIO_EXT_IO_RELAY1_PIN:
             ioctl(_gpio_io_fd, GPIO_GET, (unsigned long)&relays);
-            return (relays & PX4IO_P_SETUP_RELAYS_POWER1)?HIGH:LOW;
+            return (relays & F4BYIO_P_SETUP_RELAYS_POWER1)?HIGH:LOW;
 #endif
 
-#ifdef PX4IO_P_SETUP_RELAYS_POWER2
-        case PX4_GPIO_EXT_IO_RELAY2_PIN:
+#ifdef F4BYIO_P_SETUP_RELAYS_POWER2
+        case F4BY_GPIO_EXT_IO_RELAY2_PIN:
             ioctl(_gpio_io_fd, GPIO_GET, (unsigned long)&relays);
-            return (relays & PX4IO_P_SETUP_RELAYS_POWER2)?HIGH:LOW;
+            return (relays & F4BYIO_P_SETUP_RELAYS_POWER2)?HIGH:LOW;
 #endif
 
-#ifdef PX4IO_P_SETUP_RELAYS_ACC1
-        case PX4_GPIO_EXT_IO_ACC1_PIN:
+#ifdef F4BYIO_P_SETUP_RELAYS_ACC1
+        case F4BY_GPIO_EXT_IO_ACC1_PIN:
             ioctl(_gpio_io_fd, GPIO_GET, (unsigned long)&relays);
-            return (relays & PX4IO_P_SETUP_RELAYS_ACC1)?HIGH:LOW;
+            return (relays & F4BYIO_P_SETUP_RELAYS_ACC1)?HIGH:LOW;
 #endif
 
-#ifdef PX4IO_P_SETUP_RELAYS_ACC2
-        case PX4_GPIO_EXT_IO_ACC2_PIN:
+#ifdef F4BYIO_P_SETUP_RELAYS_ACC2
+        case F4BY_GPIO_EXT_IO_ACC2_PIN:
             ioctl(_gpio_io_fd, GPIO_GET, (unsigned long)&relays);
-            return (relays & PX4IO_P_SETUP_RELAYS_ACC2)?HIGH:LOW;
+            return (relays & F4BYIO_P_SETUP_RELAYS_ACC2)?HIGH:LOW;
 #endif
 
-    case PX4_GPIO_FMU_SERVO_PIN(0) ... PX4_GPIO_FMU_SERVO_PIN(7): {
+    case F4BY_GPIO_FMU_SERVO_PIN(0) ... F4BY_GPIO_FMU_SERVO_PIN(7): {
         uint32_t v = 0;
         ioctl(_gpio_fmu_fd, GPIO_GET, (unsigned long)&v);
-        return (v & (1U<<(pin-PX4_GPIO_FMU_SERVO_PIN(0))))?HIGH:LOW;
+        return (v & (1U<<(pin-F4BY_GPIO_FMU_SERVO_PIN(0))))?HIGH:LOW;
     }
     }
     return LOW;
 }
 
-void PX4GPIO::write(uint8_t pin, uint8_t value)
+void F4BYGPIO::write(uint8_t pin, uint8_t value)
 {
     switch (pin) {
 
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
+#ifdef CONFIG_ARCH_BOARD_F4BYFMU_V1
         case HAL_GPIO_A_LED_PIN:    // Arming LED
             if (value == LOW) {
                 ioctl(_led_fd, LED_OFF, LED_RED);
@@ -155,7 +155,7 @@ void PX4GPIO::write(uint8_t pin, uint8_t value)
             break;
 #endif
 
-        case PX4_GPIO_PIEZO_PIN:    // Piezo beeper 
+        case F4BY_GPIO_PIEZO_PIN:    // Piezo beeper 
             if (value == LOW) { // this is inverted 
                 ioctl(_tone_alarm_fd, TONE_SET_ALARM, 3);    // Alarm on !! 
                 //::write(_tone_alarm_fd, &user_tune, sizeof(user_tune));
@@ -165,59 +165,59 @@ void PX4GPIO::write(uint8_t pin, uint8_t value)
             break;
 
 #ifdef GPIO_EXT_1
-        case PX4_GPIO_EXT_FMU_RELAY1_PIN:
+        case F4BY_GPIO_EXT_FMU_RELAY1_PIN:
             ioctl(_gpio_fmu_fd, value==LOW?GPIO_CLEAR:GPIO_SET, GPIO_EXT_1);
             break;
 #endif
 
 #ifdef GPIO_EXT_2
-        case PX4_GPIO_EXT_FMU_RELAY2_PIN:
+        case F4BY_GPIO_EXT_FMU_RELAY2_PIN:
             ioctl(_gpio_fmu_fd, value==LOW?GPIO_CLEAR:GPIO_SET, GPIO_EXT_2);
             break;
 #endif
 
-#ifdef PX4IO_P_SETUP_RELAYS_POWER1
-        case PX4_GPIO_EXT_IO_RELAY1_PIN:
-            ioctl(_gpio_io_fd, value==LOW?GPIO_CLEAR:GPIO_SET, PX4IO_P_SETUP_RELAYS_POWER1);
+#ifdef F4BYIO_P_SETUP_RELAYS_POWER1
+        case F4BY_GPIO_EXT_IO_RELAY1_PIN:
+            ioctl(_gpio_io_fd, value==LOW?GPIO_CLEAR:GPIO_SET, F4BYIO_P_SETUP_RELAYS_POWER1);
             break;
 #endif
 
-#ifdef PX4IO_P_SETUP_RELAYS_POWER2
-        case PX4_GPIO_EXT_IO_RELAY2_PIN:
-            ioctl(_gpio_io_fd, value==LOW?GPIO_CLEAR:GPIO_SET, PX4IO_P_SETUP_RELAYS_POWER2);
+#ifdef F4BYIO_P_SETUP_RELAYS_POWER2
+        case F4BY_GPIO_EXT_IO_RELAY2_PIN:
+            ioctl(_gpio_io_fd, value==LOW?GPIO_CLEAR:GPIO_SET, F4BYIO_P_SETUP_RELAYS_POWER2);
             break;
 #endif
 
-#ifdef PX4IO_P_SETUP_RELAYS_ACC1
-        case PX4_GPIO_EXT_IO_ACC1_PIN:
-            ioctl(_gpio_io_fd, value==LOW?GPIO_CLEAR:GPIO_SET, PX4IO_P_SETUP_RELAYS_ACC1);
+#ifdef F4BYIO_P_SETUP_RELAYS_ACC1
+        case F4BY_GPIO_EXT_IO_ACC1_PIN:
+            ioctl(_gpio_io_fd, value==LOW?GPIO_CLEAR:GPIO_SET, F4BYIO_P_SETUP_RELAYS_ACC1);
             break;
 #endif
 
-#ifdef PX4IO_P_SETUP_RELAYS_ACC2
-        case PX4_GPIO_EXT_IO_ACC2_PIN:
-            ioctl(_gpio_io_fd, value==LOW?GPIO_CLEAR:GPIO_SET, PX4IO_P_SETUP_RELAYS_ACC2);
+#ifdef F4BYIO_P_SETUP_RELAYS_ACC2
+        case F4BY_GPIO_EXT_IO_ACC2_PIN:
+            ioctl(_gpio_io_fd, value==LOW?GPIO_CLEAR:GPIO_SET, F4BYIO_P_SETUP_RELAYS_ACC2);
             break;
 #endif
 
-    case PX4_GPIO_FMU_SERVO_PIN(0) ... PX4_GPIO_FMU_SERVO_PIN(7):
-        ioctl(_gpio_fmu_fd, value==LOW?GPIO_CLEAR:GPIO_SET, 1U<<(pin-PX4_GPIO_FMU_SERVO_PIN(0)));
+    case F4BY_GPIO_FMU_SERVO_PIN(0) ... F4BY_GPIO_FMU_SERVO_PIN(7):
+        ioctl(_gpio_fmu_fd, value==LOW?GPIO_CLEAR:GPIO_SET, 1U<<(pin-F4BY_GPIO_FMU_SERVO_PIN(0)));
         break;
     }
 }
 
-void PX4GPIO::toggle(uint8_t pin)
+void F4BYGPIO::toggle(uint8_t pin)
 {
     write(pin, !read(pin));
 }
 
 /* Alternative interface: */
-AP_HAL::DigitalSource* PX4GPIO::channel(uint16_t n) {
-    return new PX4DigitalSource(0);
+AP_HAL::DigitalSource* F4BYGPIO::channel(uint16_t n) {
+    return new F4BYDigitalSource(0);
 }
 
 /* Interrupt interface: */
-bool PX4GPIO::attach_interrupt(uint8_t interrupt_num, AP_HAL::Proc p, uint8_t mode)
+bool F4BYGPIO::attach_interrupt(uint8_t interrupt_num, AP_HAL::Proc p, uint8_t mode)
 {
     return true;
 }
@@ -225,28 +225,28 @@ bool PX4GPIO::attach_interrupt(uint8_t interrupt_num, AP_HAL::Proc p, uint8_t mo
 /*
   return true when USB connected
  */
-bool PX4GPIO::usb_connected(void)
+bool F4BYGPIO::usb_connected(void)
 {
     return stm32_gpioread(GPIO_OTGFS_VBUS);
 }
 
 
-PX4DigitalSource::PX4DigitalSource(uint8_t v) :
+F4BYDigitalSource::F4BYDigitalSource(uint8_t v) :
     _v(v)
 {}
 
-void PX4DigitalSource::mode(uint8_t output)
+void F4BYDigitalSource::mode(uint8_t output)
 {}
 
-uint8_t PX4DigitalSource::read() {
+uint8_t F4BYDigitalSource::read() {
     return _v;
 }
 
-void PX4DigitalSource::write(uint8_t value) {
+void F4BYDigitalSource::write(uint8_t value) {
     _v = value;
 }
 
-void PX4DigitalSource::toggle() {
+void F4BYDigitalSource::toggle() {
     _v = !_v;
 }
 

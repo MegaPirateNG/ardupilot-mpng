@@ -1,6 +1,6 @@
 
 #include <AP_HAL.h>
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 #include <stdio.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -16,14 +16,14 @@
 extern const AP_HAL::HAL& hal;
 
 #include "Util.h"
-using namespace PX4;
+using namespace F4BY;
 
-extern bool _px4_thread_should_exit;
+extern bool _f4by_thread_should_exit;
 
 /*
   constructor
  */
-PX4Util::PX4Util(void) 
+F4BYUtil::F4BYUtil(void) 
 {
     _safety_handle = orb_subscribe(ORB_ID(safety));
 }
@@ -32,16 +32,16 @@ PX4Util::PX4Util(void)
 /*
   start an instance of nsh
  */
-bool PX4Util::run_debug_shell(AP_HAL::BetterStream *stream)
+bool F4BYUtil::run_debug_shell(AP_HAL::BetterStream *stream)
 {
-	PX4UARTDriver *uart = (PX4UARTDriver *)stream;
+	F4BYUARTDriver *uart = (F4BYUARTDriver *)stream;
 	int fd;
 
 	// trigger exit in the other threads. This stops use of the
 	// various driver handles, and especially the px4io handle,
 	// which otherwise would cause a crash if px4io is stopped in
 	// the shell
-	_px4_thread_should_exit = true;
+	_f4by_thread_should_exit = true;
 
 	// take control of stream fd
 	fd = uart->_get_fd();
@@ -69,7 +69,7 @@ bool PX4Util::run_debug_shell(AP_HAL::BetterStream *stream)
 /*
   return state of safety switch
  */
-enum PX4Util::safety_state PX4Util::safety_switch_state(void)
+enum F4BYUtil::safety_state F4BYUtil::safety_switch_state(void)
 {
     if (_safety_handle == -1) {
         _safety_handle = orb_subscribe(ORB_ID(safety));
@@ -90,7 +90,7 @@ enum PX4Util::safety_state PX4Util::safety_switch_state(void)
     return AP_HAL::Util::SAFETY_DISARMED;
 }
 
-void PX4Util::set_system_clock(uint64_t time_utc_usec)
+void F4BYUtil::set_system_clock(uint64_t time_utc_usec)
 {
     timespec ts;
     ts.tv_sec = time_utc_usec/1.0e6;
@@ -99,17 +99,17 @@ void PX4Util::set_system_clock(uint64_t time_utc_usec)
 }
 
 /*
-  display PX4 system identifer - board type and serial number
+  display F4BY system identifer - board type and serial number
  */
-bool PX4Util::get_system_id(char buf[40])
+bool F4BYUtil::get_system_id(char buf[40])
 {
     uint8_t serialid[12];
     memset(serialid, 0, sizeof(serialid));
     val_read(serialid, (const void *)UDID_START, sizeof(serialid));
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
-    const char *board_type = "PX4v1";
+#ifdef CONFIG_ARCH_BOARD_F4BYFMU_V1
+    const char *board_type = "F4BYv1";
 #else
-    const char *board_type = "PX4v2";
+    const char *board_type = "F4BYv2";
 #endif
     // this format is chosen to match the human_readable_serial()
     // function in auth.c
@@ -124,7 +124,7 @@ bool PX4Util::get_system_id(char buf[40])
 /**
    how much free memory do we have in bytes.
 */
-uint16_t PX4Util::available_memory(void) 
+uint16_t F4BYUtil::available_memory(void) 
 {
     struct mallinfo mem;
     mem = mallinfo();
@@ -134,4 +134,4 @@ uint16_t PX4Util::available_memory(void)
     return mem.fordblks;
 }
 
-#endif // CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#endif // CONFIG_HAL_BOARD == HAL_BOARD_F4BY

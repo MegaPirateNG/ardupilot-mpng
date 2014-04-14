@@ -1,13 +1,13 @@
 
-#ifndef __AP_HAL_PX4_RCINPUT_H__
-#define __AP_HAL_PX4_RCINPUT_H__
+#ifndef __AP_HAL_F4BY_RCINPUT_H__
+#define __AP_HAL_F4BY_RCINPUT_H__
 
-#include <AP_HAL_PX4.h>
+#include <AP_HAL_F4BY.h>
 #include <drivers/drv_rc_input.h>
 #include <systemlib/perf_counter.h>
 #include <pthread.h>
 
-class PX4::PX4RCInput : public AP_HAL::RCInput {
+class F4BY::F4BYRCInput : public AP_HAL::RCInput {
 public:
     void init(void* machtnichts);
     uint8_t  valid_channels();
@@ -32,4 +32,4 @@ private:
     pthread_mutex_t rcin_mutex;
 };
 
-#endif // __AP_HAL_PX4_RCINPUT_H__
+#endif // __AP_HAL_F4BY_RCINPUT_H__

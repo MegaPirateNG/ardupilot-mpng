@@ -1,13 +1,13 @@
 
-#ifndef __AP_HAL_PX4_RCOUTPUT_H__
-#define __AP_HAL_PX4_RCOUTPUT_H__
+#ifndef __AP_HAL_F4BY_RCOUTPUT_H__
+#define __AP_HAL_F4BY_RCOUTPUT_H__
 
-#include <AP_HAL_PX4.h>
+#include <AP_HAL_F4BY.h>
 #include <systemlib/perf_counter.h>
 
-#define PX4_NUM_OUTPUT_CHANNELS 16
+#define F4BY_NUM_OUTPUT_CHANNELS 16
 
-class PX4::PX4RCOutput : public AP_HAL::RCOutput 
+class F4BY::F4BYRCOutput : public AP_HAL::RCOutput 
 {
 public:
     void     init(void* machtnichts);
@@ -28,7 +28,7 @@ private:
     int _pwm_fd;
     int _alt_fd;
     uint16_t _freq_hz;
-    uint16_t _period[PX4_NUM_OUTPUT_CHANNELS];
+    uint16_t _period[F4BY_NUM_OUTPUT_CHANNELS];
     volatile uint8_t _max_channel;
     volatile bool _need_update;
     perf_counter_t  _perf_rcout;
@@ -41,4 +41,4 @@ private:
     void _init_alt_channels(void);
 };
 
-#endif // __AP_HAL_PX4_RCOUTPUT_H__
+#endif // __AP_HAL_F4BY_RCOUTPUT_H__

@@ -1,9 +1,9 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 #include <AP_HAL.h>
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 
-#include "AP_HAL_PX4.h"
+#include "AP_HAL_F4BY.h"
 #include "Scheduler.h"
 
 #include <unistd.h>
@@ -23,19 +23,19 @@
 #include "RCOutput.h"
 #include "RCInput.h"
 
-using namespace PX4;
+using namespace F4BY;
 
 extern const AP_HAL::HAL& hal;
 
-extern bool _px4_thread_should_exit;
+extern bool _f4by_thread_should_exit;
 
-PX4Scheduler::PX4Scheduler() :
+F4BYScheduler::F4BYScheduler() :
     _perf_timers(perf_alloc(PC_ELAPSED, "APM_timers")),
     _perf_io_timers(perf_alloc(PC_ELAPSED, "APM_IO_timers")),
 	_perf_delay(perf_alloc(PC_ELAPSED, "APM_delay"))
 {}
 
-void PX4Scheduler::init(void *unused) 
+void F4BYScheduler::init(void *unused) 
 {
     _sketch_start_time = hrt_absolute_time();
 
@@ -52,7 +52,7 @@ void PX4Scheduler::init(void *unused)
 	(void)pthread_attr_setschedparam(&thread_attr, &param);
     pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
 
-	pthread_create(&_timer_thread_ctx, &thread_attr, (pthread_startroutine_t)&PX4::PX4Scheduler::_timer_thread, this);
+	pthread_create(&_timer_thread_ctx, &thread_attr, (pthread_startroutine_t)&F4BY::F4BYScheduler::_timer_thread, this);
 
     // the UART thread runs at a medium priority
 	pthread_attr_init(&thread_attr);
@@ -62,7 +62,7 @@ void PX4Scheduler::init(void *unused)
 	(void)pthread_attr_setschedparam(&thread_attr, &param);
     pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
 
-	pthread_create(&_uart_thread_ctx, &thread_attr, (pthread_startroutine_t)&PX4::PX4Scheduler::_uart_thread, this);
+	pthread_create(&_uart_thread_ctx, &thread_attr, (pthread_startroutine_t)&F4BY::F4BYScheduler::_uart_thread, this);
 
     // the IO thread runs at lower priority
 	pthread_attr_init(&thread_attr);
@@ -72,15 +72,15 @@ void PX4Scheduler::init(void *unused)
 	(void)pthread_attr_setschedparam(&thread_attr, &param);
     pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
 
-	pthread_create(&_io_thread_ctx, &thread_attr, (pthread_startroutine_t)&PX4::PX4Scheduler::_io_thread, this);
+	pthread_create(&_io_thread_ctx, &thread_attr, (pthread_startroutine_t)&F4BY::F4BYScheduler::_io_thread, this);
 }
 
-uint32_t PX4Scheduler::micros() 
+uint32_t F4BYScheduler::micros() 
 {
     return (uint32_t)(hrt_absolute_time() - _sketch_start_time);
 }
 
-uint32_t PX4Scheduler::millis() 
+uint32_t F4BYScheduler::millis() 
 {
     return hrt_absolute_time() / 1000;
 }
@@ -88,7 +88,7 @@ uint32_t PX4Scheduler::millis()
 /**
    delay for a specified number of microseconds using a semaphore wait
  */
-void PX4Scheduler::delay_microseconds_semaphore(uint16_t usec) 
+void F4BYScheduler::delay_microseconds_semaphore(uint16_t usec) 
 {
     sem_t wait_semaphore;
     struct hrt_call wait_call;
@@ -97,7 +97,7 @@ void PX4Scheduler::delay_microseconds_semaphore(uint16_t usec)
     sem_wait(&wait_semaphore);
 }
 
-void PX4Scheduler::delay_microseconds(uint16_t usec) 
+void F4BYScheduler::delay_microseconds(uint16_t usec) 
 {
     perf_begin(_perf_delay);
     if (usec >= 500) {
@@ -113,7 +113,7 @@ void PX4Scheduler::delay_microseconds(uint16_t usec)
     perf_end(_perf_delay);
 }
 
-void PX4Scheduler::delay(uint16_t ms)
+void F4BYScheduler::delay(uint16_t ms)
 {
     if (in_timerprocess()) {
         ::printf("ERROR: delay() from timer process\n");
@@ -123,7 +123,7 @@ void PX4Scheduler::delay(uint16_t ms)
 	uint64_t start = hrt_absolute_time();
     
     while ((hrt_absolute_time() - start)/1000 < ms && 
-           !_px4_thread_should_exit) {
+           !_f4by_thread_should_exit) {
         delay_microseconds_semaphore(1000);
         if (_min_delay_cb_ms <= ms) {
             if (_delay_cb) {
@@ -132,19 +132,19 @@ void PX4Scheduler::delay(uint16_t ms)
         }
     }
     perf_end(_perf_delay);
-    if (_px4_thread_should_exit) {
+    if (_f4by_thread_should_exit) {
         exit(1);
     }
 }
 
-void PX4Scheduler::register_delay_callback(AP_HAL::Proc proc,
+void F4BYScheduler::register_delay_callback(AP_HAL::Proc proc,
                                             uint16_t min_time_ms) 
 {
     _delay_cb = proc;
     _min_delay_cb_ms = min_time_ms;
 }
 
-void PX4Scheduler::register_timer_process(AP_HAL::MemberProc proc) 
+void F4BYScheduler::register_timer_process(AP_HAL::MemberProc proc) 
 {
     for (uint8_t i = 0; i < _num_timer_procs; i++) {
         if (_timer_proc[i] == proc) {
@@ -152,7 +152,7 @@ void PX4Scheduler::register_timer_process(AP_HAL::MemberProc proc)
         }
     }
 
-    if (_num_timer_procs < PX4_SCHEDULER_MAX_TIMER_PROCS) {
+    if (_num_timer_procs < F4BY_SCHEDULER_MAX_TIMER_PROCS) {
         _timer_proc[_num_timer_procs] = proc;
         _num_timer_procs++;
     } else {
@@ -160,7 +160,7 @@ void PX4Scheduler::register_timer_process(AP_HAL::MemberProc proc)
     }
 }
 
-void PX4Scheduler::register_io_process(AP_HAL::MemberProc proc) 
+void F4BYScheduler::register_io_process(AP_HAL::MemberProc proc) 
 {
     for (uint8_t i = 0; i < _num_io_procs; i++) {
         if (_io_proc[i] == proc) {
@@ -168,7 +168,7 @@ void PX4Scheduler::register_io_process(AP_HAL::MemberProc proc)
         }
     }
 
-    if (_num_io_procs < PX4_SCHEDULER_MAX_TIMER_PROCS) {
+    if (_num_io_procs < F4BY_SCHEDULER_MAX_TIMER_PROCS) {
         _io_proc[_num_io_procs] = proc;
         _num_io_procs++;
     } else {
@@ -176,17 +176,17 @@ void PX4Scheduler::register_io_process(AP_HAL::MemberProc proc)
     }
 }
 
-void PX4Scheduler::register_timer_failsafe(AP_HAL::Proc failsafe, uint32_t period_us) 
+void F4BYScheduler::register_timer_failsafe(AP_HAL::Proc failsafe, uint32_t period_us) 
 {
     _failsafe = failsafe;
 }
 
-void PX4Scheduler::suspend_timer_procs() 
+void F4BYScheduler::suspend_timer_procs() 
 {
     _timer_suspended = true;
 }
 
-void PX4Scheduler::resume_timer_procs() 
+void F4BYScheduler::resume_timer_procs() 
 {
     _timer_suspended = false;
     if (_timer_event_missed == true) {
@@ -195,12 +195,12 @@ void PX4Scheduler::resume_timer_procs()
     }
 }
 
-void PX4Scheduler::reboot(bool hold_in_bootloader) 
+void F4BYScheduler::reboot(bool hold_in_bootloader) 
 {
 	systemreset(hold_in_bootloader);
 }
 
-void PX4Scheduler::_run_timers(bool called_from_timer_thread)
+void F4BYScheduler::_run_timers(bool called_from_timer_thread)
 {
     if (_in_timer_proc) {
         return;
@@ -224,17 +224,17 @@ void PX4Scheduler::_run_timers(bool called_from_timer_thread)
     }
 
     // process analog input
-    ((PX4AnalogIn *)hal.analogin)->_timer_tick();
+    ((F4BYAnalogIn *)hal.analogin)->_timer_tick();
 
     _in_timer_proc = false;
 }
 
-void *PX4Scheduler::_timer_thread(void)
+void *F4BYScheduler::_timer_thread(void)
 {
     while (!_hal_initialized) {
         poll(NULL, 0, 1);        
     }
-    while (!_px4_thread_should_exit) {
+    while (!_f4by_thread_should_exit) {
         delay_microseconds_semaphore(1000);
 
         // run registered timers
@@ -243,15 +243,15 @@ void *PX4Scheduler::_timer_thread(void)
         perf_end(_perf_timers);
 
         // process any pending RC output requests
-        ((PX4RCOutput *)hal.rcout)->_timer_tick();
+        ((F4BYRCOutput *)hal.rcout)->_timer_tick();
 
         // process any pending RC input requests
-        ((PX4RCInput *)hal.rcin)->_timer_tick();
+        ((F4BYRCInput *)hal.rcin)->_timer_tick();
     }
     return NULL;
 }
 
-void PX4Scheduler::_run_io(void)
+void F4BYScheduler::_run_io(void)
 {
     if (_in_io_proc) {
         return;
@@ -270,33 +270,33 @@ void PX4Scheduler::_run_io(void)
     _in_io_proc = false;
 }
 
-void *PX4Scheduler::_uart_thread(void)
+void *F4BYScheduler::_uart_thread(void)
 {
     while (!_hal_initialized) {
         poll(NULL, 0, 1);        
     }
-    while (!_px4_thread_should_exit) {
+    while (!_f4by_thread_should_exit) {
         delay_microseconds_semaphore(1000);
 
         // process any pending serial bytes
-        ((PX4UARTDriver *)hal.uartA)->_timer_tick();
-        ((PX4UARTDriver *)hal.uartB)->_timer_tick();
-        ((PX4UARTDriver *)hal.uartC)->_timer_tick();
-        ((PX4UARTDriver *)hal.uartD)->_timer_tick();
+        ((F4BYUARTDriver *)hal.uartA)->_timer_tick();
+        ((F4BYUARTDriver *)hal.uartB)->_timer_tick();
+        ((F4BYUARTDriver *)hal.uartC)->_timer_tick();
+        ((F4BYUARTDriver *)hal.uartD)->_timer_tick();
     }
     return NULL;
 }
 
-void *PX4Scheduler::_io_thread(void)
+void *F4BYScheduler::_io_thread(void)
 {
     while (!_hal_initialized) {
         poll(NULL, 0, 1);        
     }
-    while (!_px4_thread_should_exit) {
+    while (!_f4by_thread_should_exit) {
         poll(NULL, 0, 1);
 
         // process any pending storage writes
-        ((PX4Storage *)hal.storage)->_timer_tick();
+        ((F4BYStorage *)hal.storage)->_timer_tick();
 
         // run registered IO processes
         perf_begin(_perf_io_timers);
@@ -306,25 +306,25 @@ void *PX4Scheduler::_io_thread(void)
     return NULL;
 }
 
-void PX4Scheduler::panic(const prog_char_t *errormsg) 
+void F4BYScheduler::panic(const prog_char_t *errormsg) 
 {
     write(1, errormsg, strlen(errormsg));
     write(1, "\n", 1);
     hal.scheduler->delay_microseconds(10000);
-    _px4_thread_should_exit = true;
+    _f4by_thread_should_exit = true;
     exit(1);
 }
 
-bool PX4Scheduler::in_timerprocess() 
+bool F4BYScheduler::in_timerprocess() 
 {
     return getpid() != _main_task_pid;
 }
 
-bool PX4Scheduler::system_initializing() {
+bool F4BYScheduler::system_initializing() {
     return !_initialized;
 }
 
-void PX4Scheduler::system_initialized() {
+void F4BYScheduler::system_initialized() {
     if (_initialized) {
         panic(PSTR("PANIC: scheduler::system_initialized called"
                    "more than once"));

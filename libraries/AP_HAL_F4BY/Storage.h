@@ -1,21 +1,21 @@
 
 
-#ifndef __AP_HAL_PX4_STORAGE_H__
-#define __AP_HAL_PX4_STORAGE_H__
+#ifndef __AP_HAL_F4BY_STORAGE_H__
+#define __AP_HAL_F4BY_STORAGE_H__
 
 #include <AP_HAL.h>
-#include "AP_HAL_PX4_Namespace.h"
+#include "AP_HAL_F4BY_Namespace.h"
 #include <systemlib/perf_counter.h>
 
-#define PX4_STORAGE_SIZE 4096
-#define PX4_STORAGE_MAX_WRITE 512
-#define PX4_STORAGE_LINE_SHIFT 9
-#define PX4_STORAGE_LINE_SIZE (1<<PX4_STORAGE_LINE_SHIFT)
-#define PX4_STORAGE_NUM_LINES (PX4_STORAGE_SIZE/PX4_STORAGE_LINE_SIZE)
+#define F4BY_STORAGE_SIZE 4096
+#define F4BY_STORAGE_MAX_WRITE 512
+#define F4BY_STORAGE_LINE_SHIFT 9
+#define F4BY_STORAGE_LINE_SIZE (1<<F4BY_STORAGE_LINE_SHIFT)
+#define F4BY_STORAGE_NUM_LINES (F4BY_STORAGE_SIZE/F4BY_STORAGE_LINE_SIZE)
 
-class PX4::PX4Storage : public AP_HAL::Storage {
+class F4BY::F4BYStorage : public AP_HAL::Storage {
 public:
-    PX4Storage();
+    F4BYStorage();
 
     void init(void* machtnichts) {}
     uint8_t  read_byte(uint16_t loc);
@@ -36,7 +36,7 @@ private:
     void _storage_create(void);
     void _storage_open(void);
     void _mark_dirty(uint16_t loc, uint16_t length);
-    uint8_t _buffer[PX4_STORAGE_SIZE] __attribute__((aligned(4)));
+    uint8_t _buffer[F4BY_STORAGE_SIZE] __attribute__((aligned(4)));
     volatile uint32_t _dirty_mask;
     perf_counter_t  _perf_storage;
     perf_counter_t  _perf_errors;
@@ -46,4 +46,4 @@ private:
     void _mtd_write_signature(void);
 };
 
-#endif // __AP_HAL_PX4_STORAGE_H__
+#endif // __AP_HAL_F4BY_STORAGE_H__
