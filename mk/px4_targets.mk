@@ -35,12 +35,15 @@ EXTRAFLAGS += -DPX4_GIT_VERSION="\"$(PX4_GIT_VERSION)\""
 # we have different config files for V1 and V2
 PX4_V1_CONFIG_FILE=$(MK_DIR)/PX4/config_px4fmu-v1_APM.mk
 PX4_V2_CONFIG_FILE=$(MK_DIR)/PX4/config_px4fmu-v2_APM.mk
+F4BY_CONFIG_FILE=$(MK_DIR)/F4BY/config_f4by_APM.mk
 
+F4BY_SKETCHFLAGS=$(SKETCHLIBINCLUDES) -I$(PWD) -DARDUPILOT_BUILD -DCONFIG_HAL_BOARD=HAL_BOARD_F4BY -DSKETCHNAME="\\\"$(SKETCH)\\\"" -DSKETCH_MAIN=ArduPilot_main
 SKETCHFLAGS=$(SKETCHLIBINCLUDES) -I$(PWD) -DARDUPILOT_BUILD -DCONFIG_HAL_BOARD=HAL_BOARD_PX4 -DSKETCHNAME="\\\"$(SKETCH)\\\"" -DSKETCH_MAIN=ArduPilot_main -DAPM_BUILD_DIRECTORY=APM_BUILD_$(SKETCH)
 
 WARNFLAGS = -Wno-psabi -Wno-packed
 
 PX4_MAKE = $(v) make -C $(SKETCHBOOK) -f $(PX4_ROOT)/Makefile EXTRADEFINES="$(SKETCHFLAGS) $(WARNFLAGS) "'$(EXTRAFLAGS)' APM_MODULE_DIR=$(SKETCHBOOK) SKETCHBOOK=$(SKETCHBOOK) PX4_ROOT=$(PX4_ROOT) NUTTX_SRC=$(NUTTX_SRC) MAXOPTIMIZATION="-Os"
+F4BY_MAKE = $(v) make -C $(SKETCHBOOK) -f $(PX4_ROOT)/Makefile EXTRADEFINES="$(F4BY_SKETCHFLAGS) $(WARNFLAGS) "'$(EXTRAFLAGS)' APM_MODULE_DIR=$(SKETCHBOOK) SKETCHBOOK=$(SKETCHBOOK) PX4_ROOT=$(PX4_ROOT) NUTTX_SRC=$(NUTTX_SRC) MAXOPTIMIZATION="-Os"
 PX4_MAKE_ARCHIVES = make -C $(PX4_ROOT) NUTTX_SRC=$(NUTTX_SRC) archives MAXOPTIMIZATION="-Os"
 
 .PHONY: module_mk
@@ -70,6 +73,15 @@ px4-v2: showflags $(PX4_ROOT)/Archives/px4fmu-v2.export $(SKETCHCPP) module_mk p
 	$(v) /bin/rm -f $(SKETCH)-v2.px4
 	$(v) cp $(PX4_ROOT)/Images/px4fmu-v2_APM.px4 $(SKETCH)-v2.px4
 	$(v) echo "PX4 $(SKETCH) Firmware is in $(SKETCH)-v2.px4"
+
+f4by: showflags $(PX4_ROOT)/Archives/f4by.export $(SKETCHCPP) module_mk
+	$(RULEHDR)
+	$(v) rm -f $(PX4_ROOT)/makefiles/$(F4BY_CONFIG_FILE)
+	$(v) cp $(PWD)/$(F4BY_CONFIG_FILE) $(PX4_ROOT)/makefiles/
+	$(v) $(F4BY_MAKE) f4by_APM
+	$(v) /bin/rm -f $(SKETCH)-f4by.px4
+	$(v) cp $(PX4_ROOT)/Images/f4by_APM.px4 $(SKETCH)-f4by.px4
+	$(v) echo "PX4 $(SKETCH) Firmware is in $(SKETCH)-f4by.px4"
 
 px4: px4-v1 px4-v2
 
@@ -122,7 +134,6 @@ px4-io-v2: $(PX4_ROOT)/Archives/px4io-v2.export
 
 px4-io: px4-io-v1 px4-io-v2
 
-
 $(PX4_ROOT)/Archives/px4fmu-v1.export:
 	$(v) $(PX4_MAKE_ARCHIVES)
 
@@ -136,6 +147,10 @@ $(PX4_ROOT)/Archives/px4io-v2.export:
 	$(v) $(PX4_MAKE_ARCHIVES)
 
 px4-archives:
+	$(v) $(PX4_MAKE_ARCHIVES)
+
+$(PX4_ROOT)/Archives/f4by.export:
+#	make -C $(PX4_ROOT) NUTTX_SRC=$(NUTTX_SRC) f4by_APM MAXOPTIMIZATION="-Os"
 	$(v) $(PX4_MAKE_ARCHIVES)
 
 else

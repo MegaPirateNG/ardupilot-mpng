@@ -68,7 +68,7 @@ void PX4GPIO::init()
 void PX4GPIO::pinMode(uint8_t pin, uint8_t output)
 {
     switch (pin) {
-    case PX4_GPIO_FMU_SERVO_PIN(0) ... PX4_GPIO_FMU_SERVO_PIN(7):
+    case PX4_GPIO_FMU_SERVO_PIN(0) ... PX4_GPIO_FMU_SERVO_PIN(5):
         ioctl(_gpio_fmu_fd, output?GPIO_SET_OUTPUT:GPIO_SET_INPUT, 1U<<(pin-PX4_GPIO_FMU_SERVO_PIN(0)));
         break;
     }
@@ -121,7 +121,7 @@ uint8_t PX4GPIO::read(uint8_t pin) {
             return (relays & PX4IO_P_SETUP_RELAYS_ACC2)?HIGH:LOW;
 #endif
 
-    case PX4_GPIO_FMU_SERVO_PIN(0) ... PX4_GPIO_FMU_SERVO_PIN(7): {
+    case PX4_GPIO_FMU_SERVO_PIN(0) ... PX4_GPIO_FMU_SERVO_PIN(5): {
         uint32_t v = 0;
         ioctl(_gpio_fmu_fd, GPIO_GET, (unsigned long)&v);
         return (v & (1U<<(pin-PX4_GPIO_FMU_SERVO_PIN(0))))?HIGH:LOW;
@@ -200,7 +200,7 @@ void PX4GPIO::write(uint8_t pin, uint8_t value)
             break;
 #endif
 
-    case PX4_GPIO_FMU_SERVO_PIN(0) ... PX4_GPIO_FMU_SERVO_PIN(7):
+    case PX4_GPIO_FMU_SERVO_PIN(0) ... PX4_GPIO_FMU_SERVO_PIN(5):
         ioctl(_gpio_fmu_fd, value==LOW?GPIO_CLEAR:GPIO_SET, 1U<<(pin-PX4_GPIO_FMU_SERVO_PIN(0)));
         break;
     }
