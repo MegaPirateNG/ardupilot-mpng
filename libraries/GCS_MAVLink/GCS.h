@@ -11,6 +11,7 @@
 #include <AP_Common.h>
 #include <GCS_MAVLink.h>
 #include <DataFlash.h>
+#include <AP_Mission.h>
 #include <stdint.h>
 
 //  GCS Message ID's
@@ -178,6 +179,9 @@ public:
 
     uint32_t        last_heartbeat_time; // milliseconds
 
+    // last time we got a non-zero RSSI from RADIO_STATUS
+    static uint32_t last_radio_status_remrssi_ms;
+
     // common send functions
     void send_meminfo(void);
     void send_power_status(void);
@@ -276,12 +280,43 @@ private:
     // start page of log data
     uint16_t _log_data_page;
 
+    // deferred message handling
+    enum ap_message deferred_messages[MSG_RETRY_DEFERRED];
+    uint8_t next_deferred_message;
+    uint8_t num_deferred_messages;
+
+    // vehicle specific message send function
+    bool try_send_message(enum ap_message id);
+
+    void handle_guided_request(AP_Mission::Mission_Command &cmd);
+    void handle_change_alt_request(AP_Mission::Mission_Command &cmd);
+
     void handle_log_request_list(mavlink_message_t *msg, DataFlash_Class &dataflash);
     void handle_log_request_data(mavlink_message_t *msg, DataFlash_Class &dataflash);
     void handle_log_message(mavlink_message_t *msg, DataFlash_Class &dataflash);
     void handle_log_send(DataFlash_Class &dataflash);
     void handle_log_send_listing(DataFlash_Class &dataflash);
     bool handle_log_send_data(DataFlash_Class &dataflash);
+
+    void handle_mission_request_list(AP_Mission &mission, mavlink_message_t *msg);
+    void handle_mission_request(AP_Mission &mission, mavlink_message_t *msg);
+
+    void handle_mission_set_current(AP_Mission &mission, mavlink_message_t *msg);
+    void handle_mission_count(AP_Mission &mission, mavlink_message_t *msg);
+    void handle_mission_clear_all(AP_Mission &mission, mavlink_message_t *msg);
+    void handle_mission_write_partial_list(AP_Mission &mission, mavlink_message_t *msg);
+    void handle_mission_item(mavlink_message_t *msg, AP_Mission &mission);
+
+    void handle_request_data_stream(mavlink_message_t *msg, bool save);
+    void handle_param_request_list(mavlink_message_t *msg);
+    void handle_param_request_read(mavlink_message_t *msg);
+    void handle_param_set(mavlink_message_t *msg, DataFlash_Class *DataFlash);
+    void handle_radio_status(mavlink_message_t *msg, DataFlash_Class &dataflash, bool log_radio);
+    void handle_serial_control(mavlink_message_t *msg, AP_GPS &gps);
+    void lock_channel(mavlink_channel_t chan, bool lock);
+
+    // return true if this channel has hardware flow control
+    bool have_flow_control(void);
 };
 
 #endif // __GCS_H

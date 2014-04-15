@@ -99,7 +99,7 @@ void output_min()
 static void read_radio()
 {
     static uint32_t last_update = 0;
-    if (hal.rcin->valid_channels() > 0) {
+    if (hal.rcin->new_input()) {
         last_update = millis();
         ap.new_radio_frame = true;
         uint16_t periods[8];
@@ -119,6 +119,9 @@ static void read_radio()
         if (!failsafe.rc_override_active) {
             ap.rc_receiver_present = true;
         }
+
+        // update output on any aux channels, for manual passthru
+        RC_Channel_aux::output_ch_all();
     }else{
         uint32_t elapsed = millis() - last_update;
         // turn on throttle failsafe if no update from ppm encoder for 2 seconds

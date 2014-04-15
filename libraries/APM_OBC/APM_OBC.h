@@ -1,3 +1,5 @@
+/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
+
 #ifndef APM_OBC_H
 #define APM_OBC_H
 /*
@@ -22,6 +24,9 @@
 
 #include <AP_Common.h>
 #include <AP_Param.h>
+#include <AP_Mission.h>
+#include <AP_Baro.h>
+#include <AP_GPS.h>
 #include <inttypes.h>
 
 
@@ -42,28 +47,25 @@ public:
 	};
 
 	// Constructor
-	APM_OBC(void)
-	{
-		AP_Param::setup_object_defaults(this, var_info);
+    APM_OBC(AP_Mission &_mission, AP_Baro &_baro, const AP_GPS &_gps) :
+        mission(_mission),
+        baro(_baro),
+        gps(_gps)
+        {
+            AP_Param::setup_object_defaults(this, var_info);
+            
+            _last_heartbeat_pin = -1;
+            _last_manual_pin = -1;
+            _state = STATE_PREFLIGHT;
+            _terminate.set(0);
+            
+            _saved_wp = 0;
+        }
 
-		_last_heartbeat_pin = -1;
-		_last_manual_pin = -1;
-		_state = STATE_PREFLIGHT;
-		_terminate.set(0);
-
-		// get a pointer to COMMAND_INDEX so we can resume a
-		// auto mission when a failsafe condition is resolved
-		enum ap_var_type var_type;
-		_command_index = (AP_Int8 *)AP_Param::find("CMD_INDEX", &var_type);
-		_saved_wp = 0;
-	}
-
-	void check(enum control_mode control_mode,
-		   uint32_t last_heartbeat_ms,
-		   uint32_t last_gps_fix_ms);
+	void check(enum control_mode control_mode, uint32_t last_heartbeat_ms);
 
 	// should we crash the plane? Only possible with
-	// FS_TERM_ACTTION set to 43
+	// FS_TERM_ACTTION set to 42
 	bool crash_plane(void) {
 		return _terminate && _terminate_action == 42;
 	}
@@ -73,6 +75,10 @@ public:
 
 private:
 	enum state _state;
+
+    AP_Mission &mission;
+    AP_Baro &baro;
+    const AP_GPS &gps;
 
 	// digital output pins for communicating with the failsafe board
 	AP_Int8 _heartbeat_pin;
@@ -90,13 +96,16 @@ private:
 	AP_Int8 _wp_comms_hold;
 	AP_Int8 _wp_gps_loss;
 
-	bool _heartbeat_pin_value;
+    AP_Float _qnh_pressure;
+    AP_Int32 _amsl_limit;
+    AP_Int32 _amsl_margin_gps;
 
-	// pointer to command index parameter in g
-	AP_Int8 *_command_index;
+	bool _heartbeat_pin_value;
 
 	// saved waypoint for resuming mission
 	uint8_t _saved_wp;
+
+	bool check_altlimit(void);
 };
 
 // map from ArduPlane control_mode to APM_OBC::control_mode

@@ -92,7 +92,13 @@ static void init_ardupilot()
 	// on the message set configured.
 	//
     // standard gps running
-    hal.uartB->begin(115200, 256, 16);
+    hal.uartB->begin(38400, 256, 16);
+
+#if GPS2_ENABLE
+    if (hal.uartE != NULL) {
+        hal.uartE->begin(38400, 256, 16);
+    }
+#endif
 
 	cliSerial->printf_P(PSTR("\n\nInit " FIRMWARE_STRING
 						 "\n\nFree RAM: %u\n"),
@@ -116,6 +122,9 @@ static void init_ardupilot()
     // keep a record of how many resets have happened. This can be
     // used to detect in-flight resets
     g.num_resets.set_and_save(g.num_resets+1);
+
+    // init baro before we start the GCS, so that the CLI baro test works
+    barometer.init();
 
 	// init the GCS
 	gcs[0].init(hal.uartA);
@@ -174,10 +183,11 @@ static void init_ardupilot()
 	// initialise sonar
     init_sonar();
 
+    // and baro for EKF
+    init_barometer();
+
 	// Do GPS init
-	g_gps = &g_gps_driver;
-    // GPS initialisation
-	g_gps->init(hal.uartB, GPS::GPS_ENGINE_AIRBORNE_4G);
+	gps.init(&DataFlash);
 
 	//mavlink_system.sysid = MAV_SYSTEM_ID;				// Using g.sysid_this_mav
 	mavlink_system.compid = 1;	//MAV_COMP_ID_IMU;   // We do not check for comp id
@@ -213,8 +223,9 @@ static void init_ardupilot()
 
 	startup_ground();
 
-	if (g.log_bitmask & MASK_LOG_CMD)
-			Log_Write_Startup(TYPE_GROUNDSTART_MSG);
+	if (should_log(MASK_LOG_CMD)) {
+        Log_Write_Startup(TYPE_GROUNDSTART_MSG);
+    }
 
     set_mode((enum mode)g.initial_mode.get());
 
@@ -247,9 +258,8 @@ static void startup_ground(void)
 	// ---------------------------
 	trim_radio();
 
-	// initialize commands
-	// -------------------
-	init_commands();
+    // initialise mission library
+    mission.init();
 
     hal.uartA->set_blocking_writes(false);
     hal.uartC->set_blocking_writes(false);
@@ -309,8 +319,9 @@ static void set_mode(enum mode mode)
 			break;
 	}
 
-	if (g.log_bitmask & MASK_LOG_MODE)
+	if (should_log(MASK_LOG_MODE)) {
 		Log_Write_Mode();
+    }
 }
 
 /*
@@ -397,7 +408,6 @@ static void update_notify()
 static void resetPerfData(void) {
 	mainLoop_count 			= 0;
 	G_Dt_max 				= 0;
-	gps_fix_count 			= 0;
 	perf_mon_timer 			= millis();
 }
 

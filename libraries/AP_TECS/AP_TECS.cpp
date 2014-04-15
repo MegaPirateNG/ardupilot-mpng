@@ -109,6 +109,30 @@ const AP_Param::GroupInfo AP_TECS::var_info[] PROGMEM = {
 	// @User: User
     AP_GROUPINFO("SINK_MAX",  11, AP_TECS, _maxSinkRate, 5.0f),
 
+    // @Param: LAND_ARSPD
+    // @DisplayName: Airspeed during landing approach (m/s)
+    // @Description: When performing an autonomus landing, this value is used as the goal airspeed during approach.  Note that this parameter is not useful if your platform does not have an airspeed sensor (use TECS_LAND_THR instead).  If negative then this value is not used during landing.
+    // @Range: -1 to 127
+    // @Increment: 1
+    // @User: User
+    AP_GROUPINFO("LAND_ARSPD", 12, AP_TECS, _landAirspeed, -1),
+
+    // @Param; LAND_THR
+    // @DisplayName: Cruise throttle during landing approach (percentage)
+    // @Description: Use this parameter instead of LAND_ASPD if your platform does not have an airspeed sensor.  It is the cruise throttle during landing approach.  If it is negative if TECS_LAND_ASPD is in use then this value is not used during landing.
+    // @Range: -1 to 100
+    // @Increment: 0.1
+    // @User: User
+    AP_GROUPINFO("LAND_THR", 13, AP_TECS, _landThrottle, -1),
+
+    // @Param: LAND_SPDWGT
+    // @DisplayName: Weighting applied to speed control during landing.
+    // @Description: Same as SPDWEIGHT parameter, with the exception that this parameter is applied during landing flight stages.  A value closer to 2 will result in the plane ignoring height error during landing and our experience has been that the plane will therefore keep the nose up -- sometimes good for a glider landing (with the side effect that you will likely glide a ways past the landing point).  A value closer to 0 results in the plane ignoring speed error -- use caution when lowering the value below 1 -- ignoring speed could result in a stall.
+	// @Range: 0.0 to 2.0
+	// @Increment: 0.1
+	// @User: Advanced
+    AP_GROUPINFO("LAND_SPDWGT", 14, AP_TECS, _spdWeightLand, 1.0f),
+
     AP_GROUPEND
 };
 
@@ -197,8 +221,15 @@ void AP_TECS::_update_speed(void)
 
     float EAS2TAS = _ahrs.get_EAS2TAS();
     _TAS_dem  = _EAS_dem * EAS2TAS;
-    _TASmax   = aparm.airspeed_max * EAS2TAS;
-    _TASmin   = aparm.airspeed_min * EAS2TAS;
+	_TASmax   = aparm.airspeed_max * EAS2TAS;
+	_TASmin   = aparm.airspeed_min * EAS2TAS;
+    if (_landAirspeed >= 0 && _ahrs.airspeed_sensor_enabled() &&
+           (_flight_stage == FLIGHT_LAND_APPROACH || _flight_stage== FLIGHT_LAND_FINAL)) {
+		_TAS_dem = _landAirspeed * EAS2TAS;
+		if (_TASmin > _TAS_dem) {
+			_TASmin = _TAS_dem;
+		}
+    }
 
     // Reset states of time since last update is too large
     if (DT > 1.0) {
@@ -340,12 +371,17 @@ void AP_TECS::_update_energies(void)
     // Calculate specific energy rate
     _SPEdot = _integ2_state * GRAVITY_MSS;
     _SKEdot = _integ5_state * _vel_dot;
+
 }
 
 void AP_TECS::_update_throttle(void)
 {
-    // Calculate total energy values
-    _STE_error = _SPE_dem - _SPE_est + _SKE_dem - _SKE_est;
+    // Calculate limits to be applied to potential energy error to prevent over or underspeed occurring due to large height errors
+    float SPE_err_max = 0.5f * _TASmax * _TASmax - _SKE_dem;
+    float SPE_err_min = 0.5f * _TASmin * _TASmin - _SKE_dem;
+
+    // Calculate total energy error
+    _STE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max) + _SKE_dem - _SKE_est;
     float STEdot_dem = constrain_float((_SPEdot_dem + _SKEdot_dem), _STEdot_min, _STEdot_max);
     float STEdot_error = STEdot_dem - _SPEdot - _SKEdot;
 
@@ -367,7 +403,7 @@ void AP_TECS::_update_throttle(void)
 
         // Calculate feed-forward throttle
         float ff_throttle = 0;
-		float nomThr = aparm.throttle_cruise * 0.01f;
+        float nomThr = aparm.throttle_cruise * 0.01f;
 		const Matrix3f &rotMat = _ahrs.get_dcm_matrix();
 		// Use the demanded rate of change of total energy as the feed-forward demand, but add
 		// additional component which scales with (1/cos(bank angle) - 1) to compensate for induced
@@ -424,7 +460,16 @@ void AP_TECS::_update_throttle(void)
 void AP_TECS::_update_throttle_option(int16_t throttle_nudge)
 {
 	// Calculate throttle demand by interpolating between pitch and throttle limits
-    float nomThr = (aparm.throttle_cruise + throttle_nudge)* 0.01f;	
+    float nomThr;
+    //If landing and we don't have an airspeed sensor and we have a non-zero
+    //TECS_LAND_THR param then use it
+    if ((_flight_stage == FLIGHT_LAND_APPROACH || _flight_stage== FLIGHT_LAND_FINAL) &&
+           _landThrottle >= 0) {            
+        nomThr = (_landThrottle + throttle_nudge) * 0.01f;
+    } else { //not landing or not using TECS_LAND_THR parameter
+		nomThr = (aparm.throttle_cruise + throttle_nudge)* 0.01f;
+    }
+    
 	if (_flight_stage == AP_TECS::FLIGHT_TAKEOFF)
 	{
 		_throttle_dem = _THRmaxf;
@@ -483,16 +528,17 @@ void AP_TECS::_update_pitch(void)
     // This is used to determine how the pitch control prioritises speed and height control
     // A weighting of 1 provides equal priority (this is the normal mode of operation)
     // A SKE_weighting of 0 provides 100% priority to height control. This is used when no airspeed measurement is available
-	// A SKE_weighting of 2 provides 100% priority to speed control. This is used when an underspeed condition is detected
-	// or during takeoff/climbout where a minimum pitch angle is set to ensure height is gained. In this instance, if airspeed
+	// A SKE_weighting of 2 provides 100% priority to speed control. This is used when an underspeed condition is detected. In this instance, if airspeed
 	// rises above the demanded value, the pitch angle will be increased by the TECS controller.
 	float SKE_weighting = constrain_float(_spdWeight, 0.0f, 2.0f);
-	if ( ( _underspeed || (_flight_stage == AP_TECS::FLIGHT_TAKEOFF) ) && 
-		 _ahrs.airspeed_sensor_enabled() ) {
-		SKE_weighting = 2.0f;
-	} else if (!_ahrs.airspeed_sensor_enabled()) {
+    if (!_ahrs.airspeed_sensor_enabled()) {
 		SKE_weighting = 0.0f;
-	}
+    } else if ( _underspeed || _flight_stage == AP_TECS::FLIGHT_TAKEOFF) {
+		SKE_weighting = 2.0f;
+    } else if (_flight_stage == AP_TECS::FLIGHT_LAND_APPROACH || _flight_stage == AP_TECS::FLIGHT_LAND_FINAL) {
+        SKE_weighting = constrain_float(_spdWeightLand, 0.0f, 2.0f);
+    }
+    
 	float SPE_weighting = 2.0f - SKE_weighting;
 
     // Calculate Specific Energy Balance demand, and error

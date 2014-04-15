@@ -28,7 +28,7 @@ public:
 
         // Misc
         //
-        k_param_log_bitmask = 10,
+        k_param_log_bitmask_old = 10, // unused
         k_param_num_resets,
         k_param_reset_switch_chan,
         k_param_initial_mode,
@@ -36,11 +36,21 @@ public:
         k_param_relay,
         k_param_BoardConfig,
         k_param_pivot_turn_angle,
+        k_param_rc_13,
+        k_param_rc_14,
 
         // IO pins
         k_param_rssi_pin = 20,
         k_param_battery_volt_pin,
         k_param_battery_curr_pin,
+
+        // braking
+        k_param_braking_percent = 30,
+        k_param_braking_speederr,
+
+        // misc2
+        k_param_log_bitmask = 40,
+        k_param_gps,
 
 
         // 110: Telemetry control
@@ -61,6 +71,8 @@ public:
         //
         k_param_compass_enabled = 130,
         k_param_steering_learn, // unused
+        k_param_NavEKF,  // Extended Kalman Filter Inertial Navigation Group
+        k_param_mission, // mission library
 
         // 140: battery controls
         k_param_battery_monitoring = 140,   // deprecated, can be deleted
@@ -136,8 +148,8 @@ public:
         //
         // 220: Waypoint data
         //
-        k_param_command_total = 220,
-        k_param_command_index,
+        k_param_command_total = 220,    // unused
+        k_param_command_index,          // unused
         k_param_waypoint_radius,
 
         //
@@ -167,6 +179,7 @@ public:
         k_param_rcmap,
         k_param_L1_controller,
         k_param_steerController,
+        k_param_barometer,
 
         // 254,255: reserved
         };
@@ -176,13 +189,17 @@ public:
 
     // Misc
     //
-    AP_Int16    log_bitmask;
+    AP_Int32    log_bitmask;
     AP_Int16    num_resets;
     AP_Int8	    reset_switch_chan;
     AP_Int8     initial_mode;
 
     // IO pins
     AP_Int8     rssi_pin;
+
+    // braking
+    AP_Int8     braking_percent;
+    AP_Float    braking_speederr;
 
 	// Telemetry control
 	//
@@ -219,15 +236,17 @@ public:
     RC_Channel_aux	rc_6;
     RC_Channel_aux	rc_7;
     RC_Channel_aux	rc_8;
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     RC_Channel_aux rc_9;
 #endif
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     RC_Channel_aux rc_10;
     RC_Channel_aux rc_11;
 #endif
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     RC_Channel_aux rc_12;
+    RC_Channel_aux rc_13;
+    RC_Channel_aux rc_14;
 #endif
 
     // Throttle
@@ -266,8 +285,6 @@ public:
     
     // Waypoints
     //
-    AP_Int8     command_total;
-    AP_Int8     command_index;
     AP_Float    waypoint_radius;
 
     // PID controllers
@@ -284,15 +301,17 @@ public:
         rc_6(CH_6),
         rc_7(CH_7),
         rc_8(CH_8),
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
         rc_9                                    (CH_9),
 #endif
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
         rc_10                                   (CH_10),
         rc_11                                   (CH_11),
 #endif
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
         rc_12                                   (CH_12),
+        rc_13                                   (CH_13),
+        rc_14                                   (CH_14),
 #endif
 
         // PID controller    initial P        initial I        initial D        initial imax

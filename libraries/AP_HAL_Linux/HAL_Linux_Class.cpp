@@ -33,6 +33,7 @@ HAL_Linux::HAL_Linux() :
         &uartBDriver,
         &uartCDriver,
         NULL,            /* no uartD */
+        NULL,            /* no uartE */
         &i2cDriver,
         &spiDeviceManager,
         &analogIn,
@@ -75,6 +76,7 @@ void HAL_Linux::init(int argc,char* const argv[]) const
     uartA->begin(115200);
     i2c->begin();
     spi->init(NULL);
+    utilInstance.init(argc, argv);
 }
 
 const HAL_Linux AP_HAL_Linux;

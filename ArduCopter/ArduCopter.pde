@@ -89,6 +89,7 @@
 #include <AP_HAL_AVR.h>
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_PX4.h>
+#include <AP_HAL_VRBRAIN.h>
 #include <AP_HAL_FLYMAPLE.h>
 #include <AP_HAL_Linux.h>
 #include <AP_HAL_Empty.h>
@@ -108,6 +109,7 @@
 #include <AP_InertialSensor.h>  // ArduPilot Mega Inertial Sensor (accel & gyro) Library
 #include <AP_AHRS.h>
 #include <AP_NavEKF.h>
+#include <AP_Mission.h>         // Mission command library
 #include <AC_PID.h>             // PID library
 #include <AC_P.h>               // P library
 #include <AC_AttitudeControl.h> // Attitude control library
@@ -141,6 +143,9 @@
 #endif
 #if EPM_ENABLED == ENABLED
 #include <AP_EPM.h>				// EPM cargo gripper stuff
+#endif
+#if PARACHUTE == ENABLED
+#include <AP_Parachute.h>		// Parachute release library
 #endif
 
 // AP_HAL to Arduino compatibility layer
@@ -209,6 +214,8 @@ static DataFlash_File DataFlash("logs");
 static DataFlash_File DataFlash("/fs/microsd/APM/LOGS");
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 static DataFlash_File DataFlash("logs");
+#elif CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
+static DataFlash_File DataFlash("/fs/microsd/APM/LOGS");
 #else
 static DataFlash_Empty DataFlash;
 #endif
@@ -236,9 +243,9 @@ static const AP_InertialSensor::Sample_rate ins_sample_rate = AP_InertialSensor:
 //   supply data from the simulation.
 //
 
-// All GPS access should be through this pointer.
-static GPS         *g_gps;
-static GPS_Glitch   gps_glitch(g_gps);
+static AP_GPS  gps;
+
+static GPS_Glitch gps_glitch(gps);
 
 // flight modes convenience array
 static AP_Int8 *flight_modes = &g.flight_mode1;
@@ -257,6 +264,8 @@ static AP_InertialSensor_Oilpan ins(&adc);
 static AP_InertialSensor_HIL ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_PX4
 static AP_InertialSensor_PX4 ins;
+#elif CONFIG_IMU_TYPE == CONFIG_IMU_VRBRAIN
+static AP_InertialSensor_VRBRAIN ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_FLYMAPLE
 AP_InertialSensor_Flymaple ins;
 #elif CONFIG_IMU_TYPE == CONFIG_IMU_L3G4200D
@@ -274,6 +283,8 @@ static SITL sitl;
 static AP_Baro_BMP085 barometer;
   #elif CONFIG_BARO == AP_BARO_PX4
 static AP_Baro_PX4 barometer;
+#elif CONFIG_BARO == AP_BARO_VRBRAIN
+static AP_Baro_VRBRAIN barometer;
   #elif CONFIG_BARO == AP_BARO_MS5611
    #if CONFIG_MS5611_SERIAL == AP_BARO_MS5611_SPI
 static AP_Baro_MS5611 barometer(&AP_Baro_MS5611::spi);
@@ -286,43 +297,18 @@ static AP_Baro_MS5611 barometer(&AP_Baro_MS5611::i2c);
 
  #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
 static AP_Compass_PX4 compass;
+ #elif CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
+static AP_Compass_VRBRAIN compass;
  #else
 static AP_Compass_HMC5843 compass;
  #endif
  #endif
-
-// real GPS selection
- #if   GPS_PROTOCOL == GPS_PROTOCOL_AUTO
-AP_GPS_Auto     g_gps_driver(&g_gps);
-
- #elif GPS_PROTOCOL == GPS_PROTOCOL_NMEA
-AP_GPS_NMEA     g_gps_driver;
-
- #elif GPS_PROTOCOL == GPS_PROTOCOL_SIRF
-AP_GPS_SIRF     g_gps_driver;
-
- #elif GPS_PROTOCOL == GPS_PROTOCOL_UBLOX
-AP_GPS_UBLOX    g_gps_driver;
-
- #elif GPS_PROTOCOL == GPS_PROTOCOL_MTK
-AP_GPS_MTK      g_gps_driver;
-
- #elif GPS_PROTOCOL == GPS_PROTOCOL_MTK19
-AP_GPS_MTK19    g_gps_driver;
-
- #elif GPS_PROTOCOL == GPS_PROTOCOL_NONE
-AP_GPS_None     g_gps_driver;
-
- #else
-  #error Unrecognised GPS_PROTOCOL setting.
- #endif // GPS PROTOCOL
 
 #elif HIL_MODE != HIL_MODE_DISABLED
 // sensor emulators
 static AP_ADC_HIL              adc;
 static AP_Baro_HIL      barometer;
 static AP_Compass_HIL          compass;
-static AP_GPS_HIL              g_gps_driver;
 static AP_InertialSensor_HIL   ins;
 
  #if CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
@@ -336,10 +322,17 @@ static SITL sitl;
 
 // Inertial Navigation EKF
 #if AP_AHRS_NAVEKF_AVAILABLE
-AP_AHRS_NavEKF ahrs(ins, barometer, g_gps);
+AP_AHRS_NavEKF ahrs(ins, barometer, gps);
 #else
-AP_AHRS_DCM ahrs(ins, barometer, g_gps);
+AP_AHRS_DCM ahrs(ins, barometer, gps);
 #endif
+
+// Mission library
+// forward declaration to keep compiler happy
+static bool start_command(const AP_Mission::Mission_Command& cmd);
+static bool verify_command(const AP_Mission::Mission_Command& cmd);
+static void exit_mission();
+AP_Mission mission(ahrs, &start_command, &verify_command, &exit_mission, MISSION_START_BYTE, MISSION_END_BYTE);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Optical flow sensor
@@ -500,26 +493,12 @@ static float scaleLongDown = 1;
 ////////////////////////////////////////////////////////////////////////////////
 // This is the angle from the copter to the next waypoint in centi-degrees
 static int32_t wp_bearing;
-// The original bearing to the next waypoint.  used to point the nose of the copter at the next waypoint
-static int32_t original_wp_bearing;
 // The location of home in relation to the copter in centi-degrees
 static int32_t home_bearing;
 // distance between plane and home in cm
 static int32_t home_distance;
 // distance between plane and next waypoint in cm.
 static uint32_t wp_distance;
-// Register containing the index of the current navigation command in the mission script
-static int16_t command_nav_index;
-// Register containing the index of the previous navigation command in the mission script
-// Used to manage the execution of conditional commands
-static uint8_t prev_nav_index;
-// Register containing the index of the current conditional command in the mission script
-static uint8_t command_cond_index;
-// Used to track the required WP navigation information
-// options include
-// NAV_ALTITUDE - have we reached the desired altitude?
-// NAV_LOCATION - have we reached the desired location?
-// NAV_DELAY    - have we waited at the waypoint the desired time?
 static float lon_error, lat_error;      // Used to report how many cm we are from the next waypoint or loiter target position
 static uint8_t land_state;              // records state of land (flying to location, descending)
 
@@ -575,14 +554,6 @@ static uint32_t loiter_time;                    // How long have we been loiteri
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// CH7 and CH8 save waypoint control
-////////////////////////////////////////////////////////////////////////////////
-// This register tracks the current Mission Command index when writing
-// a mission using Ch7 or Ch8 aux switches in flight
-static int8_t aux_switch_wp_index;
-
-
-////////////////////////////////////////////////////////////////////////////////
 // Battery Sensors
 ////////////////////////////////////////////////////////////////////////////////
 static AP_BattMonitor battery;
@@ -608,10 +579,6 @@ static const struct  Location &home = ahrs.get_home();
 
 // Current location of the copter
 static struct   Location current_loc;
-// Holds the current loaded command from the EEPROM for navigation
-static struct   Location command_nav_queue;
-// Holds the current loaded command from the EEPROM for conditional scripts
-static struct   Location command_cond_queue;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -667,9 +634,9 @@ static float G_Dt = 0.02;
 // Inertial Navigation
 ////////////////////////////////////////////////////////////////////////////////
 #if AP_AHRS_NAVEKF_AVAILABLE
-static AP_InertialNav_NavEKF inertial_nav(ahrs, barometer, g_gps, gps_glitch);
+static AP_InertialNav_NavEKF inertial_nav(ahrs, barometer, gps_glitch);
 #else
-static AP_InertialNav inertial_nav(ahrs, barometer, g_gps, gps_glitch);
+static AP_InertialNav inertial_nav(ahrs, barometer, gps_glitch);
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -728,14 +695,12 @@ static AP_HAL::AnalogSource* rssi_analog_source;
 // --------------------------------------
 #if MOUNT == ENABLED
 // current_loc uses the baro/gps soloution for altitude rather than gps only.
-// mabe one could use current_loc for lat/lon too and eliminate g_gps alltogether?
-static AP_Mount camera_mount(&current_loc, g_gps, ahrs, 0);
+static AP_Mount camera_mount(&current_loc, ahrs, 0);
 #endif
 
 #if MOUNT2 == ENABLED
 // current_loc uses the baro/gps soloution for altitude rather than gps only.
-// mabe one could use current_loc for lat/lon too and eliminate g_gps alltogether?
-static AP_Mount camera_mount2(&current_loc, g_gps, ahrs, 1);
+static AP_Mount camera_mount2(&current_loc, ahrs, 1);
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -760,6 +725,13 @@ static AP_EPM epm;
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
+// Parachute release
+////////////////////////////////////////////////////////////////////////////////
+#if PARACHUTE == ENABLED
+static AP_Parachute parachute(relay);
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
 // function definitions to keep compiler from complaining about undeclared functions
 ////////////////////////////////////////////////////////////////////////////////
 static void pre_arm_checks(bool display_failure);
@@ -769,7 +741,7 @@ static void pre_arm_checks(bool display_failure);
 ////////////////////////////////////////////////////////////////////////////////
 
 // setup the var_info table
-AP_Param param_loader(var_info, WP_START_BYTE);
+AP_Param param_loader(var_info, MISSION_START_BYTE);
 
 #if MAIN_LOOP_RATE == 400
 /*
@@ -1211,25 +1183,32 @@ static void update_optical_flow(void)
 // called at 50hz
 static void update_GPS(void)
 {
-    static uint32_t last_gps_reading;           // time of last gps message
+    static uint32_t last_gps_reading[GPS_MAX_INSTANCES];   // time of last gps message
     static uint8_t ground_start_count = 10;     // counter used to grab at least 10 reads before commiting the Home location
     bool report_gps_glitch;
+    bool gps_updated = false;
 
-    g_gps->update();
+    gps.update();
 
     // logging and glitch protection run after every gps message
-    if (g_gps->last_message_time_ms() != last_gps_reading) {
-        last_gps_reading = g_gps->last_message_time_ms();
+    for (uint8_t i=0; i<gps.num_sensors(); i++) {
+        if (gps.last_message_time_ms(i) != last_gps_reading[i]) {
+            last_gps_reading[i] = gps.last_message_time_ms(i);
 
-        // log GPS message
-        if (g.log_bitmask & MASK_LOG_GPS) {
-            DataFlash.Log_Write_GPS(g_gps, current_loc.alt);
+            // log GPS message
+            if (g.log_bitmask & MASK_LOG_GPS) {
+                DataFlash.Log_Write_GPS(gps, i, current_loc.alt);
+            }
+
+            gps_updated = true;
         }
+    }
 
+    if (gps_updated) {
         // run glitch protection and update AP_Notify if home has been initialised
         if (ap.home_is_set) {
             gps_glitch.check_position();
-            report_gps_glitch = (gps_glitch.glitching() && !ap.usb_connected);
+            report_gps_glitch = (gps_glitch.glitching() && !ap.usb_connected && hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED);
             if (AP_Notify::flags.gps_glitching != report_gps_glitch) {
                 if (gps_glitch.glitching()) {
                     Log_Write_Error(ERROR_SUBSYSTEM_GPS, ERROR_CODE_GPS_GLITCH);
@@ -1239,44 +1218,42 @@ static void update_GPS(void)
                 AP_Notify::flags.gps_glitching = report_gps_glitch;
             }
         }
-    }
 
-    // checks to initialise home and take location based pictures
-    if (g_gps->new_data && g_gps->status() >= GPS::GPS_OK_FIX_3D) {
-        // clear new data flag
-        g_gps->new_data = false;
+        // checks to initialise home and take location based pictures
+        if (gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
 
-        // check if we can initialise home yet
-        if (!ap.home_is_set) {
-            // if we have a 3d lock and valid location
-            if(g_gps->status() >= GPS::GPS_OK_FIX_3D && g_gps->latitude != 0) {
-                if( ground_start_count > 0 ) {
-                    ground_start_count--;
-                }else{
-                    // after 10 successful reads store home location
-                    // ap.home_is_set will be true so this will only happen once
-                    ground_start_count = 0;
-                    init_home();
+            // check if we can initialise home yet
+            if (!ap.home_is_set) {
+                // if we have a 3d lock and valid location
+                if(gps.status() >= AP_GPS::GPS_OK_FIX_3D && gps.location().lat != 0) {
+                    if (ground_start_count > 0 ) {
+                        ground_start_count--;
+                    } else {
+                        // after 10 successful reads store home location
+                        // ap.home_is_set will be true so this will only happen once
+                        ground_start_count = 0;
+                        init_home();
 
-                    // set system clock for log timestamps
-                    hal.util->set_system_clock(g_gps->time_epoch_usec());
-
-                    if (g.compass_enabled) {
-                        // Set compass declination automatically
-                        compass.set_initial_location(g_gps->latitude, g_gps->longitude);
+                        // set system clock for log timestamps
+                        hal.util->set_system_clock(gps.time_epoch_usec());
+                        
+                        if (g.compass_enabled) {
+                            // Set compass declination automatically
+                            compass.set_initial_location(gps.location().lat, gps.location().lng);
+                        }
                     }
+                } else {
+                    // start again if we lose 3d lock
+                    ground_start_count = 10;
                 }
-            }else{
-                // start again if we lose 3d lock
-                ground_start_count = 10;
             }
-        }
 
 #if CAMERA == ENABLED
-        if (camera.update_location(current_loc) == true) {
-            do_take_picture();
-        }
+            if (camera.update_location(current_loc) == true) {
+                do_take_picture();
+            }
 #endif
+        }
     }
 
     // check for loss of gps
@@ -1310,6 +1287,9 @@ void update_simple_mode(void)
     if (ap.simple_mode == 0 || !ap.new_radio_frame) {
         return;
     }
+
+    // mark radio frame as consumed
+    ap.new_radio_frame = false;
 
     if (ap.simple_mode == 1) {
         // rotate roll, pitch input by -initial simple heading (i.e. north facing)
@@ -1543,6 +1523,11 @@ static void tuning(){
         ahrs.get_NavEKF()._accNoise = tuning_value;
         break;
 #endif
+
+    case CH6_RC_FEEL_RP:
+        // roll-pitch input smoothing
+        g.rc_feel_rp = g.rc_6.control_in / 10;
+        break;
     }
 }
 

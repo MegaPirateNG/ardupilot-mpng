@@ -71,6 +71,7 @@
 #include <AP_InertialSensor.h> // Inertial Sensor (uncalibated IMU) Library
 #include <AP_AHRS.h>         // ArduPilot Mega DCM Library
 #include <AP_NavEKF.h>
+#include <AP_Mission.h>     // Mission command library
 #include <PID.h>            // PID library
 #include <RC_Channel.h>     // RC Channel Library
 #include <AP_RangeFinder.h>	// Range finder library
@@ -99,6 +100,7 @@
 #include <AP_HAL_AVR.h>
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_PX4.h>
+#include <AP_HAL_VRBRAIN.h>
 #include <AP_HAL_FLYMAPLE.h>
 #include <AP_HAL_Linux.h>
 #include <AP_HAL_Empty.h>
@@ -125,7 +127,7 @@ const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
 // must be the first AP_Param variable declared to ensure its
 // constructor runs before the constructors of the other AP_Param
 // variables
-AP_Param param_loader(var_info, WP_START_BYTE);
+AP_Param param_loader(var_info, MISSION_START_BYTE);
 
 ////////////////////////////////////////////////////////////////////////////////
 // the rate we run the main loop at
@@ -174,6 +176,8 @@ static DataFlash_File DataFlash("logs");
 static DataFlash_File DataFlash("/fs/microsd/APM/LOGS");
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 static DataFlash_File DataFlash("logs");
+#elif CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
+static DataFlash_File DataFlash("/fs/microsd/APM/LOGS");
 #else
 DataFlash_Empty DataFlash;
 #endif
@@ -193,8 +197,8 @@ static bool in_log_download;
 //   supply data from the simulation.
 //
 
-// All GPS access should be through this pointer.
-static GPS         *g_gps;
+// GPS driver
+static AP_GPS gps;
 
 // flight modes convenience array
 static AP_Int8		*modes = &g.mode1;
@@ -205,6 +209,8 @@ static AP_ADC_ADS7844 adc;
 
 #if CONFIG_COMPASS == AP_COMPASS_PX4
 static AP_Compass_PX4 compass;
+#elif CONFIG_COMPASS == AP_COMPASS_VRBRAIN
+static AP_Compass_VRBRAIN compass;
 #elif CONFIG_COMPASS == AP_COMPASS_HMC5843
 static AP_Compass_HMC5843 compass;
 #elif CONFIG_COMPASS == AP_COMPASS_HIL
@@ -213,39 +219,12 @@ static AP_Compass_HIL compass;
  #error Unrecognized CONFIG_COMPASS setting
 #endif
 
-// GPS selection
-#if   GPS_PROTOCOL == GPS_PROTOCOL_AUTO
-AP_GPS_Auto     g_gps_driver(&g_gps);
-
-#elif GPS_PROTOCOL == GPS_PROTOCOL_NMEA
-AP_GPS_NMEA     g_gps_driver;
-
-#elif GPS_PROTOCOL == GPS_PROTOCOL_SIRF
-AP_GPS_SIRF     g_gps_driver;
-
-#elif GPS_PROTOCOL == GPS_PROTOCOL_UBLOX
-AP_GPS_UBLOX    g_gps_driver;
-
-#elif GPS_PROTOCOL == GPS_PROTOCOL_MTK
-AP_GPS_MTK      g_gps_driver;
-
-#elif GPS_PROTOCOL == GPS_PROTOCOL_MTK19
-AP_GPS_MTK19    g_gps_driver;
-
-#elif GPS_PROTOCOL == GPS_PROTOCOL_NONE
-AP_GPS_None     g_gps_driver;
-
-#elif GPS_PROTOCOL == GPS_PROTOCOL_HIL
-AP_GPS_HIL      g_gps_driver;
-
-#else
-  #error Unrecognised GPS_PROTOCOL setting.
-#endif // GPS PROTOCOL
-
 #if CONFIG_INS_TYPE == CONFIG_INS_MPU6000
 AP_InertialSensor_MPU6000 ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_PX4
 AP_InertialSensor_PX4 ins;
+#elif CONFIG_INS_TYPE == CONFIG_INS_VRBRAIN
+AP_InertialSensor_VRBRAIN ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_HIL
 AP_InertialSensor_HIL ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_FLYMAPLE
@@ -263,6 +242,8 @@ AP_InertialSensor_Oilpan ins( &adc );
 static AP_Baro_BMP085 barometer;
 #elif CONFIG_BARO == AP_BARO_PX4
 static AP_Baro_PX4 barometer;
+#elif CONFIG_BARO == AP_BARO_VRBRAIN
+static AP_Baro_VRBRAIN barometer;
 #elif CONFIG_BARO == AP_BARO_HIL
 static AP_Baro_HIL barometer;
 #elif CONFIG_BARO == AP_BARO_MS5611
@@ -279,9 +260,9 @@ static AP_Baro_HIL barometer;
 
 // Inertial Navigation EKF
 #if AP_AHRS_NAVEKF_AVAILABLE
-AP_AHRS_NavEKF ahrs(ins, barometer, g_gps);
+AP_AHRS_NavEKF ahrs(ins, barometer, gps);
 #else
-AP_AHRS_DCM ahrs(ins, barometer, g_gps);
+AP_AHRS_DCM ahrs(ins, barometer, gps);
 #endif
 
 static AP_L1_Control L1_controller(ahrs);
@@ -291,6 +272,15 @@ static AP_Navigation *nav_controller = &L1_controller;
 
 // steering controller
 static AP_SteerController steerController(ahrs);
+
+////////////////////////////////////////////////////////////////////////////////
+// Mission library
+// forward declaration to avoid compiler errors
+////////////////////////////////////////////////////////////////////////////////
+static bool start_command(const AP_Mission::Mission_Command& cmd);
+static bool verify_command(const AP_Mission::Mission_Command& cmd);
+static void exit_mission();
+AP_Mission mission(ahrs, &start_command, &verify_command, &exit_mission, MISSION_START_BYTE, MISSION_END_BYTE);
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
 SITL sitl;
@@ -332,8 +322,7 @@ static struct 	Location current_loc;
 // --------------------------------------
 #if MOUNT == ENABLED
 // current_loc uses the baro/gps soloution for altitude rather than gps only.
-// mabe one could use current_loc for lat/lon too and eliminate g_gps alltogether?
-AP_Mount camera_mount(&current_loc, g_gps, ahrs, 0);
+AP_Mount camera_mount(&current_loc, ahrs, 0);
 #endif
 
 
@@ -390,23 +379,9 @@ static struct {
 // notification object for LEDs, buzzers etc (parameter set to false disables external leds)
 static AP_Notify notify;
 
-////////////////////////////////////////////////////////////////////////////////
-// GPS variables
-////////////////////////////////////////////////////////////////////////////////
-// This is used to scale GPS values for EEPROM storage
-// 10^7 times Decimal GPS means 1 == 1cm
-// This approximation makes calculations integer and it's easy to read
-static const 	float t7			= 10000000.0;	
-// We use atan2 and other trig techniques to calaculate angles
-
 // A counter used to count down valid gps fixes to allow the gps estimate to settle
 // before recording our home position (and executing a ground start if we booted with an air start)
-static uint8_t 	ground_start_count	= 5;
-// Used to compute a speed estimate from the first valid gps fixes to decide if we are 
-// on the ground or in the air.  Used to decide if a ground start is appropriate if we
-// booted with an air start.
-static int16_t     ground_start_avg;
-static int32_t          gps_base_alt;		
+static uint8_t 	ground_start_count	= 20;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Location & Navigation
@@ -420,14 +395,9 @@ static bool have_position;
 
 static bool rtl_complete = false;
 
-// There may be two active commands in Auto mode.  
-// This indicates the active navigation command by index number
-static uint8_t	nav_command_index;					
-// This indicates the active non-navigation command by index number
-static uint8_t	non_nav_command_index;				
-// This is the command type (eg navigate to waypoint) of the active navigation command
-static uint8_t	nav_command_ID		= NO_COMMAND;	
-static uint8_t	non_nav_command_ID	= NO_COMMAND;	
+
+// angle of our next navigation waypoint
+static int32_t next_navigation_leg_cd;
 
 // ground speed error in m/s
 static float	groundspeed_error;	
@@ -470,9 +440,6 @@ static int16_t throttle_last = 0, throttle = 500;
 // When CH7 goes LOW PWM from HIGH PWM, this value will have been set true
 // This allows advanced functionality to know when to execute
 static bool ch7_flag;
-// This register tracks the current Mission Command index when writing
-// a mission using CH7 in flight
-static int8_t CH7_wp_index;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Battery Sensors
@@ -502,16 +469,14 @@ static int32_t 	condition_value;
 // A starting value used to check the status of a conditional command.
 // For example in a delay command the condition_start records that start time for the delay
 static int32_t 	condition_start;
-// A value used in condition commands.  For example the rate at which to change altitude.
-static int16_t 		condition_rate;
 
 ////////////////////////////////////////////////////////////////////////////////
 // 3D Location vectors
 // Location structure defined in AP_Common
 ////////////////////////////////////////////////////////////////////////////////
 // The home location used for RTL.  The location is set when we first get stable GPS lock
-static struct 	Location home;
-// Flag for if we have g_gps lock and have set the home location
+static const struct	Location &home = ahrs.get_home();
+// Flag for if we have gps lock and have set the home location
 static bool	home_is_set;
 // The location of the previous waypoint.  Used for track following and altitude ramp calculations
 static struct 	Location prev_WP;
@@ -519,11 +484,6 @@ static struct 	Location prev_WP;
 static struct 	Location next_WP;
 // The location of the active waypoint in Guided mode.
 static struct  	Location guided_WP;
-
-// The location structure information from the Nav command being processed
-static struct 	Location next_nav_command;	
-// The location structure information from the Non-Nav command being processed
-static struct 	Location next_nonnav_command;
 
 ////////////////////////////////////////////////////////////////////////////////
 // IMU variables
@@ -539,8 +499,6 @@ static float G_Dt						= 0.02;
 static int32_t 	perf_mon_timer;
 // The maximum main loop execution time recorded in the current performance monitoring interval
 static uint32_t 	G_Dt_max;
-// The number of gps fixes recorded in the current performance monitoring interval
-static uint8_t 	gps_fix_count = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 // System Timers
@@ -572,6 +530,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { set_servos,             1,   1500 },
     { update_GPS_50Hz,        1,   2500 },
     { update_GPS_10Hz,        5,   2500 },
+    { update_alt,             5,   3400 },
     { navigate,               5,   1600 },
     { update_compass,         5,   2000 },
     { update_commands,        5,   1000 },
@@ -682,6 +641,14 @@ static void mount_update(void)
 #if CAMERA == ENABLED
     camera.trigger_pic_cleanup();
 #endif
+}
+
+static void update_alt()
+{
+    barometer.read();
+    if (should_log(MASK_LOG_IMU)) {
+        Log_Write_Baro();
+    }
 }
 
 /*
@@ -815,13 +782,15 @@ static void one_second_loop(void)
 
 static void update_GPS_50Hz(void)
 {        
-    static uint32_t last_gps_reading;
-	g_gps->update();
+    static uint32_t last_gps_reading[GPS_MAX_INSTANCES];
+	gps.update();
 
-    if (g_gps->last_message_time_ms() != last_gps_reading) {
-        last_gps_reading = g_gps->last_message_time_ms();
-        if (should_log(MASK_LOG_GPS)) {
-            DataFlash.Log_Write_GPS(g_gps, current_loc.alt);
+    for (uint8_t i=0; i<gps.num_sensors(); i++) {
+        if (gps.last_message_time_ms(i) != last_gps_reading[i]) {
+            last_gps_reading[i] = gps.last_message_time_ms(i);
+            if (should_log(MASK_LOG_GPS)) {
+                DataFlash.Log_Write_GPS(gps, i, current_loc.alt);
+            }
         }
     }
 }
@@ -831,34 +800,31 @@ static void update_GPS_10Hz(void)
 {        
     have_position = ahrs.get_position(current_loc);
 
-	if (g_gps->new_data && g_gps->status() >= GPS::GPS_OK_FIX_3D) {
-		gps_fix_count++;
+	if (have_position && gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
 
-		if(ground_start_count > 1){
+		if (ground_start_count > 1){
 			ground_start_count--;
-			ground_start_avg += g_gps->ground_speed_cm;
 
 		} else if (ground_start_count == 1) {
 			// We countdown N number of good GPS fixes
 			// so that the altitude is more accurate
 			// -------------------------------------
 			if (current_loc.lat == 0) {
-				ground_start_count = 5;
-
+				ground_start_count = 20;
 			} else {
                 init_home();
 
                 // set system clock for log timestamps
-                hal.util->set_system_clock(g_gps->time_epoch_usec());
+                hal.util->set_system_clock(gps.time_epoch_usec());
 
 				if (g.compass_enabled) {
 					// Set compass declination automatically
-					compass.set_initial_location(g_gps->latitude, g_gps->longitude);
+					compass.set_initial_location(gps.location().lat, gps.location().lng);
 				}
 				ground_start_count = 0;
 			}
 		}
-        ground_speed   = g_gps->ground_speed_cm * 0.01;
+        ground_speed   = gps.ground_speed();
 
 #if CAMERA == ENABLED
         if (camera.update_location(current_loc) == true) {
@@ -948,7 +914,7 @@ static void update_navigation()
         break;
 
     case AUTO:
-		verify_commands();
+		mission.update();
         break;
 
     case RTL:

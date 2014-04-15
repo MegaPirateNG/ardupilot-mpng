@@ -53,6 +53,9 @@
 #define AUX_SWITCH_LAND             18      // change to LAND flight mode
 #define AUX_SWITCH_EPM              19      // Operate the EPM cargo gripper low=off, middle=neutral, high=on
 #define AUX_SWITCH_EKF              20      // Enable NavEKF
+#define AUX_SWITCH_PARACHUTE_ENABLE 21      // Parachute enable/disable
+#define AUX_SWITCH_PARACHUTE_RELEASE 22     // Parachute release
+#define AUX_SWITCH_PARACHUTE_3POS   23      // Parachute disable, enable, release with 3 position switch
 
 // values used by the ap.ch7_opt and ap.ch8_opt flags
 #define AUX_SWITCH_LOW              0       // indicates auxiliar switch is in the low position (pwm <1200)
@@ -76,17 +79,6 @@
 
 #define ToRad(x) radians(x)	// *pi/180
 #define ToDeg(x) degrees(x)	// *180/pi
-
-// GPS type codes - use the names, not the numbers
-#define GPS_PROTOCOL_NONE       -1
-#define GPS_PROTOCOL_NMEA       0
-#define GPS_PROTOCOL_SIRF       1
-#define GPS_PROTOCOL_UBLOX      2
-#define GPS_PROTOCOL_IMU        3
-#define GPS_PROTOCOL_MTK        4
-#define GPS_PROTOCOL_HIL        5
-#define GPS_PROTOCOL_MTK19      6
-#define GPS_PROTOCOL_AUTO       7
 
 // HIL enumerations
 #define HIL_MODE_DISABLED               0
@@ -147,6 +139,7 @@
 #define CH6_EKF_VERTICAL_POS            42  // EKF's baro vs accel (higher rely on accels more, baro impact is reduced).  Range should be 0.2 ~ 4.0?  2.0 is default
 #define CH6_EKF_HORIZONTAL_POS          43  // EKF's gps vs accel (higher rely on accels more, gps impact is reduced).  Range should be 1.0 ~ 3.0?  1.5 is default
 #define CH6_EKF_ACCEL_NOISE             44  // EKF's accel noise (lower means trust accels more, gps & baro less).  Range should be 0.02 ~ 0.5  0.5 is default (but very robust at that level)
+#define CH6_RC_FEEL_RP                  45  // roll-pitch input smoothing
 
 // Acro Trainer types
 #define ACRO_TRAINER_DISABLED   0
@@ -160,12 +153,6 @@
 #define RC_FEEL_RP_CRISP            75
 #define RC_FEEL_RP_VERY_CRISP       100
 
-// Commands - Note that APM now uses a subset of the MAVLink protocol
-// commands.  See enum MAV_CMD in the GCS_Mavlink library
-#define CMD_BLANK 0 // there is no command stored in the mem location
-                    // requested
-#define NO_COMMAND 0
-
 // Yaw behaviours during missions - possible values for WP_YAW_BEHAVIOR parameter
 #define WP_YAW_BEHAVIOR_NONE                          0   // auto pilot will never control yaw during missions or rtl (except for DO_CONDITIONAL_YAW command received)
 #define WP_YAW_BEHAVIOR_LOOK_AT_NEXT_WP               1   // auto pilot will face next waypoint or home during rtl
@@ -174,7 +161,6 @@
 
 
 // Waypoint options
-#define MASK_OPTIONS_RELATIVE_ALT               1
 #define WP_OPTION_ALT_CHANGE                    2
 #define WP_OPTION_YAW                           4
 #define WP_OPTION_ALT_REQUIRED                  8
@@ -189,7 +175,8 @@ enum AutoMode {
     Auto_WP,
     Auto_Land,
     Auto_RTL,
-    Auto_Circle
+    Auto_Circle,
+    Auto_Spline
 };
 
 // RTL states
@@ -221,7 +208,6 @@ enum FlipState {
 #define LOG_CONTROL_TUNING_MSG          0x04
 #define LOG_NAV_TUNING_MSG              0x05
 #define LOG_PERFORMANCE_MSG             0x06
-#define LOG_CMD_MSG                     0x08
 #define LOG_CURRENT_MSG                 0x09
 #define LOG_STARTUP_MSG                 0x0A
 #define LOG_OPTFLOW_MSG                 0x0C
@@ -239,8 +225,6 @@ enum FlipState {
 #define LOG_AUTOTUNE_MSG                0x19
 #define LOG_AUTOTUNEDETAILS_MSG         0x1A
 #define LOG_COMPASS2_MSG                0x1B
-#define LOG_INDEX_MSG                   0xF0
-#define MAX_NUM_LOGS                    50
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)
 #define MASK_LOG_ATTITUDE_MED           (1<<1)
@@ -298,28 +282,21 @@ enum FlipState {
 #define DATA_EPM_ON                     46
 #define DATA_EPM_OFF                    47
 #define DATA_EPM_NEUTRAL                48
+#define DATA_PARACHUTE_DISABLED         49
+#define DATA_PARACHUTE_ENABLED          50
+#define DATA_PARACHUTE_RELEASED         51
 
 // Centi-degrees to radians
 #define DEGX100 5729.57795f
 
-
-// EEPROM addresses
-#define EEPROM_MAX_ADDR         4096
-// parameters get the first 1536 bytes of EEPROM, remainder is for waypoints
-#define WP_START_BYTE 0x600 // where in memory home WP is stored + all other
-                            // WP
-#define WP_SIZE 15
-
 // fence points are stored at the end of the EEPROM
 #define MAX_FENCEPOINTS 6
 #define FENCE_WP_SIZE sizeof(Vector2l)
-#define FENCE_START_BYTE (EEPROM_MAX_ADDR-(MAX_FENCEPOINTS*FENCE_WP_SIZE))
+#define FENCE_START_BYTE (HAL_STORAGE_SIZE_AVAILABLE-(MAX_FENCEPOINTS*FENCE_WP_SIZE))
 
-#define MAX_WAYPOINTS  ((FENCE_START_BYTE - WP_START_BYTE) / WP_SIZE) - 1 // -
-                                                                          // 1
-                                                                          // to
-                                                                          // be
-                                                                          // safe
+// parameters get the first 1536 bytes of EEPROM, mission commands are stored between these params and the fence points
+#define MISSION_START_BYTE   0x600
+#define MISSION_END_BYTE     (FENCE_START_BYTE-1)
 
 // mark a function as not to be inlined
 #define NOINLINE __attribute__((noinline))
@@ -330,10 +307,12 @@ enum FlipState {
 #define CONFIG_IMU_SITL    3
 #define CONFIG_IMU_PX4     4
 #define CONFIG_IMU_FLYMAPLE 5
+#define CONFIG_IMU_VRBRAIN 6
 
 #define AP_BARO_BMP085    1
 #define AP_BARO_MS5611    2
 #define AP_BARO_PX4       3
+#define AP_BARO_VRBRAIN   4
 
 #define AP_BARO_MS5611_SPI 1
 #define AP_BARO_MS5611_I2C 2
@@ -353,6 +332,7 @@ enum FlipState {
 #define ERROR_SUBSYSTEM_CRASH_CHECK         12
 #define ERROR_SUBSYSTEM_FLIP                13
 #define ERROR_SUBSYSTEM_AUTOTUNE            14
+#define ERROR_SUBSYSTEM_PARACHUTE           15
 // general error codes
 #define ERROR_CODE_ERROR_RESOLVED           0
 #define ERROR_CODE_FAILED_TO_INITIALISE     1
@@ -369,10 +349,13 @@ enum FlipState {
 #define ERROR_CODE_MAIN_INS_DELAY           1
 // subsystem specific error codes -- crash checker
 #define ERROR_CODE_CRASH_CHECK_CRASH        1
+#define ERROR_CODE_CRASH_CHECK_LOSS_OF_CONTROL 2
 // subsystem specific error codes -- flip
 #define ERROR_CODE_FLIP_ABANDONED           2
 // subsystem specific error codes -- autotune
 #define ERROR_CODE_AUTOTUNE_BAD_GAINS       2
+// parachute failed to deploy because of low altitude
+#define ERROR_CODE_PARACHUTE_TOO_LOW        2
 
 // Arming Check Enable/Disable bits
 #define ARMING_CHECK_NONE                   0x00

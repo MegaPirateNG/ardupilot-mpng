@@ -64,7 +64,7 @@ bool AP_Compass_PX4::init(void)
 
         // remember if the compass is external
         _is_external[i] = (ioctl(_mag_fd[i], MAGIOCGEXTERNAL, 0) > 0);
-        if (_is_external[0]) {
+        if (_is_external[i]) {
             hal.console->printf("Using external compass[%u]\n", (unsigned)i);
         }
         _count[0] = 0;
@@ -92,6 +92,9 @@ bool AP_Compass_PX4::read(void)
     }
 
     for (uint8_t i=0; i<_num_instances; i++) {
+        // avoid division by zero if we haven't received any mag reports
+        if (_count[i] == 0) continue;
+
         _sum[i] /= _count[i];
         _sum[i] *= 1000;
 
@@ -126,9 +129,9 @@ bool AP_Compass_PX4::read(void)
         _count[i] = 0;
     }
 
-    last_update = _last_timestamp[0];
+    last_update = _last_timestamp[_get_primary()];
     
-    return _healthy[0];
+    return _healthy[_get_primary()];
 }
 
 void AP_Compass_PX4::accumulate(void)

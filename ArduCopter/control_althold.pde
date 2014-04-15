@@ -7,11 +7,12 @@
 // althold_init - initialise althold controller
 static bool althold_init(bool ignore_checks)
 {
-    // initialise filters on roll/pitch input
-    reset_roll_pitch_in_filters(g.rc_1.control_in, g.rc_2.control_in);
-
     // initialise altitude target to stopping point
     pos_control.set_target_to_stopping_point_z();
+
+    // initialize vertical speeds and leash lengths
+    pos_control.set_speed_z(-g.pilot_velocity_z_max, g.pilot_velocity_z_max);
+
     return true;
 }
 
@@ -59,7 +60,7 @@ static void althold_run()
         attitude_control.set_throttle_out(0, false);
     }else{
         // call attitude controller
-        attitude_control.angle_ef_roll_pitch_rate_ef_yaw(target_roll, target_pitch, target_yaw_rate);
+        attitude_control.angle_ef_roll_pitch_rate_ef_yaw_smooth(target_roll, target_pitch, target_yaw_rate, get_smoothing_gain());
         // body-frame rate controller is run directly from 100hz loop
 
         // call throttle controller

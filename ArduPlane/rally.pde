@@ -63,12 +63,12 @@ static bool find_best_rally_point(const Location &myloc, const Location &homeloc
 }
 
 // translate a RallyLocation to a Location
-static Location rally_location_to_location(const RallyLocation &r_loc, const Location &homeloc) 
+static Location rally_location_to_location(const RallyLocation &r_loc, const Location &homeloc)
 {
     Location ret = {};
 
-    ret.id = MAV_CMD_NAV_LOITER_UNLIM;
-    ret.options = MASK_OPTIONS_RELATIVE_ALT;
+    // we return an absolute altitude, as we add homeloc.alt below
+    ret.flags.relative_alt = false;
 
     //Currently can't do true AGL on the APM.  Relative altitudes are
     //relative to HOME point's altitude.  Terrain on the board is inbound
@@ -93,6 +93,8 @@ static Location rally_find_best_location(const Location &myloc, const Location &
         ret = homeloc;
         // Altitude to hold over home
         ret.alt = read_alt_to_hold();
+        // read_alt_to_hold returns an absolute altitude
+        ret.flags.relative_alt = false;
     }
     return ret;
 }

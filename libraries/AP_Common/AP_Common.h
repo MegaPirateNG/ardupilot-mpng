@@ -87,12 +87,25 @@
 /// bit 7: Move to next Command             0: YES,         1: Loiter until commanded
 
 //@{
+#define LOCATION_MASK_OPTIONS_RELATIVE_ALT      (1<<0)     // 1 = Relative altitude
+#define LOCATION_MASK_OPTIONS_LOITER_DIRECTION  (1<<2)     // 0 = CW, 1 = CCW
 
-struct Location {
-    uint8_t id;                                                 ///< command id
-    uint8_t options;                                    ///< options bitmask (1<<0 = relative altitude)
-    uint8_t p1;                                                 ///< param 1
-    int32_t alt;                                        ///< param 2 - Altitude in centimeters (meters * 100)
+struct PACKED Location_Option_Flags {
+    uint8_t relative_alt : 1;           // 1 if altitude is relateive to home
+    uint8_t unused1      : 1;           // unused flag (defined so that loiter_ccw uses the correct bit)
+    uint8_t loiter_ccw   : 1;           // 0 if clockwise, 1 if counter clockwise
+};
+
+struct PACKED Location {
+    union {
+        Location_Option_Flags flags;                    ///< options bitmask (1<<0 = relative altitude)
+        uint8_t options;                                /// allows writing all flags to eeprom as one byte
+    };
+    // by making alt 24 bit we can make p1 in a command 16 bit,
+    // allowing an accurate angle in centi-degrees. This keeps the
+    // storage cost per mission item at 15 bytes, and allows mission
+    // altitudes of up to +/- 83km
+    int32_t alt:24;                                     ///< param 2 - Altitude in centimeters (meters * 100)
     int32_t lat;                                        ///< param 3 - Lattitude * 10**7
     int32_t lng;                                        ///< param 4 - Longitude * 10**7
 };
@@ -139,5 +152,6 @@ struct PACKED RallyLocation {
 #define AP_PRODUCT_ID_APM2_REV_D9       0x59    // APM2 with MPU6000_REV_D9
 #define AP_PRODUCT_ID_FLYMAPLE          0x100   // Flymaple with ITG3205, ADXL345, HMC5883, BMP085
 #define AP_PRODUCT_ID_L3G4200D          0x101   // Linux with L3G4200D and ADXL345
+#define AP_PRODUCT_ID_VRBRAIN           0x150   // VRBRAIN on NuttX
 
 #endif // _AP_COMMON_H

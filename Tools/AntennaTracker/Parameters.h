@@ -51,12 +51,12 @@ public:
         k_param_format_version = 0,
         k_param_software_type,
 
-        k_param_gcs0 = 100,         // stream rates for port0
-        k_param_gcs3,               // stream rates for port3
+        k_param_gcs0 = 100,         // stream rates for uartA
+        k_param_gcs1,               // stream rates for uartC
         k_param_sysid_this_mav,
         k_param_sysid_my_gcs,
         k_param_serial0_baud,
-        k_param_serial3_baud,
+        k_param_serial1_baud,
         k_param_imu,
         k_param_compass_enabled,
         k_param_compass,
@@ -67,9 +67,27 @@ public:
         k_param_sitl,
         k_param_pidPitch2Srv,
         k_param_pidYaw2Srv,
+        k_param_gcs2,               // stream rates for uartD
+        k_param_serial2_baud,
+
+        k_param_yaw_slew_time,
+        k_param_pitch_slew_time,
+        k_param_min_reverse_time,
+
+        k_param_start_latitude,
+        k_param_start_longitude,
+        k_param_startup_delay,
+        k_param_BoardConfig,
+        k_param_gps,
+        k_param_scan_speed,
 
         k_param_channel_yaw = 200,
-        k_param_channel_pitch
+        k_param_channel_pitch,
+
+        //
+        // 220: Waypoint data
+        //
+        k_param_command_total = 220,
 
         // 254,255: reserved
     };
@@ -82,17 +100,34 @@ public:
     AP_Int16 sysid_this_mav;
     AP_Int16 sysid_my_gcs;
     AP_Int8 serial0_baud;
-    AP_Int8 serial3_baud;
+    AP_Int8 serial1_baud;
+#if MAVLINK_COMM_NUM_BUFFERS > 2
+    AP_Int8 serial2_baud;
+#endif
 
     AP_Int8 compass_enabled;
+
+    AP_Float yaw_slew_time;
+    AP_Float pitch_slew_time;
+    AP_Float min_reverse_time;
+    AP_Float scan_speed;
+
+    AP_Float start_latitude;
+    AP_Float start_longitude;
+
+    AP_Float startup_delay;
+
+    // Waypoints
+    //
+    AP_Int8 command_total; // 1 if HOME is set
 
     // PID controllers
     PID         pidPitch2Srv;
     PID         pidYaw2Srv;
 
     Parameters() :
-        pidPitch2Srv(1.0f, 0.2f, 0.05f, 4000.0f),
-        pidYaw2Srv(1.0f, 0.2f, 0.05f, 4000.0f)
+        pidPitch2Srv(0.2, 0, 0.05f, 4000.0f),
+        pidYaw2Srv  (0.2, 0, 0.05f, 4000.0f)
         {}
 };
 

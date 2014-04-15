@@ -141,10 +141,10 @@ void AC_PosControl::get_stopping_point_z(Vector3f& stopping_point) const
     const float curr_pos_z = _inav.get_altitude();
     const float curr_vel_z = _inav.get_velocity_z();
 
-    float linear_distance;  // half the distace we swap between linear and sqrt and the distace we offset sqrt
+    float linear_distance;  // half the distance we swap between linear and sqrt and the distance we offset sqrt
     float linear_velocity;  // the velocity we swap between linear and sqrt
 
-    // calculate the velocity at which we switch from calculating the stopping point using a linear funcction to a sqrt function
+    // calculate the velocity at which we switch from calculating the stopping point using a linear function to a sqrt function
     linear_velocity = POSCONTROL_ALT_HOLD_ACCEL_MAX/_p_alt_pos.kP();
 
     if (fabs(curr_vel_z) < linear_velocity) {
@@ -190,7 +190,7 @@ void AC_PosControl::calc_leash_length_z()
 {
     if (_flags.recalc_leash_z) {
         _leash_up_z = calc_leash_length(_speed_up_cms, _accel_z_cms, _p_alt_pos.kP());
-        _leash_down_z = calc_leash_length(_speed_down_cms, _accel_z_cms, _p_alt_pos.kP());
+        _leash_down_z = calc_leash_length(-_speed_down_cms, _accel_z_cms, _p_alt_pos.kP());
         _flags.recalc_leash_z = false;
     }
 }
@@ -338,7 +338,6 @@ void AC_PosControl::accel_to_throttle(float accel_target_z)
     d = _pid_alt_accel.get_d(_accel_error.z, _dt);
 
     // To-Do: pull min/max throttle from motors
-    // To-Do: where to get hover throttle?
     // To-Do: we had a contraint here but it's now removed, is this ok?  with the motors library handle it ok?
     _attitude_control.set_throttle_out((int16_t)p+i+d+_throttle_hover, true);
     
@@ -395,7 +394,7 @@ void AC_PosControl::get_stopping_point_xy(Vector3f &stopping_point) const
     float kP = _p_pos_xy.kP();
 
     // calculate current velocity
-    float vel_total = safe_sqrt(curr_vel.x*curr_vel.x + curr_vel.y*curr_vel.y);
+    float vel_total = pythagorous2(curr_vel.x, curr_vel.y);
 
     // avoid divide by zero by using current position if the velocity is below 10cm/s, kP is very low or acceleration is zero
     if (vel_total < 10.0f || kP <= 0.0f || _accel_cms <= 0.0f) {
@@ -503,7 +502,7 @@ void AC_PosControl::desired_vel_to_pos(float nav_dt)
     }
 
     // constrain and scale the desired velocity
-    vel_desired_total = safe_sqrt(_vel_desired.x*_vel_desired.x + _vel_desired.y*_vel_desired.y);
+    vel_desired_total = pythagorous2(_vel_desired.x, _vel_desired.y);
     if (vel_desired_total > _speed_cms && vel_desired_total > 0.0f) {
         _vel_desired.x = _speed_cms * _vel_desired.x/vel_desired_total;
         _vel_desired.y = _speed_cms * _vel_desired.y/vel_desired_total;
@@ -535,7 +534,7 @@ void AC_PosControl::pos_to_rate_xy(bool use_desired_rate, float dt)
         _pos_error.y = _pos_target.y - curr_pos.y;
 
         // constrain target position to within reasonable distance of current location
-        _distance_to_target = safe_sqrt(_pos_error.x*_pos_error.x + _pos_error.y*_pos_error.y);
+        _distance_to_target = pythagorous2(_pos_error.x, _pos_error.y);
         if (_distance_to_target > _leash && _distance_to_target > 0.0f) {
             _pos_target.x = curr_pos.x + _leash * _pos_error.x/_distance_to_target;
             _pos_target.y = curr_pos.y + _leash * _pos_error.y/_distance_to_target;
@@ -570,7 +569,7 @@ void AC_PosControl::pos_to_rate_xy(bool use_desired_rate, float dt)
         }
 
         // scale velocity to stays within limits
-        float vel_total = safe_sqrt(_vel_target.x*_vel_target.x + _vel_target.y*_vel_target.y);
+        float vel_total = pythagorous2(_vel_target.x, _vel_target.y);
         if (vel_total > vel_max_from_pos_error) {
             _vel_target.x = vel_max_from_pos_error * _vel_target.x/vel_total;
             _vel_target.y = vel_max_from_pos_error * _vel_target.y/vel_total;
@@ -612,14 +611,14 @@ void AC_PosControl::rate_to_accel_xy(float dt)
     _vel_error.x = _vel_target.x - vel_curr.x;
     _vel_error.y = _vel_target.y - vel_curr.y;
 
-    // combine feed foward accel with PID output from velocity error
+    // combine feed forward accel with PID output from velocity error
     // To-Do: check accel limit flag before adding I term
     _accel_target.x += _pid_rate_lat.get_pid(_vel_error.x, dt);
     _accel_target.y += _pid_rate_lon.get_pid(_vel_error.y, dt);
 
     // scale desired acceleration if it's beyond acceptable limit
     // To-Do: move this check down to the accel_to_lean_angle method?
-    accel_total = safe_sqrt(_accel_target.x*_accel_target.x + _accel_target.y*_accel_target.y);
+    accel_total = pythagorous2(_accel_target.x, _accel_target.y);
     if (accel_total > POSCONTROL_ACCEL_XY_MAX) {
         _accel_target.x = POSCONTROL_ACCEL_XY_MAX * _accel_target.x/accel_total;
         _accel_target.y = POSCONTROL_ACCEL_XY_MAX * _accel_target.y/accel_total;

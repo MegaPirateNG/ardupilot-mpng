@@ -53,10 +53,12 @@
 #include <AP_NavEKF.h>
 
 #include <AP_Vehicle.h>
+#include <AP_Mission.h>
 #include <AP_Notify.h>      // Notify library
 #include <AP_BattMonitor.h> // Battery monitor library
 #include <AP_Airspeed.h>
 #include <RC_Channel.h>
+#include <AP_BoardConfig.h>
 
 // Configuration
 #include "config.h"
@@ -102,8 +104,18 @@ static struct {
     float bearing;
     float distance;
     float pitch;
+    float altitude_difference;
+    float altitude_offset;
+    bool manual_control_yaw:1;
+    bool manual_control_pitch:1;
+    bool need_altitude_calibration:1;
+    bool scan_reverse_pitch:1;
+    bool scan_reverse_yaw:1;
 } nav_status;
 
+static uint32_t start_time_ms;
+
+static bool usb_connected;
 
 ////////////////////////////////////////////////////////////////////////////////
 // prototypes
@@ -113,8 +125,7 @@ void gcs_send_text_fmt(const prog_char_t *fmt, ...);
 ////////////////////////////////////////////////////////////////////////////////
 // Sensors
 ////////////////////////////////////////////////////////////////////////////////
-// All GPS access should be through this pointer.
-static GPS         *g_gps;
+static AP_GPS gps;
 
 #if CONFIG_BARO == AP_BARO_BMP085
 static AP_Baro_BMP085 barometer;
@@ -144,9 +155,6 @@ static AP_Compass_HIL compass;
  #error Unrecognized CONFIG_COMPASS setting
 #endif
 
-// GPS selection
-AP_GPS_Auto     g_gps_driver(&g_gps);
-
 #if CONFIG_INS_TYPE == CONFIG_INS_MPU6000
 AP_InertialSensor_MPU6000 ins;
 #elif CONFIG_INS_TYPE == CONFIG_INS_PX4
@@ -165,9 +173,9 @@ AP_InertialSensor_L3G4200D ins;
 
 // Inertial Navigation EKF
 #if AP_AHRS_NAVEKF_AVAILABLE
-AP_AHRS_NavEKF ahrs(ins, barometer, g_gps);
+AP_AHRS_NavEKF ahrs(ins, barometer, gps);
 #else
-AP_AHRS_DCM ahrs(ins, barometer, g_gps);
+AP_AHRS_DCM ahrs(ins, barometer, gps);
 #endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
@@ -183,8 +191,21 @@ static RC_Channel channel_pitch(CH_2);
 ////////////////////////////////////////////////////////////////////////////////
 // GCS selection
 ////////////////////////////////////////////////////////////////////////////////
-static GCS_MAVLINK gcs0;
-static GCS_MAVLINK gcs3;
+static const uint8_t num_gcs = MAVLINK_COMM_NUM_BUFFERS;
+static GCS_MAVLINK gcs[MAVLINK_COMM_NUM_BUFFERS];
+
+// board specific config
+static AP_BoardConfig BoardConfig;
+
+////////////////////////////////////////////////////////////////////////////////
+// 3D Location vectors
+// Location structure defined in AP_Common
+////////////////////////////////////////////////////////////////////////////////
+static struct   Location current_loc;
+
+// This is the state of the antenna control system
+// There are multiple states defined such as MANUAL, FBW-A, AUTO
+static enum ControlMode control_mode  = INITIALISING;
 
 /*
   scheduler table - all regular tasks apart from the fast_loop()
@@ -198,12 +219,12 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { update_GPS,             5,   4000 },
     { update_compass,         5,   1500 },
     { update_barometer,       5,   1500 },
-    { update_tracking,        1,   1000 },
     { gcs_update,             1,   1700 },
     { gcs_data_stream_send,   1,   3000 },
     { compass_accumulate,     1,   1500 },
     { barometer_accumulate,   1,    900 },
     { update_notify,          1,    100 },
+    { check_usb_mux,          5,    300 },
     { gcs_retry_deferred,     1,   1000 },
     { one_second_loop,       50,   3900 }
 };

@@ -28,17 +28,6 @@ enum ch7_option {
 #define T6 1000000
 #define T7 10000000
 
-// GPS type codes - use the names, not the numbers
-#define GPS_PROTOCOL_NONE	-1
-#define GPS_PROTOCOL_NMEA	0
-#define GPS_PROTOCOL_SIRF	1
-#define GPS_PROTOCOL_UBLOX	2
-#define GPS_PROTOCOL_IMU	3
-#define GPS_PROTOCOL_MTK	4
-#define GPS_PROTOCOL_HIL	5
-#define GPS_PROTOCOL_MTK19	6
-#define GPS_PROTOCOL_AUTO	7
-
 // HIL enumerations
 #define HIL_MODE_DISABLED			0
 #define HIL_MODE_SENSORS			1
@@ -61,15 +50,6 @@ enum mode {
 #define FAILSAFE_EVENT_GCS      (1<<1)
 #define FAILSAFE_EVENT_RC       (1<<2)
 
-// Commands - Note that APM now uses a subset of the MAVLink protocol commands.  See enum MAV_CMD in the GCS_Mavlink library
-#define CMD_BLANK 0 // there is no command stored in the mem location requested
-#define NO_COMMAND 0
-#define WAIT_COMMAND 255
-
-// Command/Waypoint/Location Options Bitmask
-//--------------------
-#define MASK_OPTIONS_RELATIVE_ALT	(1<<0)		// 1 = Relative altitude
-
 //repeating events
 #define NO_REPEAT 0
 #define CH_5_TOGGLE 1
@@ -85,7 +65,6 @@ enum mode {
 #define LOG_CTUN_MSG	        0x01
 #define LOG_NTUN_MSG    		0x02
 #define LOG_PERFORMANCE_MSG		0x03
-#define LOG_CMD_MSG			    0x04
 #define LOG_CURRENT_MSG 		0x05
 #define LOG_STARTUP_MSG 		0x06
 #define LOG_SONAR_MSG 		    0x07
@@ -152,12 +131,9 @@ enum mode {
 
 
 // EEPROM addresses
-#define EEPROM_MAX_ADDR		4096
-// parameters get the first 1KiB of EEPROM, remainder is for waypoints
-#define WP_START_BYTE 0x500 // where in memory home WP is stored + all other WP
-#define WP_SIZE 15
-
-#define MAX_WAYPOINTS  ((EEPROM_MAX_ADDR - WP_START_BYTE) / WP_SIZE) - 1 // - 1 to be safe
+// parameters get the first 1KiB of EEPROM, remainder is for mission commands
+#define MISSION_START_BYTE  0x500
+#define MISSION_END_BYTE    HAL_STORAGE_SIZE_AVAILABLE
 
 // convert a boolean (0 or 1) to a sign for multiplying (0 maps to 1, 1 maps to -1)
 #define BOOL_TO_SIGN(bvalue) ((bvalue)?-1:1)
@@ -172,10 +148,19 @@ enum mode {
 #define CONFIG_INS_PX4     4
 #define CONFIG_INS_FLYMAPLE 5
 #define CONFIG_INS_L3G4200D 6
+#define CONFIG_INS_VRBRAIN 7
+
+// barometer driver types
+#define AP_BARO_BMP085   1
+#define AP_BARO_MS5611   2
+#define AP_BARO_PX4      3
+#define AP_BARO_HIL      4
+#define AP_BARO_VRBRAIN  5
 
 // compass driver types
 #define AP_COMPASS_HMC5843   1
 #define AP_COMPASS_PX4       2
 #define AP_COMPASS_HIL       3
+#define AP_COMPASS_VRBRAIN   4
 
 #endif // _DEFINES_H

@@ -103,6 +103,12 @@ static void init_ardupilot()
     hal.uartB->begin(38400, 256, 16);
 #endif
 
+#if GPS2_ENABLE
+    if (hal.uartE != NULL) {
+        hal.uartE->begin(38400, 256, 16);
+    }
+#endif
+
     cliSerial->printf_P(PSTR("\n\nInit " FIRMWARE_STRING
                          "\n\nFree RAM: %u\n"),
                         hal.util->available_memory());
@@ -221,9 +227,7 @@ static void init_ardupilot()
  #endif // CONFIG_ADC
 
     // Do GPS init
-    g_gps = &g_gps_driver;
-    // GPS Initialization
-    g_gps->init(hal.uartB, GPS::GPS_ENGINE_AIRBORNE_4G);
+    gps.init(&DataFlash);
 
     if(g.compass_enabled)
         init_compass();
@@ -273,9 +277,8 @@ static void init_ardupilot()
     init_sonar();
 #endif
 
-    // initialize commands
-    // -------------------
-    init_commands();
+    // initialise mission library
+    mission.init();
 
     // initialise the flight mode and aux switch
     // ---------------------------
@@ -325,7 +328,8 @@ static void startup_ground(bool force_gyro_cal)
 // returns true if the GPS is ok and home position is set
 static bool GPS_ok()
 {
-    if (g_gps != NULL && ap.home_is_set && g_gps->status() == GPS::GPS_OK_FIX_3D && !gps_glitch.glitching() && !failsafe.gps) {
+    if (ap.home_is_set && gps.status() >= AP_GPS::GPS_OK_FIX_3D && 
+        !gps_glitch.glitching() && !failsafe.gps) {
         return true;
     }else{
         return false;

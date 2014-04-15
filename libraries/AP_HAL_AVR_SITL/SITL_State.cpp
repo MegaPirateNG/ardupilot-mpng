@@ -73,7 +73,7 @@ SITL *SITL_State::_sitl;
 uint16_t SITL_State::pwm_output[11];
 uint16_t SITL_State::last_pwm_output[11];
 uint16_t SITL_State::pwm_input[8];
-bool SITL_State::pwm_valid;
+bool SITL_State::new_rc_input;
 
 // catch floating point exceptions
 void SITL_State::_sig_fpe(int signum)
@@ -103,7 +103,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     setvbuf(stdout, (char *)0, _IONBF, 0);
     setvbuf(stderr, (char *)0, _IONBF, 0);
 
-	while ((opt = getopt(argc, argv, "swhr:H:CI:")) != -1) {
+	while ((opt = getopt(argc, argv, "swhr:H:CI:P:")) != -1) {
 		switch (opt) {
 		case 'w':
 			AP_Param::erase_all();
@@ -124,6 +124,9 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
             _rcout_port += instance * 10;
             _simin_port += instance * 10;
         }
+			break;
+		case 'P':
+            _set_param_default(optarg);
 			break;
 		default:
 			_usage();
@@ -153,6 +156,37 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
 	}
 
 	_sitl_setup();
+}
+
+
+void SITL_State::_set_param_default(char *parm)
+{
+    char *p = strchr(parm, '=');
+    if (p == NULL) {
+        printf("Please specify parameter as NAME=VALUE");
+        exit(1);
+    }
+    float value = atof(p+1);
+    *p = 0;
+    enum ap_var_type var_type;
+    AP_Param *vp = AP_Param::find(parm, &var_type);
+    if (vp == NULL) {
+        printf("Unknown parameter %s\n", parm);
+        exit(1);        
+    }
+    if (var_type == AP_PARAM_FLOAT) {
+        ((AP_Float *)vp)->set_and_save(value);
+    } else if (var_type == AP_PARAM_INT32) {
+        ((AP_Int32 *)vp)->set_and_save(value);
+    } else if (var_type == AP_PARAM_INT16) {
+        ((AP_Int16 *)vp)->set_and_save(value);
+    } else if (var_type == AP_PARAM_INT8) {
+        ((AP_Int8 *)vp)->set_and_save(value);
+    } else {
+        printf("Unable to set parameter %s\n", parm);
+        exit(1);
+    }
+    printf("Set parameter %s to %f\n", parm, value);
 }
 
 
@@ -263,7 +297,7 @@ void SITL_State::_timer_handler(int signum)
     // simulate RC input at 50Hz
     if (hal.scheduler->millis() - last_pwm_input >= 20 && _sitl->rc_fail == 0) {
         last_pwm_input = hal.scheduler->millis();
-        pwm_valid = true;
+        new_rc_input = true;
     }
 
 	/* check for packet from flight sim */
@@ -495,6 +529,9 @@ void SITL_State::_simulator_output(void)
 	// setup wind control
     float wind_speed = _sitl->wind_speed * 100;
     float altitude = _barometer?_barometer->get_altitude():0;
+    if (altitude < 0) {
+        altitude = 0;
+    }
     if (altitude < 60) {
         wind_speed *= altitude / 60.0f;
     }
@@ -584,6 +621,16 @@ void SITL_State::loop_hook(void)
         max_fd = max(fd, max_fd);
     }
     fd = ((AVR_SITL::SITLUARTDriver*)hal.uartC)->_fd;
+    if (fd != -1) {
+        FD_SET(fd, &fds);
+        max_fd = max(fd, max_fd);
+    }
+    fd = ((AVR_SITL::SITLUARTDriver*)hal.uartD)->_fd;
+    if (fd != -1) {
+        FD_SET(fd, &fds);
+        max_fd = max(fd, max_fd);
+    }
+    fd = ((AVR_SITL::SITLUARTDriver*)hal.uartE)->_fd;
     if (fd != -1) {
         FD_SET(fd, &fds);
         max_fd = max(fd, max_fd);

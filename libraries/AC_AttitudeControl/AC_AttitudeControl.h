@@ -20,8 +20,8 @@
 #define AC_ATTITUDE_CONTROL_DEGX100 5729.57795f                 // constant to convert from radians to centi-degrees
 #define AC_ATTITUDE_CONTROL_RATE_RP_MAX_DEFAULT         18000   // maximum rotation rate in roll/pitch axis requested by angle controller used in stabilize, loiter, rtl, auto flight modes
 #define AC_ATTITUDE_CONTROL_RATE_Y_MAX_DEFAULT          18000   // maximum rotation rate on yaw axis requested by angle controller used in stabilize, loiter, rtl, auto flight modes
-#define AC_ATTITUDE_CONTROL_SLEW_YAW_DEFAULT            6000    // default yaw slew rate in centi-degrees/sec (i.e. maximum yaw target change in 1second)
-#define AC_ATTITUDE_CONTROL_ACCEL_RP_MAX_DEFAULT        54000   // default maximum acceleration for roll/pitch axis in centi-degrees/sec/sec
+#define AC_ATTITUDE_CONTROL_SLEW_YAW_DEFAULT            1000    // constraint on yaw angle error in degrees.  This should lead to maximum turn rate of 10deg/sed * Stab Rate P so by default will be 45deg/sec.
+#define AC_ATTITUDE_CONTROL_ACCEL_RP_MAX_DEFAULT        90000   // default maximum acceleration for roll/pitch axis in centi-degrees/sec/sec
 #define AC_ATTITUDE_CONTROL_ACCEL_Y_MAX_DEFAULT         18000   // default maximum acceleration for yaw axis in centi-degrees/sec/sec
 
 #define AC_ATTITUDE_RATE_CONTROLLER_TIMEOUT             1.0f    // body-frame rate controller timeout in seconds
@@ -79,6 +79,10 @@ public:
     // methods to be called by upper controllers to request and implement a desired attitude
     //
 
+    // angle_ef_roll_pitch_rate_ef_yaw_smooth - attempts to maintain a roll and pitch angle and yaw rate (all earth frame) while smoothing the attitude based on the feel parameter
+    //      smoothing_gain : a number from 1 to 50 with 1 being sluggish and 50 being very crisp
+    void angle_ef_roll_pitch_rate_ef_yaw_smooth(float roll_angle_ef, float pitch_angle_ef, float yaw_rate_ef, float smoothing_gain);
+
     // angle_ef_roll_pitch_rate_ef_yaw - attempts to maintain a roll and pitch angle and yaw rate (all earth frame)
     void angle_ef_roll_pitch_rate_ef_yaw(float roll_angle_ef, float pitch_angle_ef, float yaw_rate_ef);
 
@@ -115,7 +119,7 @@ public:
     void limit_angle_to_rate_request(bool limit_request) { _flags.limit_angle_to_rate_request = limit_request; }
 
     // angle_ef_targets - returns angle controller earth-frame targets (for reporting)
-    Vector3f angle_ef_targets() const { return _angle_ef_target; }
+    const Vector3f& angle_ef_targets() const { return _angle_ef_target; }
 
     // rate_bf_targets - gets rate controller body-frame targets
     void rate_bf_roll_target(float rate_cds) { _rate_bf_target.x = rate_cds; }

@@ -1,112 +1,123 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-/********************************************************************************/
-// Command Event Handlers
-/********************************************************************************/
-// process_nav_command - main switch statement to initiate the next nav command in the command_nav_queue
-static void process_nav_command()
-{
-    switch(command_nav_queue.id) {
+// forward declarations to make compiler happy
+static void do_takeoff(const AP_Mission::Mission_Command& cmd);
+static void do_nav_wp(const AP_Mission::Mission_Command& cmd);
+static void do_land(const AP_Mission::Mission_Command& cmd);
+static void do_loiter_unlimited(const AP_Mission::Mission_Command& cmd);
+static void do_circle(const AP_Mission::Mission_Command& cmd);
+static void do_loiter_time(const AP_Mission::Mission_Command& cmd);
+static void do_spline_wp(const AP_Mission::Mission_Command& cmd);
+static void do_wait_delay(const AP_Mission::Mission_Command& cmd);
+static void do_within_distance(const AP_Mission::Mission_Command& cmd);
+static void do_change_alt(const AP_Mission::Mission_Command& cmd);
+static void do_yaw(const AP_Mission::Mission_Command& cmd);
+static void do_change_speed(const AP_Mission::Mission_Command& cmd);
+static void do_set_home(const AP_Mission::Mission_Command& cmd);
+static void do_roi(const AP_Mission::Mission_Command& cmd);
+#if PARACHUTE == ENABLED
+static void do_parachute(const AP_Mission::Mission_Command& cmd);
+#endif
+static bool verify_nav_wp(const AP_Mission::Mission_Command& cmd);
+static bool verify_spline_wp(const AP_Mission::Mission_Command& cmd);
+static void auto_spline_start(const Vector3f& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Vector3f& next_spline_destination);
 
+// start_command - this function will be called when the ap_mission lib wishes to start a new command
+static bool start_command(const AP_Mission::Mission_Command& cmd)
+{
+    // To-Do: logging when new commands start/end
+    if (g.log_bitmask & MASK_LOG_CMD) {
+        Log_Write_Cmd(cmd);
+    }
+
+    switch(cmd.id) {
+
+    ///
+    /// navigation commands
+    ///
     case MAV_CMD_NAV_TAKEOFF:                   // 22
-        do_takeoff();
+        do_takeoff(cmd);
         break;
 
     case MAV_CMD_NAV_WAYPOINT:                  // 16  Navigate to Waypoint
-        do_nav_wp();
+        do_nav_wp(cmd);
         break;
 
     case MAV_CMD_NAV_LAND:              // 21 LAND to Waypoint
-        do_land(&command_nav_queue);
+        do_land(cmd);
         break;
 
     case MAV_CMD_NAV_LOITER_UNLIM:              // 17 Loiter indefinitely
-        do_loiter_unlimited();
+        do_loiter_unlimited(cmd);
         break;
 
     case MAV_CMD_NAV_LOITER_TURNS:              //18 Loiter N Times
-        do_circle();
+        do_circle(cmd);
         break;
 
     case MAV_CMD_NAV_LOITER_TIME:              // 19
-        do_loiter_time();
+        do_loiter_time(cmd);
         break;
 
     case MAV_CMD_NAV_RETURN_TO_LAUNCH:             //20
         do_RTL();
         break;
 
-    default:
+    case MAV_CMD_NAV_SPLINE_WAYPOINT:           // 82  Navigate to Waypoint using spline
+        do_spline_wp(cmd);
         break;
-    }
 
-}
-
-// process_cond_command - main switch statement to initiate the next conditional command in the command_cond_queue
-static void process_cond_command()
-{
-    switch(command_cond_queue.id) {
-
+    //
+    // conditional commands
+    //
     case MAV_CMD_CONDITION_DELAY:             // 112
-        do_wait_delay();
+        do_wait_delay(cmd);
         break;
 
     case MAV_CMD_CONDITION_DISTANCE:             // 114
-        do_within_distance();
+        do_within_distance(cmd);
         break;
 
     case MAV_CMD_CONDITION_CHANGE_ALT:             // 113
-        do_change_alt();
+        do_change_alt(cmd);
         break;
 
     case MAV_CMD_CONDITION_YAW:             // 115
-        do_yaw();
+        do_yaw(cmd);
         break;
 
-    default:
-        break;
-    }
-}
-
-// process_now_command - main switch statement to initiate the next now command in the command_cond_queue
-// now commands are conditional commands that are executed immediately so they do not require a corresponding verify to be run later
-static void process_now_command()
-{
-    switch(command_cond_queue.id) {
-
-    case MAV_CMD_DO_JUMP:              // 177
-        do_jump();
-        break;
-
+    ///
+    /// do commands
+    ///
     case MAV_CMD_DO_CHANGE_SPEED:             // 178
-        do_change_speed();
+        do_change_speed(cmd);
         break;
 
     case MAV_CMD_DO_SET_HOME:             // 179
-        do_set_home();
+        do_set_home(cmd);
         break;
 
     case MAV_CMD_DO_SET_SERVO:
-        ServoRelayEvents.do_set_servo(command_cond_queue.p1, command_cond_queue.alt);
+        ServoRelayEvents.do_set_servo(cmd.content.servo.channel, cmd.content.servo.pwm);
         break;
         
     case MAV_CMD_DO_SET_RELAY:
-        ServoRelayEvents.do_set_relay(command_cond_queue.p1, command_cond_queue.alt);
+        ServoRelayEvents.do_set_relay(cmd.content.relay.num, cmd.content.relay.state);
         break;
         
     case MAV_CMD_DO_REPEAT_SERVO:
-        ServoRelayEvents.do_repeat_servo(command_cond_queue.p1, command_cond_queue.alt,
-                                         command_cond_queue.lat, command_cond_queue.lng);
+        ServoRelayEvents.do_repeat_servo(cmd.content.repeat_servo.channel, cmd.content.repeat_servo.pwm,
+                                         cmd.content.repeat_servo.repeat_count, cmd.content.repeat_servo.cycle_time * 1000.0f);
         break;
         
     case MAV_CMD_DO_REPEAT_RELAY:
-        ServoRelayEvents.do_repeat_relay(command_cond_queue.p1, command_cond_queue.alt,
-                                         command_cond_queue.lat);
+        ServoRelayEvents.do_repeat_relay(cmd.content.repeat_relay.num, cmd.content.repeat_relay.repeat_count,
+                                         cmd.content.repeat_relay.cycle_time * 1000.0f);
         break;
 
     case MAV_CMD_DO_SET_ROI:                // 201
         // point the copter and camera at a region of interest (ROI)
-        do_roi();
+        do_roi(cmd);
         break;
 
 #if CAMERA == ENABLED
@@ -121,7 +132,7 @@ static void process_now_command()
         break;
 
     case MAV_CMD_DO_SET_CAM_TRIGG_DIST:
-        camera.set_trigger_distance(command_cond_queue.alt);
+        camera.set_trigger_distance(cmd.content.cam_trigg_dist.meters);
         break;
 #endif
 
@@ -135,28 +146,41 @@ static void process_now_command()
         break;
 #endif
 
+#if PARACHUTE == ENABLED
+    case MAV_CMD_DO_PARACHUTE:                          // Mission command to configure or release parachute
+        do_parachute(cmd);
+        break;
+#endif
+
     default:
         // do nothing with unrecognized MAVLink messages
         break;
     }
+
+    // always return success
+    return true;
 }
 
 /********************************************************************************/
 // Verify command Handlers
 /********************************************************************************/
 
-// verify_nav_command - switch statement to ensure the active navigation command is progressing
-// returns true once the active navigation command completes successfully
-static bool verify_nav_command()
+// verify_command - this will be called repeatedly by ap_mission lib to ensure the active commands are progressing
+//  should return true once the active navigation command completes successfully
+//  called at 10hz or higher
+static bool verify_command(const AP_Mission::Mission_Command& cmd)
 {
-    switch(command_nav_queue.id) {
+    switch(cmd.id) {
 
+    //
+    // navigation commands
+    //
     case MAV_CMD_NAV_TAKEOFF:
         return verify_takeoff();
         break;
 
     case MAV_CMD_NAV_WAYPOINT:
-        return verify_nav_wp();
+        return verify_nav_wp(cmd);
         break;
 
     case MAV_CMD_NAV_LAND:
@@ -179,18 +203,13 @@ static bool verify_nav_command()
         return verify_RTL();
         break;
 
-    default:
-        return false;
+    case MAV_CMD_NAV_SPLINE_WAYPOINT:
+        return verify_spline_wp(cmd);
         break;
-    }
-}
 
-// verify_cond_command - switch statement to ensure the active conditional command is progressing
-// returns true once the active conditional command completes successfully
-static bool verify_cond_command()
-{
-    switch(command_cond_queue.id) {
-
+    ///
+    /// conditional commands
+    ///
     case MAV_CMD_CONDITION_DELAY:
         return verify_wait_delay();
         break;
@@ -207,9 +226,39 @@ static bool verify_cond_command()
         return verify_yaw();
         break;
 
-    default:
-        return false;
+#if PARACHUTE == ENABLED
+    case MAV_CMD_DO_PARACHUTE:
+        // assume parachute was released successfully
+        return true;
         break;
+#endif
+
+    default:
+        // return true if we do not recognise the command so that we move on to the next command
+        return true;
+        break;
+    }
+}
+
+// exit_mission - function that is called once the mission completes
+static void exit_mission()
+{
+    // if we are not on the ground switch to loiter or land
+    if(!ap.land_complete) {
+        // try to enter loiter but if that fails land
+        if (!set_mode(LOITER)) {
+            set_mode(LAND);
+        }
+    }else{
+#if LAND_REQUIRE_MIN_THROTTLE_TO_DISARM == ENABLED
+        // disarm when the landing detector says we've landed and throttle is at minimum
+        if (g.rc_3.control_in == 0 || failsafe.radio) {
+            init_disarm_motors();
+        }
+#else
+        // if we've landed it's safe to disarm
+        init_disarm_motors();
+#endif
     }
 }
 
@@ -229,29 +278,27 @@ static void do_RTL(void)
 /********************************************************************************/
 
 // do_takeoff - initiate takeoff navigation command
-static void do_takeoff()
+static void do_takeoff(const AP_Mission::Mission_Command& cmd)
 {
     // Set wp navigation target to safe altitude above current position
-    float takeoff_alt = command_nav_queue.alt;
+    float takeoff_alt = cmd.content.location.alt;
     takeoff_alt = max(takeoff_alt,current_loc.alt);
     takeoff_alt = max(takeoff_alt,100.0f);
     auto_takeoff_start(takeoff_alt);
 }
 
 // do_nav_wp - initiate move to next waypoint
-static void do_nav_wp()
+static void do_nav_wp(const AP_Mission::Mission_Command& cmd)
 {
-    // Set wp navigation target
-    auto_wp_start(pv_location_to_vector(command_nav_queue));
-
-    // initialise original_wp_bearing which is used to check if we have missed the waypoint
-    wp_bearing = wp_nav.get_wp_bearing_to_destination();
-    original_wp_bearing = wp_bearing;
+    Vector3f local_pos = pv_location_to_vector(cmd.content.location);
 
     // this will be used to remember the time in millis after we reach or pass the WP.
-    loiter_time     = 0;
-    // this is the delay, stored in seconds and expanded to millis
-    loiter_time_max = command_nav_queue.p1;
+    loiter_time = 0;
+    // this is the delay, stored in seconds
+    loiter_time_max = abs(cmd.p1);
+
+    // Set wp navigation target
+    auto_wp_start(local_pos);
     // if no delay set the waypoint as "fast"
     if (loiter_time_max == 0 ) {
         wp_nav.set_fast_waypoint(true);
@@ -259,23 +306,19 @@ static void do_nav_wp()
 }
 
 // do_land - initiate landing procedure
-static void do_land(const struct Location *cmd)
+static void do_land(const AP_Mission::Mission_Command& cmd)
 {
     // To-Do: check if we have already landed
 
     // if location provided we fly to that location at current altitude
-    if (cmd != NULL && (cmd->lat != 0 || cmd->lng != 0)) {
+    if (cmd.content.location.lat != 0 || cmd.content.location.lng != 0) {
         // set state to fly to location
         land_state = LAND_STATE_FLY_TO_LOCATION;
 
         // calculate and set desired location above landing target
-        Vector3f pos = pv_location_to_vector(*cmd);
-        pos.z = min(current_loc.alt, RTL_ALT_MAX);
+        Vector3f pos = pv_location_to_vector(cmd.content.location);
+        pos.z = current_loc.alt;
         auto_wp_start(pos);
-
-        // initialise original_wp_bearing which is used to check if we have missed the waypoint
-        wp_bearing = wp_nav.get_wp_bearing_to_destination();
-        original_wp_bearing = wp_bearing;
     }else{
         // set landing state
         land_state = LAND_STATE_DESCENDING;
@@ -287,7 +330,7 @@ static void do_land(const struct Location *cmd)
 
 // do_loiter_unlimited - start loitering with no end conditions
 // note: caller should set yaw_mode
-static void do_loiter_unlimited()
+static void do_loiter_unlimited(const AP_Mission::Mission_Command& cmd)
 {
     Vector3f target_pos;
 
@@ -295,16 +338,16 @@ static void do_loiter_unlimited()
     Vector3f curr_pos = inertial_nav.get_position();
 
     // default to use position provided
-    target_pos = pv_location_to_vector(command_nav_queue);
+    target_pos = pv_location_to_vector(cmd.content.location);
 
     // use current location if not provided
-    if(command_nav_queue.lat == 0 && command_nav_queue.lng == 0) {
+    if(cmd.content.location.lat == 0 && cmd.content.location.lng == 0) {
         wp_nav.get_wp_stopping_point_xy(target_pos);
     }
 
     // use current altitude if not provided
     // To-Do: use z-axis stopping point instead of current alt
-    if( command_nav_queue.alt == 0 ) {
+    if( cmd.content.location.alt == 0 ) {
         target_pos.z = curr_pos.z;
     }
 
@@ -313,10 +356,10 @@ static void do_loiter_unlimited()
 }
 
 // do_circle - initiate moving in a circle
-static void do_circle()
+static void do_circle(const AP_Mission::Mission_Command& cmd)
 {
     Vector3f curr_pos = inertial_nav.get_position();
-    Vector3f circle_center = pv_location_to_vector(command_nav_queue);
+    Vector3f circle_center = pv_location_to_vector(cmd.content.location);
 
     // set target altitude if not provided
     if (circle_center.z == 0) {
@@ -325,7 +368,7 @@ static void do_circle()
 
     // set lat/lon position if not provided
     // To-Do: use stopping point instead of current location
-    if (command_nav_queue.lat == 0 && command_nav_queue.lng == 0) {
+    if (cmd.content.location.lat == 0 && cmd.content.location.lng == 0) {
         circle_center.x = curr_pos.x;
         circle_center.y = curr_pos.y;
     }
@@ -334,12 +377,12 @@ static void do_circle()
     auto_circle_start(circle_center);
 
     // record number of desired rotations from mission command
-    circle_desired_rotations = command_nav_queue.p1;
+    circle_desired_rotations = cmd.p1;
 }
 
 // do_loiter_time - initiate loitering at a point for a given time period
 // note: caller should set yaw_mode
-static void do_loiter_time()
+static void do_loiter_time(const AP_Mission::Mission_Command& cmd)
 {
     Vector3f target_pos;
 
@@ -347,15 +390,15 @@ static void do_loiter_time()
     Vector3f curr_pos = inertial_nav.get_position();
 
     // default to use position provided
-    target_pos = pv_location_to_vector(command_nav_queue);
+    target_pos = pv_location_to_vector(cmd.content.location);
 
     // use current location if not provided
-    if(command_nav_queue.lat == 0 && command_nav_queue.lng == 0) {
+    if(cmd.content.location.lat == 0 && cmd.content.location.lng == 0) {
         wp_nav.get_wp_stopping_point_xy(target_pos);
     }
 
     // use current altitude if not provided
-    if( command_nav_queue.alt == 0 ) {
+    if( cmd.content.location.alt == 0 ) {
         target_pos.z = curr_pos.z;
     }
 
@@ -364,8 +407,74 @@ static void do_loiter_time()
 
     // setup loiter timer
     loiter_time     = 0;
-    loiter_time_max = command_nav_queue.p1;     // units are (seconds)
+    loiter_time_max = cmd.p1;     // units are (seconds)
 }
+
+// do_spline_wp - initiate move to next waypoint
+static void do_spline_wp(const AP_Mission::Mission_Command& cmd)
+{
+    Vector3f local_pos = pv_location_to_vector(cmd.content.location);
+
+    // this will be used to remember the time in millis after we reach or pass the WP.
+    loiter_time = 0;
+    // this is the delay, stored in seconds
+    loiter_time_max = abs(cmd.p1);
+
+    // determine segment start and end type
+    bool stopped_at_start = true;
+    AC_WPNav::spline_segment_end_type seg_end_type = AC_WPNav::SEGMENT_END_STOP;
+    AP_Mission::Mission_Command temp_cmd;
+    Vector3f next_destination;      // end of next segment
+
+    // if previous command was a wp_nav command with no delay set stopped_at_start to false
+    // To-Do: move processing of delay into wp-nav controller to allow it to determine the stopped_at_start value itself?
+    uint16_t prev_cmd_idx = mission.get_prev_nav_cmd_index();
+    if (prev_cmd_idx != AP_MISSION_CMD_INDEX_NONE) {
+        if (mission.read_cmd_from_storage(prev_cmd_idx, temp_cmd)) {
+            if ((temp_cmd.id == MAV_CMD_NAV_WAYPOINT || temp_cmd.id == MAV_CMD_NAV_SPLINE_WAYPOINT) && temp_cmd.p1 == 0) {
+                stopped_at_start = false;
+            }
+        }
+    }
+
+    // if there is no delay at the end of this segment get next nav command
+    if (cmd.p1 == 0 && mission.get_next_nav_cmd(cmd.index+1, temp_cmd)) {
+        // if the next nav command is a waypoint set end type to spline or straight
+        if (temp_cmd.id == MAV_CMD_NAV_WAYPOINT) {
+            seg_end_type = AC_WPNav::SEGMENT_END_STRAIGHT;
+            next_destination = pv_location_to_vector(temp_cmd.content.location);
+        }else if (temp_cmd.id == MAV_CMD_NAV_SPLINE_WAYPOINT) {
+            seg_end_type = AC_WPNav::SEGMENT_END_SPLINE;
+            next_destination = pv_location_to_vector(temp_cmd.content.location);
+        }
+    }
+
+    // set spline navigation target
+    auto_spline_start(local_pos, stopped_at_start, seg_end_type, next_destination);
+}
+
+#if PARACHUTE == ENABLED
+// do_parachute - configure or release parachute
+static void do_parachute(const AP_Mission::Mission_Command& cmd)
+{
+    switch (cmd.p1) {
+        case PARACHUTE_DISABLE:
+            parachute.enabled(false);
+            Log_Write_Event(DATA_PARACHUTE_DISABLED);
+            break;
+        case PARACHUTE_ENABLE:
+            parachute.enabled(true);
+            Log_Write_Event(DATA_PARACHUTE_ENABLED);
+            break;
+        case PARACHUTE_RELEASE:
+            parachute_release();
+            break;
+        default:
+            // do nothing
+            break;
+    }
+}
+#endif
 
 /********************************************************************************/
 //	Verify Nav (Must) commands
@@ -415,7 +524,7 @@ static bool verify_land()
 }
 
 // verify_nav_wp - check if we have reached the next way point
-static bool verify_nav_wp()
+static bool verify_nav_wp(const AP_Mission::Mission_Command& cmd)
 {
     // check if we have reached the waypoint
     if( !wp_nav.reached_wp_destination() ) {
@@ -429,7 +538,7 @@ static bool verify_nav_wp()
 
     // check if timer has run out
     if (((millis() - loiter_time) / 1000) >= loiter_time_max) {
-        gcs_send_text_fmt(PSTR("Reached Command #%i"),command_nav_index);
+        gcs_send_text_fmt(PSTR("Reached Command #%i"),cmd.index);
         return true;
     }else{
         return false;
@@ -476,19 +585,39 @@ static bool verify_RTL()
     return (rtl_state_complete && (rtl_state == FinalDescent || rtl_state == Land));
 }
 
+// verify_spline_wp - check if we have reached the next way point using spline
+static bool verify_spline_wp(const AP_Mission::Mission_Command& cmd)
+{
+    // check if we have reached the waypoint
+    if( !wp_nav.reached_wp_destination() ) {
+        return false;
+    }
+
+    // start timer if necessary
+    if(loiter_time == 0) {
+        loiter_time = millis();
+    }
+
+    // check if timer has run out
+    if (((millis() - loiter_time) / 1000) >= loiter_time_max) {
+        gcs_send_text_fmt(PSTR("Reached Command #%i"),cmd.index);
+        return true;
+    }else{
+        return false;
+    }
+}
+
 /********************************************************************************/
 //	Condition (May) commands
 /********************************************************************************/
 
-static void do_wait_delay()
+static void do_wait_delay(const AP_Mission::Mission_Command& cmd)
 {
-    //cliSerial->print("dwd ");
     condition_start = millis();
-    condition_value = command_cond_queue.lat * 1000;     // convert to milliseconds
-    //cliSerial->println(condition_value,DEC);
+    condition_value = cmd.content.delay.seconds * 1000;     // convert seconds to milliseconds
 }
 
-static void do_change_alt()
+static void do_change_alt(const AP_Mission::Mission_Command& cmd)
 {
     // adjust target appropriately for each nav mode
     if (control_mode == AUTO) {
@@ -497,6 +626,7 @@ static void do_change_alt()
             // To-Do: adjust waypoint target altitude to new provided altitude
             break;
         case Auto_WP:
+        case Auto_Spline:
             // To-Do; reset origin to current location + stopping distance at new altitude
             break;
         case Auto_Land:
@@ -511,39 +641,38 @@ static void do_change_alt()
     // To-Do: store desired altitude in a variable so that it can be verified later
 }
 
-static void do_within_distance()
+static void do_within_distance(const AP_Mission::Mission_Command& cmd)
 {
-    condition_value  = command_cond_queue.lat * 100;
+    condition_value  = cmd.content.distance.meters * 100;
 }
 
-static void do_yaw()
+static void do_yaw(const AP_Mission::Mission_Command& cmd)
 {
     // get current yaw target
     int32_t curr_yaw_target = attitude_control.angle_ef_targets().z;
 
     // get final angle, 1 = Relative, 0 = Absolute
-    if( command_cond_queue.lng == 0 ) {
+    if (cmd.content.yaw.relative_angle == 0) {
         // absolute angle
-        yaw_look_at_heading = wrap_360_cd(command_cond_queue.alt * 100);
+        yaw_look_at_heading = wrap_360_cd(cmd.content.yaw.angle_deg * 100);
     }else{
         // relative angle
-        yaw_look_at_heading = wrap_360_cd(curr_yaw_target + command_cond_queue.alt * 100);
+        yaw_look_at_heading = wrap_360_cd(curr_yaw_target + cmd.content.yaw.angle_deg * 100);
     }
 
     // get turn speed
-    if( command_cond_queue.lat == 0 ) {
+    if (cmd.content.yaw.turn_rate_dps == 0 ) {
         // default to regular auto slew rate
         yaw_look_at_heading_slew = AUTO_YAW_SLEW_RATE;
     }else{
-        int32_t turn_rate = (wrap_180_cd(yaw_look_at_heading - curr_yaw_target) / 100) / command_cond_queue.lat;
+        int32_t turn_rate = (wrap_180_cd(yaw_look_at_heading - curr_yaw_target) / 100) / cmd.content.yaw.turn_rate_dps;
         yaw_look_at_heading_slew = constrain_int32(turn_rate, 1, 360);    // deg / sec
     }
 
     // set yaw mode
     set_auto_yaw_mode(AUTO_YAW_LOOK_AT_HEADING);
 
-    // TO-DO: restore support for clockwise / counter clockwise rotation held in command_cond_queue.p1
-    // command_cond_queue.p1; // 0 = undefined, 1 = clockwise, -1 = counterclockwise
+    // TO-DO: restore support for clockwise and counter clockwise rotation held in cmd.content.yaw.direction.  1 = clockwise, -1 = counterclockwise
 }
 
 
@@ -553,13 +682,10 @@ static void do_yaw()
 
 static bool verify_wait_delay()
 {
-    //cliSerial->print("vwd");
     if (millis() - condition_start > (uint32_t)max(condition_value,0)) {
-        //cliSerial->println("y");
         condition_value = 0;
         return true;
     }
-    //cliSerial->println("n");
     return false;
 }
 
@@ -593,60 +719,37 @@ static bool verify_yaw()
 /********************************************************************************/
 
 // do_guided - start guided mode
-// this is not actually a mission command but rather a 
-static void do_guided(const struct Location *cmd)
+static bool do_guided(const AP_Mission::Mission_Command& cmd)
 {
     // switch to guided mode if we're not already in guided mode
     if (control_mode != GUIDED) {
         if (!set_mode(GUIDED)) {
             // if we failed to enter guided mode return immediately
-            return;
+            return false;
         }
     }
 
     // set wp_nav's destination
-    Vector3f pos = pv_location_to_vector(*cmd);
+    Vector3f pos = pv_location_to_vector(cmd.content.location);
     guided_set_destination(pos);
+    return true;
 }
 
-static void do_change_speed()
+static void do_change_speed(const AP_Mission::Mission_Command& cmd)
 {
-    wp_nav.set_horizontal_velocity(command_cond_queue.p1 * 100);
-}
-
-static void do_jump()
-{
-    // Used to track the state of the jump command in Mission scripting
-    // -10 is a value that means the register is unused
-    // when in use, it contains the current remaining jumps
-    static int8_t jump = -10;                                                                   // used to track loops in jump command
-
-    if(jump == -10) {
-        // we use a locally stored index for jump
-        jump = command_cond_queue.lat;
-    }
-
-    if(jump > 0) {
-        jump--;
-        change_command(command_cond_queue.p1);
-
-    } else if (jump == 0) {
-        // we're done, move along
-        jump = -11;
-
-    } else if (jump == -1) {
-        // repeat forever
-        change_command(command_cond_queue.p1);
+    if (cmd.content.speed.target_ms > 0) {
+        wp_nav.set_horizontal_velocity(cmd.content.speed.target_ms * 100.0f);
     }
 }
 
-static void do_set_home()
+static void do_set_home(const AP_Mission::Mission_Command& cmd)
 {
-    if(command_cond_queue.p1 == 1) {
+    if(cmd.p1 == 1) {
         init_home();
     } else {
-        ahrs.set_home(command_cond_queue.lat, command_cond_queue.lng, 0);
-        //home_is_set 	= true;
+        Location loc = cmd.content.location;
+        loc.alt = 0;
+        ahrs.set_home(loc);
         set_home_is_set(true);
     }
 }
@@ -656,22 +759,27 @@ static void do_set_home()
 //          and possibly rotating the copter to point at the ROI if our mount type does not support a yaw feature
 //          Note: the ROI should already be in the command_nav_queue global variable
 //	TO-DO: add support for other features of MAV_CMD_DO_SET_ROI including pointing at a given waypoint
-static void do_roi()
+static void do_roi(const AP_Mission::Mission_Command& cmd)
 {
     // if location is zero lat, lon and altitude turn off ROI
-    if (auto_yaw_mode == AUTO_YAW_ROI && (command_cond_queue.alt == 0 && command_cond_queue.lat == 0 && command_cond_queue.lng == 0)) {
+    if (auto_yaw_mode == AUTO_YAW_ROI && (cmd.content.location.alt == 0 && cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
         // set auto yaw mode back to default assuming the active command is a waypoint command.  A more sophisticated method is required to ensure we return to the proper yaw control for the active command
         set_auto_yaw_mode(get_default_auto_yaw_mode(false));
-        // To-Do: switch off the camera tracking if enabled
+#if MOUNT == ENABLED
+        // switch off the camera tracking if enabled
+        if (camera_mount.get_mode() == MAV_MOUNT_MODE_GPS_POINT) {
+            camera_mount.set_mode_to_default();
+        }
+#endif  // MOUNT == ENABLED
     }else{
 #if MOUNT == ENABLED
         // check if mount type requires us to rotate the quad
         if(camera_mount.get_mount_type() != AP_Mount::k_pan_tilt && camera_mount.get_mount_type() != AP_Mount::k_pan_tilt_roll) {
-            roi_WP = pv_location_to_vector(command_cond_queue);
+            roi_WP = pv_location_to_vector(cmd.content.location);
             set_auto_yaw_mode(AUTO_YAW_ROI);
         }
         // send the command to the camera mount
-        camera_mount.set_roi_cmd(&command_cond_queue);
+        camera_mount.set_roi_cmd(&cmd.content.location);
 
         // TO-DO: expand handling of the do_nav_roi to support all modes of the MAVLink.  Currently we only handle mode 4 (see below)
         //		0: do nothing
@@ -681,9 +789,9 @@ static void do_roi()
         //		4: point at a target given a target id (can't be implemented)
 #else
         // if we have no camera mount aim the quad at the location
-        roi_WP = pv_location_to_vector(command_cond_queue);
+        roi_WP = pv_location_to_vector(cmd.content.location);
         set_auto_yaw_mode(AUTO_YAW_ROI);
-#endif
+#endif  // MOUNT == ENABLED
     }
 }
 

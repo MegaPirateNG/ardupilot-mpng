@@ -576,6 +576,16 @@ uint16_t DataFlash_Class::StartNewLog(void)
     return ret;
 }
 
+// add new logging formats to the log. Used by libraries that want to
+// add their own log messages
+void DataFlash_Class::AddLogFormats(const struct LogStructure *structures, uint8_t num_types)
+{
+    // write new log formats
+    for (uint8_t i=0; i<num_types; i++) {
+        Log_Write_Format(&structures[i]);
+    }
+}
+
 /*
   write a structure format to the log
  */
@@ -652,33 +662,60 @@ void DataFlash_Class::Log_Write_Parameters(void)
 
 
 // Write an GPS packet
-void DataFlash_Class::Log_Write_GPS(const GPS *gps, int32_t relative_alt)
+void DataFlash_Class::Log_Write_GPS(const AP_GPS &gps, uint8_t i, int32_t relative_alt)
 {
-    struct log_GPS pkt = {
-        LOG_PACKET_HEADER_INIT(LOG_GPS_MSG),
-    	status        : (uint8_t)gps->status(),
-    	gps_week_ms   : gps->time_week_ms,
-    	gps_week      : gps->time_week,
-        num_sats      : gps->num_sats,
-        hdop          : gps->hdop,
-        latitude      : gps->latitude,
-        longitude     : gps->longitude,
-        rel_altitude  : relative_alt,
-        altitude      : gps->altitude_cm,
-        ground_speed  : gps->ground_speed_cm,
-        ground_course : gps->ground_course_cd,
-        vel_z         : gps->velocity_down(),
-        apm_time      : hal.scheduler->millis()
-    };
-    WriteBlock(&pkt, sizeof(pkt));
+    if (i == 0) {
+        const struct Location &loc = gps.location(i);
+        struct log_GPS pkt = {
+            LOG_PACKET_HEADER_INIT(LOG_GPS_MSG),
+            status        : (uint8_t)gps.status(i),
+            gps_week_ms   : gps.time_week_ms(i),
+            gps_week      : gps.time_week(i),
+            num_sats      : gps.num_sats(i),
+            hdop          : gps.get_hdop(i),
+            latitude      : loc.lat,
+            longitude     : loc.lng,
+            rel_altitude  : relative_alt,
+            altitude      : loc.alt,
+            ground_speed  : (uint32_t)(gps.ground_speed(i) * 100),
+            ground_course : gps.ground_course_cd(i),
+            vel_z         : gps.velocity(i).z,
+            apm_time      : hal.scheduler->millis()
+        };
+        WriteBlock(&pkt, sizeof(pkt));
+    }
+#if HAL_CPU_CLASS > HAL_CPU_CLASS_16
+    if (i > 0) {
+        const struct Location &loc2 = gps.location(i);
+        struct log_GPS2 pkt2 = {
+            LOG_PACKET_HEADER_INIT(LOG_GPS2_MSG),
+            status        : (uint8_t)gps.status(i),
+            gps_week_ms   : gps.time_week_ms(i),
+            gps_week      : gps.time_week(i),
+            num_sats      : gps.num_sats(i),
+            hdop          : gps.get_hdop(i),
+            latitude      : loc2.lat,
+            longitude     : loc2.lng,
+            altitude      : loc2.alt,
+            ground_speed  : (uint32_t)(gps.ground_speed(i)*100),
+            ground_course : gps.ground_course_cd(i),
+            vel_z         : gps.velocity(i).z,
+            apm_time      : hal.scheduler->millis(),
+            dgps_numch    : 0,
+            dgps_age      : 0
+        };
+        WriteBlock(&pkt2, sizeof(pkt2));
+    }
+#endif
 }
 
 // Write an RCIN packet
 void DataFlash_Class::Log_Write_RCIN(void)
 {
+    uint32_t timestamp = hal.scheduler->millis();
     struct log_RCIN pkt = {
         LOG_PACKET_HEADER_INIT(LOG_RCIN_MSG),
-        timestamp     : hal.scheduler->millis(),
+        timestamp     : timestamp,
         chan1         : hal.rcin->read(0),
         chan2         : hal.rcin->read(1),
         chan3         : hal.rcin->read(2),
@@ -686,7 +723,13 @@ void DataFlash_Class::Log_Write_RCIN(void)
         chan5         : hal.rcin->read(4),
         chan6         : hal.rcin->read(5),
         chan7         : hal.rcin->read(6),
-        chan8         : hal.rcin->read(7)
+        chan8         : hal.rcin->read(7),
+        chan9         : hal.rcin->read(8),
+        chan10        : hal.rcin->read(9),
+        chan11        : hal.rcin->read(10),
+        chan12        : hal.rcin->read(11),
+        chan13        : hal.rcin->read(12),
+        chan14        : hal.rcin->read(13)
     };
     WriteBlock(&pkt, sizeof(pkt));
 }
@@ -896,26 +939,63 @@ void DataFlash_Class::Log_Write_EKF(AP_AHRS_NavEKF &ahrs)
     WriteBlock(&pkt3, sizeof(pkt3));
 	
 	// Write fourth EKF packet
-	Vector3f velVar;
-	Vector3f posVar;
+    float velVar;
+    float posVar;
+    float hgtVar;
 	Vector3f magVar;
 	float tasVar;
-    ahrs.get_NavEKF().getVariances(velVar, posVar, magVar, tasVar);
+    Vector2f offset;
+    ahrs.get_NavEKF().getVariances(velVar, posVar, hgtVar, magVar, tasVar, offset);
     struct log_EKF4 pkt4 = {
         LOG_PACKET_HEADER_INIT(LOG_EKF4_MSG),
         time_ms : hal.scheduler->millis(),
-        sqrtvarVN : (int16_t)(100*sqrtf(velVar.x)),
-        sqrtvarVE : (int16_t)(100*sqrtf(velVar.y)),
-        sqrtvarVD : (int16_t)(100*sqrtf(velVar.z)),
-        sqrtvarPN : (int16_t)(100*sqrtf(posVar.x)),
-        sqrtvarPE : (int16_t)(100*sqrtf(posVar.y)),
-        sqrtvarPD : (int16_t)(100*sqrtf(posVar.z)),
-        sqrtvarMX : (int16_t)(sqrtf(magVar.x)),
-        sqrtvarMY : (int16_t)(sqrtf(magVar.y)),
-        sqrtvarMZ : (int16_t)(sqrtf(magVar.z)),
-        sqrtvarVT : (int16_t)(100*sqrtf(tasVar))
+        sqrtvarV : (int16_t)(100*velVar),
+        sqrtvarP : (int16_t)(100*posVar),
+        sqrtvarH : (int16_t)(100*hgtVar),
+        sqrtvarMX : (int16_t)(100*magVar.x),
+        sqrtvarMY : (int16_t)(100*magVar.y),
+        sqrtvarMZ : (int16_t)(100*magVar.z),
+        sqrtvarVT : (int16_t)(100*tasVar),
+        offsetNorth : (int8_t)(offset.x),
+        offsetEast : (int8_t)(offset.y)
     };
     WriteBlock(&pkt4, sizeof(pkt4));
 }
 #endif
+
+// Write a command processing packet
+void DataFlash_Class::Log_Write_MavCmd(uint16_t cmd_total, const mavlink_mission_item_t& mav_cmd)
+{
+    struct log_Cmd pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_CMD_MSG),
+        time_ms         : hal.scheduler->millis(),
+        command_total   : (uint16_t)cmd_total,
+        sequence        : (uint16_t)mav_cmd.seq,
+        command         : (uint16_t)mav_cmd.command,
+        param1          : (float)mav_cmd.param1,
+        param2          : (float)mav_cmd.param2,
+        param3          : (float)mav_cmd.param3,
+        param4          : (float)mav_cmd.param4,
+        latitude        : (float)mav_cmd.x,
+        longitude       : (float)mav_cmd.y,
+        altitude        : (float)mav_cmd.z
+    };
+    WriteBlock(&pkt, sizeof(pkt));
+}
+
+void DataFlash_Class::Log_Write_Radio(const mavlink_radio_t &packet) 
+{
+    struct log_Radio pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_RADIO_MSG),
+        time_ms      : hal.scheduler->millis(),
+        rssi         : packet.rssi,
+        remrssi      : packet.remrssi,
+        txbuf        : packet.txbuf,
+        noise        : packet.noise,
+        remnoise     : packet.remnoise,
+        rxerrors     : packet.rxerrors,
+        fixed        : packet.fixed
+    };
+    WriteBlock(&pkt, sizeof(pkt)); 
+}
 

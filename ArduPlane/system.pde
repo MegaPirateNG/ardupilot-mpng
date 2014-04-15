@@ -77,11 +77,6 @@ static void init_ardupilot()
     //
     hal.uartA->begin(SERIAL0_BAUD, 128, SERIAL_BUFSIZE);
 
-    // GPS serial port.
-    //
-    // standard gps running
-    hal.uartB->begin(38400, 256, 16);
-
     cliSerial->printf_P(PSTR("\n\nInit " FIRMWARE_STRING
                          "\n\nFree RAM: %u\n"),
                         hal.util->available_memory());
@@ -172,10 +167,8 @@ static void init_ardupilot()
     // give AHRS the airspeed sensor
     ahrs.set_airspeed(&airspeed);
 
-	// Do GPS init
-	g_gps = &g_gps_driver;
     // GPS Initialization
-    g_gps->init(hal.uartB, GPS::GPS_ENGINE_AIRBORNE_4G);
+    gps.init(&DataFlash);
 
     //mavlink_system.sysid = MAV_SYSTEM_ID;				// Using g.sysid_this_mav
     mavlink_system.compid = 1;          //MAV_COMP_ID_IMU;   // We do not check for comp id
@@ -254,9 +247,8 @@ static void startup_ground(void)
     // ------------------------------------
     //save_EEPROM_groundstart();
 
-    // initialize commands
-    // -------------------
-    init_commands();
+    // initialise mission library
+    mission.init();
 
     // Makes the servos wiggle - 3 times signals ready to fly
     // -----------------------
@@ -277,13 +269,11 @@ static void startup_ground(void)
         hal.uartD->set_blocking_writes(false);
     }
 
-#if 0
-    // leave GPS blocking until we have support for correct handling
-    // of GPS config in uBlox when non-blocking
-    hal.uartB->set_blocking_writes(false);
-#endif
-
     gcs_send_text_P(SEVERITY_LOW,PSTR("\n\n Ready to FLY."));
+}
+
+static enum FlightMode get_previous_mode() {
+    return previous_mode; 
 }
 
 static void set_mode(enum FlightMode mode)
@@ -295,71 +285,91 @@ static void set_mode(enum FlightMode mode)
     if(g.auto_trim > 0 && control_mode == MANUAL)
         trim_control_surfaces();
 
+    // perform any cleanup required for prev flight mode
+    exit_mode(control_mode);
+
+    // set mode
+    previous_mode = control_mode;
     control_mode = mode;
+
+    if (previous_mode == AUTOTUNE && control_mode != AUTOTUNE) {
+        // restore last gains
+        autotune_restore();
+    }
 
     switch(control_mode)
     {
     case INITIALISING:
+        auto_throttle_mode = true;
+        break;
+
     case MANUAL:
     case STABILIZE:
     case TRAINING:
     case FLY_BY_WIRE_A:
+        auto_throttle_mode = false;
+        break;
+
+    case AUTOTUNE:
+        auto_throttle_mode = false;
+        autotune_start();
         break;
 
     case ACRO:
+        auto_throttle_mode = false;
         acro_state.locked_roll = false;
         acro_state.locked_pitch = false;
         break;
 
     case CRUISE:
+        auto_throttle_mode = true;
         cruise_state.locked_heading = false;
         cruise_state.lock_timer_ms = 0;
         target_altitude_cm = current_loc.alt;
         break;
 
     case FLY_BY_WIRE_B:
+        auto_throttle_mode = true;
         target_altitude_cm = current_loc.alt;
         break;
 
     case CIRCLE:
         // the altitude to circle at is taken from the current altitude
-        next_WP.alt = current_loc.alt;
+        auto_throttle_mode = true;
+        next_WP_loc.alt = current_loc.alt;
         break;
 
     case AUTO:
-        prev_WP = current_loc;
-        update_auto();
+        auto_throttle_mode = true;
+        prev_WP_loc = current_loc;
+        // start the mission. Note that we use resume(), not start(),
+        // as the correct behaviour for plane when entering auto is to
+        // continue the mission. If the pilot wants to restart the
+        // mission they need to either use RST_MISSION_CH or change
+        // waypoint number to 0
+        mission.resume();
         break;
 
     case RTL:
-        prev_WP = current_loc;
+        auto_throttle_mode = true;
+        prev_WP_loc = current_loc;
         do_RTL();
         break;
 
     case LOITER:
+        auto_throttle_mode = true;
         do_loiter_at_location();
         break;
 
     case GUIDED:
+        auto_throttle_mode = true;
         guided_throttle_passthru = false;
         set_guided_WP();
         break;
-
-    default:
-        prev_WP = current_loc;
-        do_RTL();
-        break;
     }
 
-    // if in an auto-throttle mode, start with throttle suppressed for
-    // safety. suppress_throttle() will unsupress it when appropriate
-    if (control_mode == CIRCLE || control_mode >= FLY_BY_WIRE_B) {
-        auto_throttle_mode = true;
-        throttle_suppressed = true;
-    } else {
-        auto_throttle_mode = false;        
-        throttle_suppressed = false;
-    }
+    // start with throttle suppressed in auto_throttle modes
+    throttle_suppressed = auto_throttle_mode;
 
     if (should_log(MASK_LOG_MODE))
         Log_Write_Mode(control_mode);
@@ -368,6 +378,17 @@ static void set_mode(enum FlightMode mode)
     rollController.reset_I();
     pitchController.reset_I();
     yawController.reset_I();    
+}
+
+// exit_mode - perform any cleanup required when leaving a flight mode
+static void exit_mode(enum FlightMode mode)
+{
+    // stop mission when we leave auto
+    if (mode == AUTO) {
+        if (mission.state() == AP_Mission::MISSION_RUNNING) {
+            mission.stop();
+        }
+    }
 }
 
 static void check_long_failsafe()
@@ -387,8 +408,8 @@ static void check_long_failsafe()
                    (tnow - failsafe.last_heartbeat_ms) > g.long_fs_timeout*1000) {
             failsafe_long_on_event(FAILSAFE_GCS);
         } else if (g.gcs_heartbeat_fs_enabled == GCS_FAILSAFE_HB_RSSI && 
-                   failsafe.last_radio_status_remrssi_ms != 0 &&
-                   (tnow - failsafe.last_radio_status_remrssi_ms) > g.long_fs_timeout*1000) {
+                   gcs[0].last_radio_status_remrssi_ms != 0 &&
+                   (tnow - gcs[0].last_radio_status_remrssi_ms) > g.long_fs_timeout*1000) {
             failsafe_long_on_event(FAILSAFE_GCS);
         }
     } else {
@@ -483,7 +504,6 @@ static void update_notify()
 static void resetPerfData(void) {
     mainLoop_count                  = 0;
     G_Dt_max                        = 0;
-    gps_fix_count                   = 0;
     perf_mon_timer                  = millis();
 }
 
@@ -554,6 +574,9 @@ print_flight_mode(AP_HAL::BetterStream *port, uint8_t mode)
         break;
     case FLY_BY_WIRE_A:
         port->print_P(PSTR("FBW_A"));
+        break;
+    case AUTOTUNE:
+        port->print_P(PSTR("AUTOTUNE"));
         break;
     case FLY_BY_WIRE_B:
         port->print_P(PSTR("FBW_B"));

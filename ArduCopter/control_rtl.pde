@@ -95,10 +95,6 @@ static void rtl_return_start()
     rtl_state = ReturnHome;
     rtl_state_complete = false;
 
-    // initialise original_wp_bearing which is used to point the nose home
-    wp_bearing = wp_nav.get_wp_bearing_to_destination();
-    original_wp_bearing = wp_bearing;
-
     // set target to above home
     Vector3f destination = Vector3f(0,0,get_RTL_alt());
     wp_nav.set_wp_destination(destination);
@@ -270,5 +266,13 @@ static void rtl_land_run()
 
     // check if we've completed this stage of RTL
     rtl_state_complete = ap.land_complete;
+}
+
+// get_RTL_alt - return altitude which vehicle should return home at
+//      altitude is in cm above home
+static float get_RTL_alt()
+{
+    // return maximum of current altitude and rtl altitude
+    return max(current_loc.alt, g.rtl_altitude);
 }
 

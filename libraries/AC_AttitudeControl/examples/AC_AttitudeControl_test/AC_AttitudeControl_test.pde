@@ -27,6 +27,7 @@
 #include <AP_Buffer.h>          // ArduPilot general purpose FIFO buffer
 #include <AP_InertialNav.h>     // Inertial Navigation library
 #include <GCS_MAVLink.h>
+#include <AP_Mission.h>
 #include <AP_Notify.h>
 #include <AP_Vehicle.h>
 #include <DataFlash.h>
@@ -54,15 +55,14 @@ AP_Baro_BMP085 baro;
 #endif
 
 // GPS declaration
-GPS *gps;
-AP_GPS_Auto auto_gps(&gps);
+AP_GPS gps;
 GPS_Glitch gps_glitch(gps);
 
 AP_Compass_HMC5843 compass;
 AP_AHRS_DCM ahrs(ins, baro, gps);
 
 // Inertial Nav declaration
-AP_InertialNav inertial_nav(ahrs, baro, gps, gps_glitch);
+AP_InertialNav inertial_nav(ahrs, baro, gps_glitch);
 
 // fake PIDs
 AC_P   p_angle_roll, p_angle_pitch, p_angle_yaw;

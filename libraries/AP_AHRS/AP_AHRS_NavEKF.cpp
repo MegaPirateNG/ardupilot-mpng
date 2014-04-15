@@ -52,14 +52,14 @@ void AP_AHRS_NavEKF::update(void)
     _dcm_attitude(roll, pitch, yaw);
 
     if (!ekf_started) {
-        // if we have a compass set we can start the EKF
-        if (get_compass()) {
+        // if we have a GPS lock we can start the EKF
+        if (get_gps().status() >= AP_GPS::GPS_OK_FIX_3D) {
             if (start_time_ms == 0) {
                 start_time_ms = hal.scheduler->millis();
             }
             if (hal.scheduler->millis() - start_time_ms > startup_delay_ms) {
                 ekf_started = true;
-                EKF.InitialiseFilterBootstrap();
+                EKF.InitialiseFilterDynamic();
             }
         }
     }
@@ -123,6 +123,8 @@ float AP_AHRS_NavEKF::get_error_yaw(void)
 Vector3f AP_AHRS_NavEKF::wind_estimate(void)
 {
     if (!using_EKF()) {
+        // EKF does not estimate wind speed when there is no airspeed
+        // sensor active
         return AP_AHRS_DCM::wind_estimate();
     }
     Vector3f wind;
@@ -132,7 +134,7 @@ Vector3f AP_AHRS_NavEKF::wind_estimate(void)
 
 // return an airspeed estimate if available. return true
 // if we have an estimate
-bool AP_AHRS_NavEKF::airspeed_estimate(float *airspeed_ret)
+bool AP_AHRS_NavEKF::airspeed_estimate(float *airspeed_ret) const
 {
     return AP_AHRS_DCM::airspeed_estimate(airspeed_ret);
 }
@@ -189,9 +191,9 @@ Vector2f AP_AHRS_NavEKF::groundspeed_vector(void)
     return Vector2f(vec.x, vec.y);
 }
 
-void AP_AHRS_NavEKF::set_home(int32_t lat, int32_t lng, int32_t alt_cm)
+void AP_AHRS_NavEKF::set_home(const Location &loc)
 {
-    AP_AHRS_DCM::set_home(lat, lng, alt_cm);
+    AP_AHRS_DCM::set_home(loc);
 }
 
 // return true if inertial navigation is active

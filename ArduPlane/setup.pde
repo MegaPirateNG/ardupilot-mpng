@@ -310,6 +310,7 @@ setup_flightmodes(uint8_t argc, const Menu::arg *argv)
                 mode != TRAINING &&
                 mode != ACRO &&
                 mode != FLY_BY_WIRE_A &&
+                mode != AUTOTUNE &&
                 mode != FLY_BY_WIRE_B &&
                 mode != CRUISE &&
                 mode != AUTO &&
@@ -474,8 +475,14 @@ static void report_compass()
     case AP_COMPASS_TYPE_HIL:
         cliSerial->println_P(PSTR("HIL"));
         break;
+    case AP_COMPASS_TYPE_PX4:
+        cliSerial->println_P(PSTR("PX4"));
+        break;
+    case AP_COMPASS_TYPE_VRBRAIN:
+        cliSerial->println_P(PSTR("VRBRAIN"));
+        break;
     default:
-        cliSerial->println_P(PSTR("??"));
+        cliSerial->println_P(PSTR("(unknown)"));
         break;
     }
 
@@ -590,7 +597,7 @@ static void zero_eeprom(void)
 {
     uint8_t b = 0;
     cliSerial->printf_P(PSTR("\nErasing EEPROM\n"));
-    for (uint16_t i = 0; i < EEPROM_MAX_ADDR; i++) {
+    for (uint16_t i = 0; i < HAL_STORAGE_SIZE_AVAILABLE; i++) {
         hal.storage->write_byte(i, b);
     }
     cliSerial->printf_P(PSTR("done\n"));

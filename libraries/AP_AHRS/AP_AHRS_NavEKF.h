@@ -33,12 +33,11 @@ class AP_AHRS_NavEKF : public AP_AHRS_DCM
 {
 public:
     // Constructor
-    AP_AHRS_NavEKF(AP_InertialSensor &ins, AP_Baro &baro, GPS *&gps) :
+    AP_AHRS_NavEKF(AP_InertialSensor &ins, AP_Baro &baro, AP_GPS &gps) :
         AP_AHRS_DCM(ins, baro, gps),
         EKF(this, baro),
-        _baro(baro),
         ekf_started(false),
-        startup_delay_ms(5000)
+        startup_delay_ms(10000)
         {
         }
 
@@ -67,7 +66,7 @@ public:
 
     // return an airspeed estimate if available. return true
     // if we have an estimate
-    bool airspeed_estimate(float *airspeed_ret);
+    bool airspeed_estimate(float *airspeed_ret) const;
 
     // true if compass is being used
     bool use_compass(void);
@@ -84,7 +83,7 @@ public:
     Vector2f groundspeed_vector(void);
 
     // set home location
-    void set_home(int32_t lat, int32_t lng, int32_t alt_cm);
+    void set_home(const Location &loc);
 
     bool have_inertial_nav(void) const;
 
@@ -97,7 +96,6 @@ private:
     bool using_EKF(void) const;
 
     NavEKF EKF;
-    AP_Baro &_baro;
     bool ekf_started;
     Matrix3f _dcm_matrix;
     Vector3f _dcm_attitude;

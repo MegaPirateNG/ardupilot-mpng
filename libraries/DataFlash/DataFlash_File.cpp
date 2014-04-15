@@ -42,16 +42,24 @@ DataFlash_File::DataFlash_File(const char *log_directory) :
     _log_directory(log_directory),
     _writebuf(NULL),
     _writebuf_size(16*1024),
-    #ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
+#if defined(CONFIG_ARCH_BOARD_PX4FMU_V1)
     // V1 gets IO errors with larger than 512 byte writes
-        _writebuf_chunk(512),
-    #else
-        _writebuf_chunk(4096),
-    #endif
+    _writebuf_chunk(512),
+#elif defined(CONFIG_ARCH_BOARD_F4BY)
+    _writebuf_chunk(512),
+#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V4)
+    _writebuf_chunk(512),
+#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V5)
+    _writebuf_chunk(512),
+#elif defined(CONFIG_ARCH_BOARD_VRHERO_V1)
+    _writebuf_chunk(512),
+#else
+    _writebuf_chunk(4096),
+#endif
     _writebuf_head(0),
     _writebuf_tail(0),
     _last_write_time(0)
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
     ,_perf_write(perf_alloc(PC_ELAPSED, "DF_write")),
     _perf_fsync(perf_alloc(PC_ELAPSED, "DF_fsync")),
     _perf_errors(perf_alloc(PC_COUNT, "DF_errors"))
@@ -67,7 +75,7 @@ void DataFlash_File::Init(const struct LogStructure *structure, uint8_t num_type
     int ret;
     struct stat st;
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
     // try to cope with an existing lowercase log directory
     // name. NuttX does not handle case insensitive VFAT well
     DIR *d = opendir("/fs/microsd/APM");
@@ -321,8 +329,8 @@ int16_t DataFlash_File::get_log_data(uint16_t log_num, uint16_t page, uint32_t o
       bug. We can remove this once we find the real bug.
     */
     if (ofs / 4096 != (ofs+len) / 4096) {
-        int seek_current = ::lseek(_read_fd, 0, SEEK_CUR);
-        if (seek_current != _read_offset) {
+        off_t seek_current = ::lseek(_read_fd, 0, SEEK_CUR);
+        if (seek_current != (off_t)_read_offset) {
             ::lseek(_read_fd, _read_offset, SEEK_SET);
         }
     }
@@ -356,7 +364,7 @@ uint16_t DataFlash_File::get_num_logs(void)
 {
     uint16_t ret;
     uint16_t high = find_last_log();
-    for (ret=1; ret<high; ret++) {
+    for (ret=0; ret<high; ret++) {
         if (_get_log_size(high - ret) <= 0) {
             break;
         }

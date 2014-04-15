@@ -20,6 +20,7 @@
 #include <AP_Airspeed.h>
 #include <AP_Baro.h>
 #include <GCS_MAVLink.h>
+#include <AP_Mission.h>
 #include <Filter.h>
 #include <SITL.h>
 #include <AP_Buffer.h>
@@ -47,12 +48,10 @@ AP_InertialSensor_HIL ins;
 
 AP_Compass_HMC5843 compass;
 
-GPS *g_gps;
-
-AP_GPS_Auto g_gps_driver(&g_gps);
+AP_GPS gps;
 
 // choose which AHRS system to use
-AP_AHRS_DCM  ahrs(ins, baro, g_gps);
+AP_AHRS_DCM  ahrs(ins, baro, gps);
 
 AP_Baro_HIL barometer;
 
@@ -81,10 +80,7 @@ void setup(void)
     } else {
         hal.console->printf("No compass detected\n");
     }
-    g_gps = &g_gps_driver;
-#if WITH_GPS
-    g_gps->init(hal.uartB);
-#endif
+    gps.init(NULL);
 }
 
 void loop(void)

@@ -61,6 +61,7 @@ static void arm_motors_check()
             }else{
                 // reset arming counter if pre-arm checks fail
                 arming_counter = 0;
+                AP_Notify::flags.arming_failed = true;
             }
         }
 
@@ -84,6 +85,7 @@ static void arm_motors_check()
 
     // Yaw is centered so reset arming counter
     }else{
+        AP_Notify::flags.arming_failed = false;
         arming_counter = 0;
     }
 }
@@ -248,7 +250,7 @@ static void pre_arm_checks(bool display_failure)
     // check Compass
     if ((g.arming_check == ARMING_CHECK_ALL) || (g.arming_check & ARMING_CHECK_COMPASS)) {
         // check the compass is healthy
-        if(!compass.healthy()) {
+        if(!compass.healthy(0)) {
             if (display_failure) {
                 gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: Compass not healthy"));
             }
@@ -315,7 +317,7 @@ static void pre_arm_checks(bool display_failure)
             return;
         }
     }
-
+#if CONFIG_HAL_BOARD != HAL_BOARD_VRBRAIN
 #ifndef CONFIG_ARCH_BOARD_PX4FMU_V1
     // check board voltage
     if ((g.arming_check == ARMING_CHECK_ALL) || (g.arming_check & ARMING_CHECK_VOLTAGE)) {
@@ -326,6 +328,7 @@ static void pre_arm_checks(bool display_failure)
             return;
         }
     }
+#endif
 #endif
 
     // check various parameter values
@@ -409,16 +412,32 @@ static bool pre_arm_gps_checks(bool display_failure)
 {
     float speed_cms = inertial_nav.get_velocity().length();     // speed according to inertial nav in cm/s
 
-    // ensure GPS is ok and our speed is below 50cm/s
-    if (!GPS_ok() || gps_glitch.glitching() || speed_cms == 0 || speed_cms > PREARM_MAX_VELOCITY_CMS) {
+    // check GPS is not glitching
+    if (gps_glitch.glitching()) {
         if (display_failure) {
-            gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: Bad GPS Pos"));
+            gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: GPS Glitch"));
+        }
+        return false;
+    }
+
+    // ensure GPS is ok
+    if (!GPS_ok()) {
+        if (display_failure) {
+            gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: Need 3D Fix"));
+        }
+        return false;
+    }
+
+    // check speed is below 50cm/s
+    if (speed_cms == 0 || speed_cms > PREARM_MAX_VELOCITY_CMS) {
+        if (display_failure) {
+            gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: Bad Velocity"));
         }
         return false;
     }
 
     // warn about hdop separately - to prevent user confusion with no gps lock
-    if (g_gps->hdop > g.gps_hdop_good) {
+    if (gps.get_hdop() > g.gps_hdop_good) {
         if (display_failure) {
             gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: High GPS HDOP"));
         }

@@ -39,7 +39,9 @@ public:
         GPS_TYPE_MTK   = 2,
         GPS_TYPE_MTK16 = 3,
         GPS_TYPE_MTK19 = 4,
-        GPS_TYPE_NMEA  = 5
+        GPS_TYPE_NMEA  = 5,
+        GPS_TYPE_SBP   = 6,
+        GPS_TYPE_SBP_RTK = 7,
     };
 
 	struct sitl_fdm state;
@@ -63,6 +65,7 @@ public:
 	AP_Float drift_time;  // period in minutes
     AP_Float engine_mul;  // engine multiplier
 	AP_Int8  gps_disable; // disable simulated GPS
+	AP_Int8  gps2_enable; // enable 2nd simulated GPS
 	AP_Int8  gps_delay;   // delay in samples
     AP_Int8  gps_type;    // see enum GPSType
     AP_Float gps_byteloss;// byte loss as a percent
@@ -72,6 +75,7 @@ public:
     AP_Float batt_voltage; // battery voltage base
     AP_Float accel_fail;  // accelerometer failure value
 	AP_Int8  rc_fail;     // fail RC input
+	AP_Int8  baro_disable; // disable simulated barometer
 
     // wind control
     AP_Float wind_speed;

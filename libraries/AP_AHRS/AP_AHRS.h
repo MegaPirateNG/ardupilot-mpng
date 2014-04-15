@@ -37,7 +37,7 @@ class AP_AHRS
 {
 public:
     // Constructor
-    AP_AHRS(AP_InertialSensor &ins, AP_Baro &baro, GPS *&gps) :
+    AP_AHRS(AP_InertialSensor &ins, AP_Baro &baro, AP_GPS &gps) :
         _compass(NULL),
         _ins(ins),
         _baro(baro),
@@ -47,7 +47,8 @@ public:
         _cos_yaw(1.0f),
         _sin_roll(0.0f),
         _sin_pitch(0.0f),
-        _sin_yaw(0.0f)
+        _sin_yaw(0.0f),
+        _active_accel_instance(0)
     {
         // load default values from var_info table
         AP_Param::setup_object_defaults(this, var_info);
@@ -66,9 +67,7 @@ public:
         _flags.armed = true;
 
         // initialise _home
-        _home.id         = MAV_CMD_NAV_WAYPOINT;
         _home.options    = 0;
-        _home.p1         = 0;
         _home.alt        = 0;
         _home.lng        = 0;
         _home.lat        = 0;
@@ -82,6 +81,10 @@ public:
     // Accessors
     void set_fly_forward(bool b) {
         _flags.fly_forward = b;
+    }
+
+    bool get_fly_forward(void) const {
+        return _flags.fly_forward;
     }
 
     void set_wind_estimation(bool b) {
@@ -114,7 +117,7 @@ public:
         return _airspeed;
     }
 
-    const GPS *get_gps() const {
+    const AP_GPS &get_gps() const {
         return _gps;
     }
 
@@ -127,7 +130,7 @@ public:
     }
 
     // accelerometer values in the earth frame in m/s/s
-    const Vector3f &get_accel_ef(void) const { return _accel_ef; }
+    const Vector3f &get_accel_ef(void) const { return _accel_ef[_ins.get_primary_accel()]; }
 
     // Methods
     virtual void update(void) = 0;
@@ -216,10 +219,10 @@ public:
 
     // return ground speed estimate in meters/second. Used by ground vehicles.
     float groundspeed(void) const {
-        if (!_gps || _gps->status() <= GPS::NO_FIX) {
+        if (_gps.status() <= AP_GPS::NO_FIX) {
             return 0.0f;
         }
-        return _gps->ground_speed_cm * 0.01f;
+        return _gps.ground_speed();
     }
 
     // return true if we will use compass for yaw
@@ -295,11 +298,14 @@ public:
     // set the home location in 10e7 degrees. This should be called
     // when the vehicle is at this position. It is assumed that the
     // current barometer and GPS altitudes correspond to this altitude
-    virtual void set_home(int32_t lat, int32_t lon, int32_t alt_cm) = 0;
+    virtual void set_home(const Location &loc) = 0;
 
     // return true if the AHRS object supports inertial navigation,
     // with very accurate position and velocity
     virtual bool have_inertial_nav(void) const { return false; }
+
+    // return the active accelerometer instance
+    uint8_t get_active_accel_instance(void) const { return _active_accel_instance; }
 
 protected:
     // settable parameters
@@ -338,7 +344,7 @@ protected:
     //       IMU under us without our noticing.
     AP_InertialSensor   &_ins;
     AP_Baro             &_baro;
-    GPS                 *&_gps;
+    const AP_GPS        &_gps;
 
     // a vector to capture the difference between the controller and body frames
     AP_Vector3f         _trim;
@@ -348,7 +354,7 @@ protected:
     float _gyro_drift_limit;
 
     // accelerometer values in the earth frame in m/s/s
-    Vector3f        _accel_ef;
+    Vector3f        _accel_ef[INS_MAX_INSTANCES];
 
 	// Declare filter states for HPF and LPF used by complementary
 	// filter in AP_AHRS::groundspeed_vector
@@ -362,6 +368,9 @@ protected:
     // helper trig variables
     float _cos_roll, _cos_pitch, _cos_yaw;
     float _sin_roll, _sin_pitch, _sin_yaw;
+
+    // which accelerometer instance is active
+    uint8_t _active_accel_instance;
 };
 
 #include <AP_AHRS_DCM.h>

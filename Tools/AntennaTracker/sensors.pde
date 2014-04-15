@@ -60,6 +60,39 @@ static void barometer_accumulate(void)
  */
 static void update_GPS(void)
 {
-    g_gps->update();
+    gps.update();
+
+    static uint32_t last_gps_msg_ms;
+    static uint8_t ground_start_count = 5;
+    if (gps.last_message_time_ms() != last_gps_msg_ms && 
+        gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
+        last_gps_msg_ms = gps.last_message_time_ms();
+        
+        if(ground_start_count > 1) {
+            ground_start_count--;
+        } else if (ground_start_count == 1) {
+            // We countdown N number of good GPS fixes
+            // so that the altitude is more accurate
+            // -------------------------------------
+            if (current_loc.lat == 0) {
+                ground_start_count = 5;
+
+            } else {
+                // Now have an initial GPS position
+                // use it as the HOME position in future startups
+                current_loc = gps.location();
+                set_home(current_loc);
+
+                // set system clock for log timestamps
+                hal.util->set_system_clock(gps.time_epoch_usec());
+
+                if (g.compass_enabled) {
+                    // Set compass declination automatically
+                    compass.set_initial_location(gps.location().lat, gps.location().lng);
+                }
+                ground_start_count = 0;
+            }
+        }
+    }
 }
 

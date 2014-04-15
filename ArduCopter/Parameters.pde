@@ -143,7 +143,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Description: Controls whether failsafe will be invoked (and what action to take) when connection with Ground station is lost for at least 5 seconds
     // @Values: 0:Disabled,1:Enabled always RTL,2:Enabled Continue with Mission in Auto Mode
     // @User: Standard
-    GSCALAR(failsafe_gcs, "FS_GCS_ENABLE", FS_GCS_DISABLED),
+    GSCALAR(failsafe_gcs, "FS_GCS_ENABLE", FS_GCS_ENABLED_ALWAYS_RTL),
 
     // @Param: GPS_HDOP_GOOD
     // @DisplayName: GPS Hdop Good
@@ -203,18 +203,6 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Values: 0:Never change yaw, 1:Face next waypoint, 2:Face next waypoint except RTL, 3:Face along GPS course
     // @User: Standard
     GSCALAR(wp_yaw_behavior,  "WP_YAW_BEHAVIOR",    WP_YAW_BEHAVIOR_DEFAULT),
-
-    // @Param: WP_TOTAL
-    // @DisplayName: Waypoint Total
-    // @Description: Total number of commands in the mission stored in the eeprom.  Do not update this parameter directly!
-    // @User: Advanced
-    GSCALAR(command_total,  "WP_TOTAL",         0),
-
-    // @Param: WP_INDEX
-    // @DisplayName: Waypoint Index
-    // @Description: The index number of the command that is currently being executed.  Do not update this parameter directly!
-    // @User: Advanced
-    GSCALAR(command_index,  "WP_INDEX",         0),
 
     // @Param: RTL_LOIT_TIME
     // @DisplayName: RTL loiter time
@@ -380,7 +368,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Param: FRAME
     // @DisplayName: Frame Orientation (+, X or V)
     // @Description: Controls motor mixing for multicopters.  Not used for Tri or Traditional Helicopters.
-    // @Values: 0:Plus, 1:X, 2:V, 3:H, 10:Y6B (New)
+    // @Values: 0:Plus, 1:X, 2:V, 3:H, 4:V-Tail, 10:Y6B (New)
     // @User: Standard
     GSCALAR(frame_orientation, "FRAME",             AP_MOTORS_X_FRAME),
 
@@ -479,7 +467,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_8,    "RC8_", RC_Channel_aux),
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     // @Group: RC9_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_9,                    "RC9_", RC_Channel_aux),
@@ -492,10 +480,18 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_11,                    "RC11_", RC_Channel_aux),
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     // @Group: RC12_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_12,                   "RC12_", RC_Channel_aux),
+
+    // @Group: RC13_
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
+    GGROUP(rc_13,                   "RC13_", RC_Channel_aux),
+
+    // @Group: RC14_
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
+    GGROUP(rc_14,                   "RC14_", RC_Channel_aux),
 #endif
 
     // @Param: RC_SPEED
@@ -868,6 +864,12 @@ const AP_Param::Info var_info[] PROGMEM = {
     GOBJECT(epm,            "EPM_", AP_EPM),
 #endif
 
+#if PARACHUTE == ENABLED
+	// @Group: CHUTE_
+    // @Path: ../libraries/AP_Parachute/AP_Parachute.cpp
+    GOBJECT(parachute,		"CHUTE_", AP_Parachute),
+#endif
+
     // @Group: COMPASS_
     // @Path: ../libraries/AP_Compass/Compass.cpp
     GOBJECT(compass,        "COMPASS_", Compass),
@@ -954,6 +956,11 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Path: ../libraries/AP_Baro/AP_Baro.cpp
     GOBJECT(barometer, "GND_", AP_Baro),
 
+    // GPS driver
+    // @Group: GPS_
+    // @Path: ../libraries/AP_GPS/AP_GPS.cpp
+    GOBJECT(gps, "GPS_", AP_GPS),
+
     // @Group: SCHED_
     // @Path: ../libraries/AP_Scheduler/AP_Scheduler.cpp
     GOBJECT(scheduler, "SCHED_", AP_Scheduler),
@@ -1010,6 +1017,16 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Group: RCMAP_
     // @Path: ../libraries/AP_RCMapper/AP_RCMapper.cpp
     GOBJECT(rcmap, "RCMAP_",        RCMapper),
+
+#if AP_AHRS_NAVEKF_AVAILABLE
+    // @Group: EKF_
+    // @Path: ../libraries/AP_NavEKF/AP_NavEKF.cpp
+    GOBJECTN(ahrs.get_NavEKF(), NavEKF, "EKF_", NavEKF),
+#endif
+
+    // @Group: MIS_
+    // @Path: ../libraries/AP_Mission/AP_Mission.cpp
+    GOBJECT(mission, "MIS_",       AP_Mission),
 
     AP_VAREND
 };

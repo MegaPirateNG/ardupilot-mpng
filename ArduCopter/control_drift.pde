@@ -5,15 +5,28 @@
  */
 
 #ifndef DRIFT_SPEEDGAIN
- # define DRIFT_SPEEDGAIN 14.0
+ # define DRIFT_SPEEDGAIN 14.0f
+#endif
+
+#ifndef DRIFT_THR_ASSIST_GAIN
+ # define DRIFT_THR_ASSIST_GAIN 1.8f    // gain controlling amount of throttle assistance
+#endif
+
+#ifndef DRIFT_THR_ASSIST_MAX
+ # define DRIFT_THR_ASSIST_MAX  300.0f  // maximum assistance throttle assist will provide
+#endif
+
+#ifndef DRIFT_THR_MIN
+ # define DRIFT_THR_MIN         213     // throttle assist will be active when pilot's throttle is above this value
+#endif
+#ifndef DRIFT_THR_MAX
+ # define DRIFT_THR_MAX         787     // throttle assist will be active when pilot's throttle is below this value
 #endif
 
 // drift_init - initialise drift controller
 static bool drift_init(bool ignore_checks)
 {
     if (GPS_ok() || ignore_checks) {
-        // initialise filters on roll/pitch input
-        reset_roll_pitch_in_filters(g.rc_1.control_in, g.rc_2.control_in);
         return true;
     }else{
         return false;
@@ -29,8 +42,8 @@ static void drift_run()
     float target_yaw_rate;
     int16_t pilot_throttle_scaled;
 
-    // if not armed or landed, set throttle to zero and exit immediately
-    if(!motors.armed() || ap.land_complete) {
+    // if not armed or landed and throttle at zero, set throttle to zero and exit immediately
+    if(!motors.armed() || (ap.land_complete && g.rc_3.control_in <= 0)) {
         attitude_control.init_targets();
         attitude_control.set_throttle_out(0, false);
         return;
@@ -43,7 +56,7 @@ static void drift_run()
     pilot_throttle_scaled = get_pilot_desired_throttle(g.rc_3.control_in);
 
     // Grab inertial velocity
-    Vector3f vel = inertial_nav.get_velocity();
+    const Vector3f& vel = inertial_nav.get_velocity();
 
     // rotate roll, pitch input from north facing to vehicle's perspective
     float roll_vel =  vel.y * ahrs.cos_yaw() - vel.x * ahrs.sin_yaw(); // body roll vel
@@ -70,9 +83,26 @@ static void drift_run()
         breaker = 0.0;
     }
 
+    // throttle assist - adjusts throttle to slow the vehicle's vertical velocity
+    //      Only active when pilot's throttle is between 213 ~ 787
+    //      Assistance is strongest when throttle is at mid, drops linearly to no assistance at 213 and 787
+    float thr_assist = 0.0f;
+    if (pilot_throttle_scaled > g.throttle_min && pilot_throttle_scaled < g.throttle_max &&
+        pilot_throttle_scaled > DRIFT_THR_MIN && pilot_throttle_scaled < DRIFT_THR_MAX) {
+        // calculate throttle assist gain
+        thr_assist = 1.2 - ((float)abs(pilot_throttle_scaled - 500) / 240.0f);
+        thr_assist = constrain_float(thr_assist, 0.0f, 1.0f) * -DRIFT_THR_ASSIST_GAIN * vel.z;
+
+        // ensure throttle assist never adjusts the throttle by more than 300 pwm
+        thr_assist = constrain_float(thr_assist, -DRIFT_THR_ASSIST_MAX, DRIFT_THR_ASSIST_MAX);
+
+        // ensure throttle assist never pushes throttle below throttle_min or above throttle_max
+        thr_assist = constrain_float(thr_assist, g.throttle_min - pilot_throttle_scaled, g.throttle_max - pilot_throttle_scaled);
+    }
+
     // call attitude controller
-    attitude_control.angle_ef_roll_pitch_rate_ef_yaw(target_roll, target_pitch, target_yaw_rate);
+    attitude_control.angle_ef_roll_pitch_rate_ef_yaw_smooth(target_roll, target_pitch, target_yaw_rate, get_smoothing_gain());
 
     // output pilot's throttle with angle boost
-    attitude_control.set_throttle_out(pilot_throttle_scaled, true);
+    attitude_control.set_throttle_out(pilot_throttle_scaled + thr_assist, true);
 }

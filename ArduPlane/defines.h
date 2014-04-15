@@ -47,17 +47,6 @@ enum gcs_failsafe {
 #define T6 1000000
 #define T7 10000000
 
-// GPS type codes - use the names, not the numbers
-#define GPS_PROTOCOL_NONE       -1
-#define GPS_PROTOCOL_NMEA       0
-#define GPS_PROTOCOL_SIRF       1
-#define GPS_PROTOCOL_UBLOX      2
-#define GPS_PROTOCOL_IMU        3
-#define GPS_PROTOCOL_MTK        4
-#define GPS_PROTOCOL_HIL        5
-#define GPS_PROTOCOL_MTK19      6
-#define GPS_PROTOCOL_AUTO       7
-
 // HIL enumerations. Note that HIL_MODE_ATTITUDE and HIL_MODE_SENSORS
 // are now the same thing, and are sensors based. The old define is
 // kept to allow old APM_Config.h headers to keep working
@@ -73,6 +62,7 @@ enum FlightMode {
     FLY_BY_WIRE_A = 5,
     FLY_BY_WIRE_B = 6,
     CRUISE        = 7,
+    AUTOTUNE      = 8,
     AUTO          = 10,
     RTL           = 11,
     LOITER        = 12,
@@ -95,20 +85,15 @@ enum ChannelMixing {
     MIXING_DNDN     = 4
 };
 
-// Commands - Note that APM now uses a subset of the MAVLink protocol
-// commands.  See enum MAV_CMD in the GCS_Mavlink library
-#define CMD_BLANK 0 // there is no command stored in the mem location
-                    // requested
-#define NO_COMMAND 0
-#define WAIT_COMMAND 255
-
-// Command/Waypoint/Location Options Bitmask
-//--------------------
-#define MASK_OPTIONS_RELATIVE_ALT       (1<<0)          // 1 = Relative
-                                                        // altitude
-#define MASK_OPTIONS_LOITER_DIRECTION   (1<<2)          // 0 = CW
-                                                        // 1 = CCW
-
+/*
+ * The cause for the most recent fence enable
+ */
+typedef enum GeofenceEnableReason {
+    NOT_ENABLED = 0,     //The fence is not enabled
+    PWM_TOGGLED,         //Fence enabled/disabled by PWM signal
+    AUTO_TOGGLED,        //Fence auto enabled/disabled at takeoff.
+    GCS_TOGGLED          //Fence enabled/disabled by the GCS via Mavlink
+} GeofenceEnableReason;
 
 //repeating events
 #define NO_REPEAT 0
@@ -124,11 +109,10 @@ enum ChannelMixing {
 // of these then existing logs will break! Only add at the end, and 
 // mark unused ones as 'deprecated', but leave them in
 enum log_messages {
-    LOG_INDEX_MSG,
     LOG_CTUN_MSG,
     LOG_NTUN_MSG,
     LOG_PERFORMANCE_MSG,
-    LOG_CMD_MSG,
+    LOG_CMD_MSG_DEPRECATED,     // deprecated
     LOG_CURRENT_MSG,
     LOG_STARTUP_MSG,
     TYPE_AIRSTART_MSG,
@@ -142,8 +126,7 @@ enum log_messages {
     LOG_SONAR_MSG,
     LOG_COMPASS2_MSG,
     LOG_ARM_DISARM_MSG,
-    LOG_AIRSPEED_MSG,
-    MAX_NUM_LOGS // always at the end
+    LOG_AIRSPEED_MSG
 };
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)
@@ -193,29 +176,19 @@ enum log_messages {
                                         // which a groundstart will be
                                         // triggered
 
-
-// EEPROM addresses
-#define EEPROM_MAX_ADDR         4096
-// parameters get the first 1280 bytes of EEPROM, remainder is for waypoints
-#define WP_START_BYTE 0x500 // where in memory home WP is stored + all other
-                            // WP
-#define WP_SIZE 15
-
 // fence points are stored at the end of the EEPROM
 #define MAX_FENCEPOINTS 20
 #define FENCE_WP_SIZE sizeof(Vector2l)
-#define FENCE_START_BYTE (EEPROM_MAX_ADDR-(MAX_FENCEPOINTS*FENCE_WP_SIZE))
+#define FENCE_START_BYTE (HAL_STORAGE_SIZE_AVAILABLE-(MAX_FENCEPOINTS*FENCE_WP_SIZE))
 
 // rally points shoehorned between fence points and waypoints
 #define MAX_RALLYPOINTS 10
 #define RALLY_WP_SIZE 15
 #define RALLY_START_BYTE (FENCE_START_BYTE-(MAX_RALLYPOINTS*RALLY_WP_SIZE))
 
-#define MAX_WAYPOINTS  ((RALLY_START_BYTE - WP_START_BYTE) / WP_SIZE) - 1 // -
-                                                                          // 1
-                                                                          // to
-                                                                          // be
-                                                                          // safe
+// parameters get the first 1280 bytes of EEPROM, mission commands are stored between these params and the rally points
+#define MISSION_START_BYTE  0x500
+#define MISSION_END_BYTE    (RALLY_START_BYTE-1)
 
 // convert a boolean (0 or 1) to a sign for multiplying (0 maps to 1, 1 maps
 // to -1)
@@ -231,17 +204,20 @@ enum log_messages {
 #define CONFIG_INS_PX4     4
 #define CONFIG_INS_FLYMAPLE 5
 #define CONFIG_INS_L3G4200D 6
+#define CONFIG_INS_VRBRAIN  7
 
 // barometer driver types
 #define AP_BARO_BMP085   1
 #define AP_BARO_MS5611   2
 #define AP_BARO_PX4      3
 #define AP_BARO_HIL      4
+#define AP_BARO_VRBRAIN  5
 
 // compass driver types
 #define AP_COMPASS_HMC5843   1
 #define AP_COMPASS_PX4       2
 #define AP_COMPASS_HIL       3
+#define AP_COMPASS_VRBRAIN   4
 
 // altitude control algorithms
 enum {

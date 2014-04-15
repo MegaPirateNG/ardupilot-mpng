@@ -422,33 +422,12 @@ static void Log_Write_Performance()
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }
 
-struct PACKED log_Cmd {
-    LOG_PACKET_HEADER;
-    uint8_t command_total;
-    uint8_t command_number;
-    uint8_t waypoint_id;
-    uint8_t waypoint_options;
-    uint8_t waypoint_param1;
-    int32_t waypoint_altitude;
-    int32_t waypoint_latitude;
-    int32_t waypoint_longitude;
-};
-
-// Write a command processing packet
-static void Log_Write_Cmd(uint8_t num, const struct Location *wp)
+// Write a mission command. Total length : 36 bytes
+static void Log_Write_Cmd(const AP_Mission::Mission_Command &cmd)
 {
-    struct log_Cmd pkt = {
-        LOG_PACKET_HEADER_INIT(LOG_CMD_MSG),
-        command_total       : g.command_total,
-        command_number      : num,
-        waypoint_id         : wp->id,
-        waypoint_options    : wp->options,
-        waypoint_param1     : wp->p1,
-        waypoint_altitude   : wp->alt,
-        waypoint_latitude   : wp->lat,
-        waypoint_longitude  : wp->lng
-    };
-    DataFlash.WriteBlock(&pkt, sizeof(pkt));
+    mavlink_mission_item_t mav_cmd = {};
+    AP_Mission::mission_cmd_to_mavlink(cmd,mav_cmd);
+    DataFlash.Log_Write_MavCmd(mission.num_commands(),mav_cmd);
 }
 
 struct PACKED log_Attitude {
@@ -648,8 +627,8 @@ static void Log_Write_Camera()
 #if CAMERA == ENABLED
     struct log_Camera pkt = {
         LOG_PACKET_HEADER_INIT(LOG_CAMERA_MSG),
-        gps_time    : g_gps->time_week_ms,
-        gps_week    : g_gps->time_week,
+        gps_time    : gps.time_week_ms(),
+        gps_week    : gps.time_week(),
         latitude    : current_loc.lat,
         longitude   : current_loc.lng,
         altitude    : current_loc.alt,
@@ -685,7 +664,7 @@ static void Log_Write_Baro(void)
 
 static const struct LogStructure log_structure[] PROGMEM = {
     LOG_COMMON_STRUCTURES,
-#if AUTOTUNE == ENABLED
+#if AUTOTUNE_ENABLED == ENABLED
     { LOG_AUTOTUNE_MSG, sizeof(log_AutoTune),
       "ATUN", "BBfffff",       "Axis,TuneStep,RateMin,RateMax,RPGain,RDGain,SPGain" },
     { LOG_AUTOTUNEDETAILS_MSG, sizeof(log_AutoTuneDetails),
@@ -705,8 +684,6 @@ static const struct LogStructure log_structure[] PROGMEM = {
       "MAG2","Ihhhhhhhhh",    "TimeMS,MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOfsX,MOfsY,MOfsZ" },
     { LOG_PERFORMANCE_MSG, sizeof(log_Performance), 
       "PM",  "HHIhBHB",    "NLon,NLoop,MaxT,PMT,I2CErr,INSErr,INAVErr" },
-    { LOG_CMD_MSG, sizeof(log_Cmd),                 
-      "CMD", "BBBBBeLL",     "CTot,CNum,CId,COpt,Prm1,Alt,Lat,Lng" },
     { LOG_ATTITUDE_MSG, sizeof(log_Attitude),       
       "ATT", "IccccCC",      "TimeMS,DesRoll,Roll,DesPitch,Pitch,DesYaw,Yaw" },
     { LOG_MODE_MSG, sizeof(log_Mode),
@@ -781,7 +758,6 @@ static void start_logging()
 #else // LOGGING_ENABLED
 
 static void Log_Write_Startup() {}
-static void Log_Write_Cmd(uint8_t num, const struct Location *wp) {}
 static void Log_Write_Mode(uint8_t mode) {}
 static void Log_Write_IMU() {}
 static void Log_Write_GPS() {}
@@ -802,6 +778,7 @@ static void Log_Write_Optflow() {}
 static void Log_Write_Nav_Tuning() {}
 static void Log_Write_Control_Tuning() {}
 static void Log_Write_Performance() {}
+static void Log_Write_Cmd(const AP_Mission::Mission_Command &cmd) {}
 static void Log_Write_Camera() {}
 static void Log_Write_Error(uint8_t sub_system, uint8_t error_code) {}
 static void Log_Write_Baro(void);

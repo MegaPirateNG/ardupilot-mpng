@@ -1,7 +1,7 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 /*
-  ArduPlane parameter definitions
+  APMRover2 parameter definitions
 */
 
 #define GSCALAR(v, name, def) { g.v.vtype, name, Parameters::k_param_ ## v, &g.v, {def_value:def} }
@@ -145,6 +145,24 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Standard
 	GSCALAR(speed_turn_dist,    "SPEED_TURN_DIST",  2.0f),
 
+    // @Param: BRAKING_PERCENT
+    // @DisplayName: Percentage braking to apply
+    // @Description: The maximum reverse throttle braking percentage to apply when cornering
+    // @Units: percent
+    // @Range: 0 100
+    // @Increment: 1
+    // @User: Standard
+	GSCALAR(braking_percent,    "BRAKING_PERCENT",  0),
+
+    // @Param: BRAKING_SPEEDERR
+    // @DisplayName: Speed error at which to apply braking
+    // @Description: The amount of overspeed error at which to start applying braking
+    // @Units: m/s
+    // @Range: 0 100
+    // @Increment: 1
+    // @User: Standard
+	GSCALAR(braking_speederr,   "BRAKING_SPEEDERR",  3),
+
     // @Param: PIVOT_TURN_ANGLE
     // @DisplayName: Pivot turn angle
     // @Description: Navigation angle threshold in degrees to switch to pivot steering when SKID_STEER_OUT is 1. This allows you to setup a skid steering rover to turn on the spot in auto mode when the angle it needs to turn it greater than this angle. An angle of zero means to disable pivot turning. Note that you will probably also want to set a low value for WP_RADIUS to get neat turns.
@@ -193,13 +211,13 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
 	GGROUP(rc_8,                    "RC8_", RC_Channel_aux),
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     // @Group: RC9_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_9,                    "RC9_", RC_Channel_aux),
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     // @Group: RC10_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_10,                    "RC10_", RC_Channel_aux),
@@ -209,10 +227,18 @@ const AP_Param::Info var_info[] PROGMEM = {
     GGROUP(rc_11,                    "RC11_", RC_Channel_aux),
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     // @Group: RC12_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_12,                    "RC12_", RC_Channel_aux),
+
+    // @Group: RC13_
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
+    GGROUP(rc_13,                    "RC13_", RC_Channel_aux),
+
+    // @Group: RC14_
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
+    GGROUP(rc_14,                    "RC14_", RC_Channel_aux),
 #endif
 
     // @Param: THR_MIN
@@ -390,9 +416,6 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Standard
 	GSCALAR(mode6,           "MODE6",         MODE_6),
 
-	GSCALAR(command_total,          "CMD_TOTAL",        0),
-	GSCALAR(command_index,          "CMD_INDEX",        0),
-
     // @Param: WP_RADIUS
     // @DisplayName: Waypoint radius
     // @Description: The distance in meters from a waypoint when we consider the waypoint has been reached. This determines when the rover will turn along the next waypoint path.
@@ -426,6 +449,12 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Group: SCHED_
     // @Path: ../libraries/AP_Scheduler/AP_Scheduler.cpp
     GOBJECT(scheduler, "SCHED_", AP_Scheduler),
+
+    // barometer ground calibration. The GND_ prefix is chosen for
+    // compatibility with previous releases of ArduPlane
+    // @Group: GND_
+    // @Path: ../libraries/AP_Baro/AP_Baro.cpp
+    GOBJECT(barometer, "GND_", AP_Baro),
 
     // @Group: RELAY_
     // @Path: ../libraries/AP_Relay/AP_Relay.cpp
@@ -494,6 +523,21 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Group: BRD_
     // @Path: ../libraries/AP_BoardConfig/AP_BoardConfig.cpp
     GOBJECT(BoardConfig,            "BRD_",       AP_BoardConfig),
+
+    // GPS driver
+    // @Group: GPS_
+    // @Path: ../libraries/AP_GPS/AP_GPS.cpp
+    GOBJECT(gps, "GPS_", AP_GPS),
+
+#if AP_AHRS_NAVEKF_AVAILABLE
+    // @Group: EKF_
+    // @Path: ../libraries/AP_NavEKF/AP_NavEKF.cpp
+    GOBJECTN(ahrs.get_NavEKF(), NavEKF, "EKF_", NavEKF),
+#endif
+
+    // @Group: MIS_
+    // @Path: ../libraries/AP_Mission/AP_Mission.cpp
+    GOBJECT(mission, "MIS_",       AP_Mission),
 
 	AP_VAREND
 };

@@ -44,10 +44,11 @@ public:
 
     /* logging methods common to all vehicles */
     uint16_t StartNewLog(void);
+    void AddLogFormats(const struct LogStructure *structures, uint8_t num_types);
     void EnableWrites(bool enable) { _writes_enabled = enable; }
     void Log_Write_Format(const struct LogStructure *structure);
     void Log_Write_Parameter(const char *name, float value);
-    void Log_Write_GPS(const GPS *gps, int32_t relative_alt);
+    void Log_Write_GPS(const AP_GPS &gps, uint8_t instance, int32_t relative_alt);
     void Log_Write_IMU(const AP_InertialSensor &ins);
     void Log_Write_RCIN(void);
     void Log_Write_RCOUT(void);
@@ -57,6 +58,8 @@ public:
 #if AP_AHRS_NAVEKF_AVAILABLE
     void Log_Write_EKF(AP_AHRS_NavEKF &ahrs);
 #endif
+    void Log_Write_MavCmd(uint16_t cmd_total, const mavlink_mission_item_t& mav_cmd);
+    void Log_Write_Radio(const mavlink_radio_t &packet);
     void Log_Write_Message(const char *message);
     void Log_Write_Message_P(const prog_char_t *message);
 
@@ -160,7 +163,7 @@ struct PACKED log_GPS {
     uint32_t gps_week_ms;
     uint16_t gps_week;
     uint8_t  num_sats;
-    int16_t  hdop;
+    uint16_t hdop;
     int32_t  latitude;
     int32_t  longitude;
     int32_t  rel_altitude;
@@ -169,6 +172,24 @@ struct PACKED log_GPS {
     int32_t  ground_course;
     float    vel_z;
     uint32_t apm_time;
+};
+
+struct PACKED log_GPS2 {
+    LOG_PACKET_HEADER;
+    uint8_t  status;
+    uint32_t gps_week_ms;
+    uint16_t gps_week;
+    uint8_t  num_sats;
+    uint16_t hdop;
+    int32_t  latitude;
+    int32_t  longitude;
+    int32_t  altitude;
+    uint32_t ground_speed;
+    int32_t  ground_course;
+    float    vel_z;
+    uint32_t apm_time;
+    uint8_t  dgps_numch;
+    uint32_t dgps_age;
 };
 
 struct PACKED log_Message {
@@ -194,6 +215,12 @@ struct PACKED log_RCIN {
     uint16_t chan6;
     uint16_t chan7;
     uint16_t chan8;
+    uint16_t chan9;
+    uint16_t chan10;
+    uint16_t chan11;
+    uint16_t chan12;
+    uint16_t chan13;
+    uint16_t chan14;
 };
 
 struct PACKED log_RCOUT {
@@ -287,16 +314,42 @@ struct PACKED log_EKF3 {
 struct PACKED log_EKF4 {
     LOG_PACKET_HEADER;
     uint32_t time_ms;
-    int16_t sqrtvarVN;
-    int16_t sqrtvarVE;
-	int16_t sqrtvarVD;
-    int16_t sqrtvarPN;
-    int16_t sqrtvarPE;
-    int16_t sqrtvarPD;
+    int16_t sqrtvarV;
+    int16_t sqrtvarP;
+    int16_t sqrtvarH;
     int16_t sqrtvarMX;
     int16_t sqrtvarMY;
     int16_t sqrtvarMZ;
     int16_t sqrtvarVT;
+    int8_t  offsetNorth;
+    int8_t  offsetEast;
+};
+
+struct PACKED log_Cmd {
+    LOG_PACKET_HEADER;
+    uint32_t time_ms;
+    uint16_t command_total;
+    uint16_t sequence;
+    uint16_t command;
+    float param1;
+    float param2;
+    float param3;
+    float param4;
+    float latitude;
+    float longitude;
+    float altitude;
+};
+
+struct PACKED log_Radio {
+    LOG_PACKET_HEADER;
+    uint32_t time_ms;
+    uint8_t rssi;
+    uint8_t remrssi;
+    uint8_t txbuf;
+    uint8_t noise;
+    uint8_t remnoise;
+    uint16_t rxerrors;
+    uint16_t fixed;
 };
 
 #define LOG_COMMON_STRUCTURES \
@@ -306,6 +359,8 @@ struct PACKED log_EKF4 {
       "PARM", "Nf",        "Name,Value" },    \
     { LOG_GPS_MSG, sizeof(log_GPS), \
       "GPS",  "BIHBcLLeeEefI", "Status,TimeMS,Week,NSats,HDop,Lat,Lng,RelAlt,Alt,Spd,GCrs,VZ,T" }, \
+    { LOG_GPS2_MSG, sizeof(log_GPS2), \
+      "GPS2",  "BIHBcLLeEefIBI", "Status,TimeMS,Week,NSats,HDop,Lat,Lng,Alt,Spd,GCrs,VZ,T,DSc,DAg" }, \
     { LOG_IMU_MSG, sizeof(log_IMU), \
       "IMU",  "Iffffff",     "TimeMS,GyrX,GyrY,GyrZ,AccX,AccY,AccZ" }, \
     { LOG_IMU2_MSG, sizeof(log_IMU), \
@@ -313,7 +368,7 @@ struct PACKED log_EKF4 {
     { LOG_MESSAGE_MSG, sizeof(log_Message), \
       "MSG",  "Z",     "Message"}, \
     { LOG_RCIN_MSG, sizeof(log_RCIN), \
-      "RCIN",  "Ihhhhhhhh",     "TimeMS,Chan1,Chan2,Chan3,Chan4,Chan5,Chan6,Chan7,Chan8" }, \
+      "RCIN",  "Ihhhhhhhhhhhhhh",     "TimeMS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14" }, \
     { LOG_RCOUT_MSG, sizeof(log_RCOUT), \
       "RCOU",  "Ihhhhhhhh",     "TimeMS,Chan1,Chan2,Chan3,Chan4,Chan5,Chan6,Chan7,Chan8" }, \
     { LOG_BARO_MSG, sizeof(log_BARO), \
@@ -331,7 +386,13 @@ struct PACKED log_EKF4 {
     { LOG_EKF3_MSG, sizeof(log_EKF3), \
       "EKF3","Icccccchhhc","TimeMS,IVN,IVE,IVD,IPN,IPE,IPD,IMX,IMY,IMZ,IVT" }, \
     { LOG_EKF4_MSG, sizeof(log_EKF4), \
-      "EKF4","Icccccchhhc","TimeMS,SVN,SVE,SVD,SPN,SPE,SPD,SMX,SMY,SMZ,SVT" }
+      "EKF4","Icccccccbb","TimeMS,SV,SP,SH,SMX,SMY,SMZ,SVT,OFN,EFE" }, \
+    { LOG_CMD_MSG, sizeof(log_Cmd), \
+      "CMD", "IHHHfffffff","TimeMS,CTot,CNum,CId,Prm1,Prm2,Prm3,Prm4,Lat,Lng,Alt" }, \
+    { LOG_RADIO_MSG, sizeof(log_Radio), \
+      "RAD", "IBBBBBHH", "TimeMS,RSSI,RemRSSI,TxBuf,Noise,RemNoise,RxErrors,Fixed" }
+
+// message types 0 to 100 reversed for vehicle specific use
 
 // message types for common messages
 #define LOG_FORMAT_MSG	  128
@@ -350,6 +411,12 @@ struct PACKED log_EKF4 {
 #define LOG_EKF2_MSG      141
 #define LOG_EKF3_MSG      142
 #define LOG_EKF4_MSG      143
+#define LOG_GPS2_MSG	  144
+#define LOG_CMD_MSG       145
+#define LOG_RADIO_MSG	  146
+
+// message types 200 to 210 reversed for GPS driver use
+// message types 211 to 220 reversed for autotune use
 
 #include "DataFlash_Block.h"
 #include "DataFlash_File.h"

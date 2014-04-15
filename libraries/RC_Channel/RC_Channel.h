@@ -9,10 +9,6 @@
 #include <AP_Common.h>
 #include <AP_Param.h>
 
-#define RC_CHANNEL_TYPE_ANGLE 0
-#define RC_CHANNEL_TYPE_RANGE 1
-#define RC_CHANNEL_TYPE_ANGLE_RAW 2
-
 #define RC_CHANNEL_TYPE_ANGLE       0
 #define RC_CHANNEL_TYPE_RANGE       1
 #define RC_CHANNEL_TYPE_ANGLE_RAW   2
@@ -57,6 +53,7 @@ public:
 
     // read input from APM_RC - create a control_in value
     void        set_pwm(int16_t pwm);
+    static void set_pwm_all(void);
     void        set_pwm_no_deadzone(int16_t pwm);
 
     // pwm is stored here
@@ -93,6 +90,7 @@ public:
     int16_t                                         pwm_to_angle_dz(uint16_t dead_zone);
     int16_t                                         pwm_to_angle();
     float                                           norm_input();
+    uint8_t                                         percent_input();
     float                                           norm_output();
     int16_t                                         angle_to_pwm();
     int16_t                                         pwm_to_range();
@@ -101,6 +99,7 @@ public:
 
     void                                            output() const;
     void                                            output_trim() const;
+    static void                                     output_trim_all();
     uint16_t                                        read() const;
     void                                            input();
     void                                            enable_out();

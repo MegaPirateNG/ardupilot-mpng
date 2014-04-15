@@ -73,6 +73,12 @@ public:
         // BoardConfig object
         k_param_BoardConfig,
 
+        // GPS object
+        k_param_gps,
+
+        // Parachute object
+        k_param_parachute,	// 17
+
         // Misc
         //
         k_param_log_bitmask = 20,
@@ -97,7 +103,11 @@ public:
         k_param_fs_batt_mah,
         k_param_angle_rate_max,         // remove
         k_param_rssi_range,
-        k_param_rc_feel_rp,             // 40
+        k_param_rc_feel_rp,
+        k_param_NavEKF,                 // 41 - Extended Kalman Filter Inertial Navigation Group
+        k_param_mission,                // mission library
+        k_param_rc_13,
+        k_param_rc_14,
 
         // 65: AP_Limits Library
         k_param_limits = 65,            // deprecated - remove
@@ -246,8 +256,8 @@ public:
         // 210: Waypoint data
         //
         k_param_waypoint_mode = 210, // remove
-        k_param_command_total,
-        k_param_command_index,
+        k_param_command_total,       // remove
+        k_param_command_index,       // remove
         k_param_command_nav_index,   // remove
         k_param_waypoint_radius,     // remove
         k_param_circle_radius,       // remove
@@ -327,8 +337,6 @@ public:
     
     // Waypoints
     //
-    AP_Int8         command_total;
-    AP_Int8         command_index;
     AP_Int32        rtl_loiter_time;
     AP_Int16        land_speed;
     AP_Int16        pilot_velocity_z_max;        // maximum vertical velocity the pilot may request
@@ -390,13 +398,15 @@ public:
     RC_Channel_aux          rc_6;
     RC_Channel_aux          rc_7;
     RC_Channel_aux          rc_8;
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     RC_Channel_aux          rc_9;
 #endif
     RC_Channel_aux          rc_10;
     RC_Channel_aux          rc_11;
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     RC_Channel_aux          rc_12;
+    RC_Channel_aux          rc_13;
+    RC_Channel_aux          rc_14;
 #endif
 
     AP_Int16                rc_speed; // speed of fast RC Channels in Hz
@@ -456,13 +466,15 @@ public:
         rc_6                (CH_6),
         rc_7                (CH_7),
         rc_8                (CH_8),
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
         rc_9                (CH_9),
 #endif
         rc_10               (CH_10),
         rc_11               (CH_11),
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
         rc_12               (CH_12),
+        rc_13               (CH_13),
+        rc_14               (CH_14),
 #endif
 
         // PID controller	    initial P	            initial I		        initial D               initial imax

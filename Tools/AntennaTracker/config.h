@@ -69,15 +69,31 @@
 #ifndef SERIAL0_BAUD
  # define SERIAL0_BAUD                   115200
 #endif
-#ifndef SERIAL3_BAUD
- # define SERIAL3_BAUD                    57600
+#ifndef SERIAL1_BAUD
+ # define SERIAL1_BAUD                    57600
 #endif
-
+#ifndef SERIAL2_BAUD
+ # define SERIAL2_BAUD                    57600
+#endif
 
 #ifndef SERIAL_BUFSIZE
  # define SERIAL_BUFSIZE 512
 #endif
 
+#ifndef SERIAL1_BUFSIZE
+ # define SERIAL1_BUFSIZE 256
+#endif
+
 #ifndef SERIAL2_BUFSIZE
  # define SERIAL2_BUFSIZE 256
 #endif
+
+//////////////////////////////////////////////////////////////////////////////
+// Developer Items
+//
+
+// use this to completely disable the CLI
+#ifndef CLI_ENABLED
+ # define CLI_ENABLED ENABLED
+#endif
+

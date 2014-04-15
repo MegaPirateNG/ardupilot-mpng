@@ -56,7 +56,7 @@ const AP_Param::GroupInfo AC_WPNav::var_info[] PROGMEM = {
     // @DisplayName: Waypoint Acceleration 
     // @Description: Defines the horizontal acceleration in cm/s/s used during missions
     // @Units: cm/s/s
-    // @Range: 0 980
+    // @Range: 50 500
     // @Increment: 10
     // @User: Standard
     AP_GROUPINFO("ACCEL",       5, AC_WPNav, _wp_accel_cms, WPNAV_ACCELERATION),
@@ -83,7 +83,11 @@ AC_WPNav::AC_WPNav(const AP_InertialNav* inav, const AP_AHRS* ahrs, AC_PosContro
     _track_desired(0.0),
     _track_accel(0.0),
     _track_speed(0.0),
-    _track_leash_length(0.0)
+    _track_leash_length(0.0),
+    _spline_time(0.0),
+    _spline_vel_scaler(0.0),
+    _spline_slow_down_dist(0.0),
+    _yaw(0.0)
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
@@ -95,14 +99,17 @@ AC_WPNav::AC_WPNav(const AP_InertialNav* inav, const AP_AHRS* ahrs, AC_PosContro
 /// set_loiter_target in cm from home
 void AC_WPNav::set_loiter_target(const Vector3f& position)
 {
-	// set target position
-	_pos_control.set_pos_target(_inav->get_position());
+    // set target position
+    _pos_control.set_pos_target(_inav->get_position());
 
-	// initialise feed forward velocity to zero
-	_pos_control.set_desired_velocity(0,0);
+    // initialise feed forward velocity to zero
+    _pos_control.set_desired_velocity(0,0);
 
-	// initialise pos controller speed and acceleration
-	_pos_control.set_speed_xy(_loiter_speed_cms);
+    // initialise pos controller speed
+    _pos_control.set_speed_xy(_loiter_speed_cms);
+
+    // initialise pos controller acceleration
+    _loiter_accel_cms = _loiter_speed_cms/2.0f;
     _pos_control.set_accel_xy(_loiter_accel_cms);
 
     // initialise pilot input
@@ -121,9 +128,11 @@ void AC_WPNav::init_loiter_target()
     // initialise feed forward velocities to zero
     _pos_control.set_desired_velocity(curr_vel.x, curr_vel.y);
 
-    // initialise pos controller speed, acceleration and leash length
-    // To-Do: will this cause problems for circle which calls this continuously?
+    // initialise pos controller speed
     _pos_control.set_speed_xy(_loiter_speed_cms);
+
+    // initialise pos controller acceleration
+    _loiter_accel_cms = _loiter_speed_cms/2.0f;
     _pos_control.set_accel_xy(_loiter_accel_cms);
 
     // initialise pilot input
@@ -157,6 +166,7 @@ void AC_WPNav::calc_loiter_desired_velocity(float nav_dt)
     // check loiter speed and avoid divide by zero
     if( _loiter_speed_cms < 100.0f) {
         _loiter_speed_cms = 100.0f;
+        _loiter_accel_cms = _loiter_speed_cms/2.0f;
     }
 
     // rotate pilot input to lat/lon frame
@@ -187,7 +197,7 @@ void AC_WPNav::calc_loiter_desired_velocity(float nav_dt)
     }
 
     // constrain and scale the feed forward velocity if necessary
-    float vel_total = safe_sqrt(desired_vel.x*desired_vel.x + desired_vel.y*desired_vel.y);
+    float vel_total = pythagorous2(desired_vel.x, desired_vel.y);
     if (vel_total > _loiter_speed_cms && vel_total > 0.0f) {
     	desired_vel.x = _loiter_speed_cms * desired_vel.x/vel_total;
     	desired_vel.y = _loiter_speed_cms * desired_vel.y/vel_total;
@@ -216,15 +226,15 @@ void AC_WPNav::update_loiter()
         if (dt >= 1.0f) {
             dt = 0.0;
         }
-            // capture time since last iteration
-            _loiter_last_update = now;
-            // translate any adjustments from pilot to loiter target
+        // capture time since last iteration
+        _loiter_last_update = now;
+        // translate any adjustments from pilot to loiter target
         calc_loiter_desired_velocity(dt);
         // trigger position controller on next update
         _pos_control.trigger_xy();
     }else{
-            // run loiter's position to velocity step
-            _pos_control.update_pos_controller(true);
+        // run loiter's position to velocity step
+        _pos_control.update_pos_controller(true);
     }
 }
 
@@ -236,17 +246,19 @@ void AC_WPNav::update_loiter()
 /// set_destination - set destination using cm from home
 void AC_WPNav::set_wp_destination(const Vector3f& destination)
 {
-    // if waypoint controller is active and copter has reached the previous waypoint use it for the origin
-    if( _flags.reached_destination && ((hal.scheduler->millis() - _wp_last_update) < 1000) ) {
-        _origin = _destination;
-    }else{
-        // otherwise calculate origin from the current position and velocity
-        _pos_control.get_stopping_point_xy(_origin);
-        _pos_control.get_stopping_point_z(_origin);
+	Vector3f origin;
+
+    // if waypoint controller is active use the existing position target as the origin
+    if ((hal.scheduler->millis() - _wp_last_update) < 1000) {
+        origin = _pos_control.get_pos_target();
+    } else {
+        // if waypoint controller is not active, set origin to reasonable stopping point (using curr pos and velocity)
+        _pos_control.get_stopping_point_xy(origin);
+        _pos_control.get_stopping_point_z(origin);
     }
 
     // set origin and destination
-    set_wp_origin_and_destination(_origin, destination);
+    set_wp_origin_and_destination(origin, destination);
 }
 
 /// set_origin_and_destination - set origin and destination using lat/lon coordinates
@@ -269,6 +281,11 @@ void AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vecto
         _pos_delta_unit = pos_delta/_track_length;
     }
 
+    // check _wp_accel_cms is reasonable
+    if (_wp_accel_cms <= 0) {
+        _wp_accel_cms.set_and_save(WPNAV_ACCELERATION);
+    }
+
     // initialise position controller speed and acceleration
     _pos_control.set_speed_xy(_wp_speed_cms);
     _pos_control.set_accel_xy(_wp_accel_cms);
@@ -279,11 +296,15 @@ void AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vecto
     // calculate leash lengths
     calculate_wp_leash_length();
 
+    // initialise yaw heading
+    _yaw = get_bearing_cd(_origin, _destination);
+
     // initialise intermediate point to the origin
     _pos_control.set_pos_target(origin);
     _track_desired = 0;             // target is at beginning of track
     _flags.reached_destination = false;
     _flags.fast_waypoint = false;   // default waypoint back to slow
+    _flags.segment_type = SEGMENT_STRAIGHT;
 
     // initialise the limited speed to current speed along the track
     const Vector3f &curr_vel = _inav->get_velocity();
@@ -318,7 +339,7 @@ void AC_WPNav::advance_wp_target_along_track(float dt)
     track_error = curr_delta - track_covered_pos;
 
     // calculate the horizontal error
-    float track_error_xy = safe_sqrt(track_error.x*track_error.x + track_error.y*track_error.y);
+    float track_error_xy = pythagorous2(track_error.x, track_error.y);
 
     // calculate the vertical error
     float track_error_z = fabsf(track_error.z);
@@ -403,7 +424,7 @@ void AC_WPNav::advance_wp_target_along_track(float dt)
 }
 
 /// get_wp_distance_to_destination - get horizontal distance to destination in cm
-float AC_WPNav::get_wp_distance_to_destination()
+float AC_WPNav::get_wp_distance_to_destination() const
 {
     // get current location
     Vector3f curr = _inav->get_position();
@@ -411,7 +432,7 @@ float AC_WPNav::get_wp_distance_to_destination()
 }
 
 /// get_wp_bearing_to_destination - get bearing to next waypoint in centi-degrees
-int32_t AC_WPNav::get_wp_bearing_to_destination()
+int32_t AC_WPNav::get_wp_bearing_to_destination() const
 {
     return get_bearing_cd(_inav->get_position(), _destination);
 }
@@ -429,15 +450,15 @@ void AC_WPNav::update_wpnav()
         if (dt >= 1.0f) {
             dt = 0.0;
         }
-            // capture time since last iteration
+        // capture time since last iteration
         _wp_last_update = now;
 
-            // advance the target if necessary
+        // advance the target if necessary
         advance_wp_target_along_track(dt);
         _pos_control.trigger_xy();
     }else{
         // run position controller
-            _pos_control.update_pos_controller(false);
+        _pos_control.update_pos_controller(false);
     }
 }
 
@@ -445,7 +466,7 @@ void AC_WPNav::update_wpnav()
 void AC_WPNav::calculate_wp_leash_length()
 {
     // length of the unit direction vector in the horizontal
-    float pos_delta_unit_xy = sqrt(_pos_delta_unit.x*_pos_delta_unit.x+_pos_delta_unit.y*_pos_delta_unit.y);
+    float pos_delta_unit_xy = pythagorous2(_pos_delta_unit.x, _pos_delta_unit.y);
     float pos_delta_unit_z = fabsf(_pos_delta_unit.z);
 
     float speed_z;
@@ -476,6 +497,246 @@ void AC_WPNav::calculate_wp_leash_length()
         _track_speed = min(speed_z/pos_delta_unit_z, _wp_speed_cms/pos_delta_unit_xy);
         _track_leash_length = min(leash_z/pos_delta_unit_z, _pos_control.get_leash_xy()/pos_delta_unit_xy);
     }
+}
+
+///
+/// spline methods
+///
+
+/// set_spline_destination waypoint using position vector (distance from home in cm)
+///     stopped_at_start should be set to true if vehicle is stopped at the origin
+///     seg_end_type should be set to stopped, straight or spline depending upon the next segment's type
+///     next_destination should be set to the next segment's destination if the seg_end_type is SEGMENT_END_STRAIGHT or SEGMENT_END_SPLINE
+void AC_WPNav::set_spline_destination(const Vector3f& destination, bool stopped_at_start, spline_segment_end_type seg_end_type, const Vector3f& next_destination)
+{
+    Vector3f origin;
+
+    // if waypoint controller is active and copter has reached the previous waypoint use it for the origin
+    if( _flags.reached_destination && ((hal.scheduler->millis() - _wp_last_update) < 1000) ) {
+        origin = _destination;
+    }else{
+        // otherwise calculate origin from the current position and velocity
+        _pos_control.get_stopping_point_xy(origin);
+        _pos_control.get_stopping_point_z(origin);
+    }
+
+    // set origin and destination
+    set_spline_origin_and_destination(origin, destination, stopped_at_start, seg_end_type, next_destination);
+}
+
+/// set_spline_origin_and_destination - set origin and destination waypoints using position vectors (distance from home in cm)
+///     seg_type should be calculated by calling function based on the mission
+void AC_WPNav::set_spline_origin_and_destination(const Vector3f& origin, const Vector3f& destination, bool stopped_at_start, spline_segment_end_type seg_end_type, const Vector3f& next_destination)
+{
+    // mission is "active" if wpnav has been called recently and vehicle reached the previous waypoint
+    bool prev_segment_exists = (_flags.reached_destination && ((hal.scheduler->millis() - _wp_last_update) < 1000));
+
+    // check _wp_accel_cms is reasonable to avoid divide by zero
+    if (_wp_accel_cms <= 0) {
+        _wp_accel_cms.set_and_save(WPNAV_ACCELERATION);
+    }
+
+    // segment start types
+    // stop - vehicle is not moving at origin
+    // straight-fast - vehicle is moving, previous segment is straight.  vehicle will fly straight through the waypoint before beginning it's spline path to the next wp
+    //     _flag.segment_type holds whether prev segment is straight vs spline but we don't know if it has a delay
+    // spline-fast - vehicle is moving, previous segment is splined, vehicle will fly through waypoint but previous segment should have it flying in the correct direction (i.e. exactly parallel to position difference vector from previous segment's origin to this segment's destination)
+
+    // calculate spline velocity at origin
+    if (stopped_at_start || !prev_segment_exists) {
+    	// if vehicle is stopped at the origin, set origin velocity to 0.1 * distance vector from origin to destination
+    	_spline_origin_vel = (destination - origin) * 0.1f;
+    	_spline_time = 0.0f;
+    	_spline_vel_scaler = 0.0f;
+    }else{
+    	// look at previous segment to determine velocity at origin
+        if (_flags.segment_type == SEGMENT_STRAIGHT) {
+            // previous segment is straight, vehicle is moving so vehicle should fly straight through the origin
+            // before beginning it's spline path to the next waypoint. Note: we are using the previous segment's origin and destination
+            _spline_origin_vel = (_destination - _origin);
+            _spline_time = 0.0f;	// To-Do: this should be set based on how much overrun there was from straight segment?
+            _spline_vel_scaler = 0.0f;    // To-Do: this should be set based on speed at end of prev straight segment?
+        }else{
+            // previous segment is splined, vehicle will fly through origin
+            // we can use the previous segment's destination velocity as this segment's origin velocity
+            // Note: previous segment will leave destination velocity parallel to position difference vector
+            //       from previous segment's origin to this segment's destination)
+            _spline_origin_vel = _spline_destination_vel;
+            if (_spline_time > 1.0f && _spline_time < 1.1f) {    // To-Do: remove hard coded 1.1f
+                _spline_time -= 1.0f;
+            }else{
+                _spline_time = 0.0f;
+            }
+            _spline_vel_scaler = 0.0f;
+        }
+    }
+
+    // calculate spline velocity at destination
+    switch (seg_end_type) {
+
+    case SEGMENT_END_STOP:
+        // if vehicle stops at the destination set destination velocity to 0.1 * distance vector from origin to destination
+        _spline_destination_vel = (destination - origin) * 0.1f;
+        _flags.fast_waypoint = false;
+        break;
+
+    case SEGMENT_END_STRAIGHT:
+        // if next segment is straight, vehicle's final velocity should face along the next segment's position
+        _spline_destination_vel = (next_destination - destination);
+        _flags.fast_waypoint = true;
+        break;
+
+    case SEGMENT_END_SPLINE:
+        // if next segment is splined, vehicle's final velocity should face parallel to the line from the origin to the next destination
+        _spline_destination_vel = (next_destination - origin);
+        _flags.fast_waypoint = true;
+        break;
+    }
+
+    // code below ensures we don't get too much overshoot when the next segment is short
+    float vel_len = (_spline_origin_vel + _spline_destination_vel).length();
+    float pos_len = (destination - origin).length() * 4.0f;
+    if (vel_len > pos_len) {
+        // if total start+stop velocity is more than twice position difference
+        // use a scaled down start and stop velocityscale the  start and stop velocities down
+        float vel_scaling = pos_len / vel_len;
+        // update spline calculator
+        update_spline_solution(origin, destination, _spline_origin_vel * vel_scaling, _spline_destination_vel * vel_scaling);
+    }else{
+        // update spline calculator
+        update_spline_solution(origin, destination, _spline_origin_vel, _spline_destination_vel);
+    }
+
+    // initialise yaw heading to current heading
+    _yaw = _ahrs->yaw_sensor;
+
+    // store origin and destination locations
+    _origin = origin;
+    _destination = destination;
+
+    // initialise position controller speed and acceleration
+    _pos_control.set_speed_xy(_wp_speed_cms);
+    _pos_control.set_accel_xy(_wp_accel_cms);
+    _pos_control.set_speed_z(-_wp_speed_down_cms, _wp_speed_up_cms);
+    _pos_control.calc_leash_length_xy();
+    _pos_control.calc_leash_length_z();
+
+    // calculate leash lengths
+    calculate_wp_leash_length();
+
+    // calculate slow down distance
+    // To-Do: this should be used for straight segments as well
+    // To-Do: should we use a combination of horizontal and vertical speeds?
+    // To-Do: update this automatically when speed or acceleration is changed
+    _spline_slow_down_dist = _wp_speed_cms * _wp_speed_cms / (2.0f*_wp_accel_cms);
+
+    // initialise intermediate point to the origin
+    _pos_control.set_pos_target(origin);
+    _flags.reached_destination = false;
+    _flags.segment_type = SEGMENT_SPLINE;
+}
+
+/// update_spline - update spline controller
+void AC_WPNav::update_spline()
+{
+    // exit immediately if this is not a spline segment
+    if (_flags.segment_type != SEGMENT_SPLINE) {
+        return;
+    }
+
+    // calculate dt
+    uint32_t now = hal.scheduler->millis();
+    float dt = (now - _wp_last_update) / 1000.0f;
+
+    // reset step back to 0 if 0.1 seconds has passed and we completed the last full cycle
+    if (dt > 0.095f) {
+        // double check dt is reasonable
+        if (dt >= 1.0f) {
+            dt = 0.0;
+        }
+        // capture time since last iteration
+        _wp_last_update = now;
+
+        // advance the target if necessary
+        advance_spline_target_along_track(dt);
+        _pos_control.trigger_xy();
+    }else{
+        // run position controller
+        _pos_control.update_pos_controller(false);
+    }
+}
+
+/// update_spline_solution - recalculates hermite_spline_solution grid
+///		relies on _spline_origin_vel, _spline_destination_vel and _origin and _destination
+void AC_WPNav::update_spline_solution(const Vector3f& origin, const Vector3f& dest, const Vector3f& origin_vel, const Vector3f& dest_vel)
+{
+    _hermite_spline_solution[0] = origin;
+    _hermite_spline_solution[1] = origin_vel;
+    _hermite_spline_solution[2] = -origin*3.0f -origin_vel*2.0f + dest*3.0f - dest_vel;
+    _hermite_spline_solution[3] = origin*2.0f + origin_vel -dest*2.0f + dest_vel;
+ }
+
+/// advance_spline_target_along_track - move target location along track from origin to destination
+void AC_WPNav::advance_spline_target_along_track(float dt)
+{
+    if (!_flags.reached_destination) {
+        Vector3f target_pos, target_vel;
+
+        // update target position and velocity from spline calculator
+        calc_spline_pos_vel(_spline_time, target_pos, target_vel);
+
+        // update velocity
+        float spline_dist_to_wp = (_destination - target_pos).length();
+
+        // if within the stopping distance from destination, set target velocity to sqrt of distance * 2 * acceleration
+        if (!_flags.fast_waypoint && spline_dist_to_wp < _spline_slow_down_dist) {
+            _spline_vel_scaler = safe_sqrt(spline_dist_to_wp * 2.0f * _wp_accel_cms);
+        }else if(_spline_vel_scaler < _wp_speed_cms) {
+            // increase velocity using acceleration
+        	// To-Do: replace 0.1f below with update frequency passed in from main program
+            _spline_vel_scaler += _wp_accel_cms* 0.1f;
+        }
+
+        // constrain target velocity
+        if (_spline_vel_scaler > _wp_speed_cms) {
+            _spline_vel_scaler = _wp_speed_cms;
+        }
+
+        // scale the spline_time by the velocity we've calculated vs the velocity that came out of the spline calculator
+        float spline_time_scale = _spline_vel_scaler/target_vel.length();
+
+        // update target position
+        _pos_control.set_pos_target(target_pos);
+
+        // update the yaw
+        _yaw = RadiansToCentiDegrees(atan2f(target_vel.y,target_vel.x));
+
+        // advance spline time to next step
+        _spline_time += spline_time_scale*dt;
+
+        // we will reach the next waypoint in the next step so set reached_destination flag
+        // To-Do: is this one step too early?
+        if (_spline_time >= 1.0f) {
+            _flags.reached_destination = true;
+        }
+    }
+}
+
+// calc_spline_pos_vel_accel - calculates target position, velocity and acceleration for the given "spline_time"
+/// 	relies on update_spline_solution being called when the segment's origin and destination were set
+void AC_WPNav::calc_spline_pos_vel(float spline_time, Vector3f& position, Vector3f& velocity)
+{
+    float spline_time_sqrd = spline_time * spline_time;
+    float spline_time_cubed = spline_time_sqrd * spline_time;
+
+    position = _hermite_spline_solution[0] + \
+               _hermite_spline_solution[1] * spline_time + \
+               _hermite_spline_solution[2] * spline_time_sqrd + \
+               _hermite_spline_solution[3] * spline_time_cubed;
+
+    velocity = _hermite_spline_solution[1] + \
+               _hermite_spline_solution[2] * 2.0f * spline_time + \
+               _hermite_spline_solution[3] * 3.0f * spline_time_sqrd;
 }
 
 
