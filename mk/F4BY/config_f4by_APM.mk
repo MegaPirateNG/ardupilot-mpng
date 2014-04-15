@@ -21,7 +21,7 @@ MODULES		+= drivers/led
 MODULES		+= drivers/f4by
 MODULES		+= drivers/boards/px4fmu-v1
 MODULES		+= drivers/rgbled
-MODULES		+= drivers/l3gd20
+#MODULES		+= drivers/l3gd20
 # MODULES		+= drivers/bma180
 MODULES		+= drivers/mpu6000
 MODULES		+= drivers/hmc5883
@@ -34,7 +34,7 @@ MODULES		+= drivers/blinkm
 MODULES		+= drivers/airspeed
 MODULES		+= drivers/ets_airspeed
 MODULES		+= drivers/meas_airspeed
-MODULES		+= drivers/mkblctrl
+#MODULES		+= drivers/mkblctrl
 #MODULES	+= modules/sensors
 
 #
