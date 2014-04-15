@@ -47,12 +47,14 @@ static F4BYGPIO gpioDriver;
 #define UARTB_DEFAULT_DEVICE "/dev/ttyS2"
 #define UARTC_DEFAULT_DEVICE "/dev/ttyS1"
 #define UARTD_DEFAULT_DEVICE "/dev/null"
+#define UARTE_DEFAULT_DEVICE "/dev/null"
 
 // 3 UART drivers, for GPS plus two mavlink-enabled devices
 static F4BYUARTDriver uartADriver(UARTA_DEFAULT_DEVICE, "APM_uartA");
 static F4BYUARTDriver uartBDriver(UARTB_DEFAULT_DEVICE, "APM_uartB");
 static F4BYUARTDriver uartCDriver(UARTC_DEFAULT_DEVICE, "APM_uartC");
 static F4BYUARTDriver uartDDriver(UARTD_DEFAULT_DEVICE, "APM_uartD");
+static F4BYUARTDriver uartEDriver(UARTE_DEFAULT_DEVICE, "APM_uartE");
 
 HAL_F4BY::HAL_F4BY() :
     AP_HAL::HAL(
@@ -60,6 +62,7 @@ HAL_F4BY::HAL_F4BY() :
         &uartBDriver,  /* uartB */
         &uartCDriver,  /* uartC */
         &uartDDriver,  /* uartD */
+        &uartEDriver,  /* uartE */
         &i2cDriver, /* i2c */
         &spiDeviceManager, /* spi */
         &analogIn, /* analogin */
