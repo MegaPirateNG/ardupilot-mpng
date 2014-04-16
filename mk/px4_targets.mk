@@ -99,6 +99,10 @@ px4-v2-upload: px4-v2
 	$(RULEHDR)
 	$(v) $(PX4_MAKE) px4fmu-v2_APM upload
 
+f4by-upload: f4by
+	$(RULEHDR)
+	$(v) $(F4BY_MAKE) f4by_APM upload
+
 px4-upload: px4-v1-upload
 
 px4-archives-clean:
