@@ -36,9 +36,6 @@ public:
 	    return _fd;
     }
 
-    void set_flow_control(enum flow_control flow_control);
-    enum flow_control get_flow_control(void) { return _flow_control; }
-
 private:
     const char *_devpath;
     int _fd;
@@ -70,11 +67,6 @@ private:
 
     void try_initialise(void);
     uint32_t _last_initialise_attempt_ms;
-
-    uint32_t _os_write_buffer_size;
-    uint32_t _total_read;
-    uint32_t _total_written;
-    enum flow_control _flow_control;
 };
 
 #endif // __AP_HAL_F4BY_UARTDRIVER_H__
