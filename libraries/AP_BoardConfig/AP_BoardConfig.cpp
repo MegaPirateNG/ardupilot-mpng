@@ -56,8 +56,26 @@ const AP_Param::GroupInfo AP_BoardConfig::var_info[] PROGMEM = {
 
 void AP_BoardConfig::init()
 {
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 
     /* configurre the FMU driver for the right number of PWMs */
+
+    // ensure only valid values are set, rounding up
+    if (_pwm_count > 6) _pwm_count.set(6);
+    if (_pwm_count < 0) _pwm_count.set(0);
+    if (_pwm_count == 1) _pwm_count.set(2);
+    if (_pwm_count == 3) _pwm_count.set(4);
+    if (_pwm_count == 5) _pwm_count.set(6);
+
+    int fd = open("/dev/px4fmu", 0);
+    if (fd == -1) {
+        hal.scheduler->panic("Unable to open /dev/px4fmu");
+    }
+    if (ioctl(fd, PWM_SERVO_SET_COUNT, _pwm_count.get()) != 0) {
+        hal.console->printf("RCOutput: Unable to setup alt PWM to %u channels\n", _pwm_count.get());  
+    }   
+    close(fd);
+elif CONFIG_HAL_BOARD == HAL_BOARD_F4BY
+	/* configurre the FMU driver for the right number of PWMs */
 
     // ensure only valid values are set, rounding up
     if (_pwm_count > 8) _pwm_count.set(8);
@@ -68,13 +86,13 @@ void AP_BoardConfig::init()
     if (_pwm_count == 5) _pwm_count.set(6);
     if (_pwm_count == 7) _pwm_count.set(8);
 
-    int fd = open("/dev/px4fmu", 0);
+    int fd = open("/dev/f4by", 0);
     if (fd == -1) {
-        hal.scheduler->panic("Unable to open /dev/px4fmu");
+        hal.scheduler->panic("Unable to open /dev/f4by");
     }
     if (ioctl(fd, PWM_SERVO_SET_COUNT, _pwm_count.get()) != 0) {
         hal.console->printf("RCOutput: Unable to setup alt PWM to %u channels\n", _pwm_count.get());  
     }   
-    close(fd);
+    close(fd);    
 #endif    
 }
