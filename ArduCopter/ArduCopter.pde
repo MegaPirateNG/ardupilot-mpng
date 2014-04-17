@@ -296,7 +296,7 @@ static AP_Baro_MS5611 barometer(&AP_Baro_MS5611::i2c);
    #endif
   #endif
 
- #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+ #if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 static AP_Compass_PX4 compass;
  #elif CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
 static AP_Compass_VRBRAIN compass;
