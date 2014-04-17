@@ -134,7 +134,7 @@ void F4BYGPIO::write(uint8_t pin, uint8_t value)
 {
     switch (pin) {
 
-#ifdef CONFIG_ARCH_BOARD_F4BYFMU_V1
+#ifdef CONFIG_ARCH_BOARD_F4BY
         case HAL_GPIO_A_LED_PIN:    // Arming LED
             if (value == LOW) {
                 ioctl(_led_fd, LED_OFF, LED_RED);
