@@ -106,10 +106,8 @@ bool F4BYUtil::get_system_id(char buf[40])
     uint8_t serialid[12];
     memset(serialid, 0, sizeof(serialid));
     val_read(serialid, (const void *)UDID_START, sizeof(serialid));
-#ifdef CONFIG_ARCH_BOARD_F4BYFMU_V1
-    const char *board_type = "F4BYv1";
-#else
-    const char *board_type = "F4BYv2";
+#ifdef CONFIG_ARCH_BOARD_F4BY
+    const char *board_type = "F4BY";
 #endif
     // this format is chosen to match the human_readable_serial()
     // function in auth.c

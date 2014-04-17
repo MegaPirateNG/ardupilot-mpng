@@ -210,13 +210,6 @@ void F4BYAnalogIn::_timer_tick(void)
         for (uint8_t i=0; i<ret/sizeof(buf_adc[0]); i++) {
         if (i == 13) buf_adc[i].am_channel == 100;
         if (i == 10) buf_adc[i].am_channel == 103;
-#ifdef CONFIG_ARCH_BOARD_F4BYFMU_V2
-            if (buf_adc[i].am_channel == 4) {
-                // record the Vcc value for later use in
-                // voltage_average_ratiometric()
-                _board_voltage = buf_adc[i].am_data * 6.6f / 4096;
-            }
-#endif
         }
         for (uint8_t i=0; i<ret/sizeof(buf_adc[0]); i++) {
             Debug("chan %u value=%u\n",
@@ -231,7 +224,7 @@ void F4BYAnalogIn::_timer_tick(void)
         }
     }
 
-#ifdef CONFIG_ARCH_BOARD_F4BYFMU_V1
+#ifdef CONFIG_ARCH_BOARD_F4BY
     // check for new battery data on FMUv1
     if (_battery_handle != -1) {
         struct battery_status_s battery;
@@ -253,49 +246,6 @@ void F4BYAnalogIn::_timer_tick(void)
                     }
                 }
             }
-        }
-    }
-#endif
-
-#ifdef CONFIG_ARCH_BOARD_F4BYFMU_V2
-    // check for new servorail data on FMUv2
-    if (_servorail_handle != -1) {
-        struct servorail_status_s servorail;
-        bool updated = false;
-        if (orb_check(_servorail_handle, &updated) == 0 && updated) {
-            orb_copy(ORB_ID(servorail_status), _servorail_handle, &servorail);
-            if (servorail.timestamp != _servorail_timestamp) {
-                _servorail_timestamp = servorail.timestamp;
-                _servorail_voltage = servorail.voltage_v;
-                for (uint8_t j=0; j<F4BY_ANALOG_MAX_CHANNELS; j++) {
-                    F4BY::F4BYAnalogSource *c = _channels[j];
-                    if (c == NULL) continue;
-                    if (c->_pin == F4BY_ANALOG_ORB_SERVO_VOLTAGE_PIN) {
-                        c->_add_value(servorail.voltage_v / F4BY_VOLTAGE_SCALING, 0);
-                    }
-                    if (c->_pin == F4BY_ANALOG_ORB_SERVO_VRSSI_PIN) {
-                        c->_add_value(servorail.rssi_v / F4BY_VOLTAGE_SCALING, 0);
-                    }
-                }
-            }
-        }
-    }
-    if (_system_power_handle != -1) {
-        struct system_power_s system_power;
-        bool updated = false;
-        if (orb_check(_system_power_handle, &updated) == 0 && updated) {
-            orb_copy(ORB_ID(system_power), _system_power_handle, &system_power);
-            uint16_t flags = 0;
-            if (system_power.usb_connected) flags |= MAV_POWER_STATUS_USB_CONNECTED;
-            if (system_power.brick_valid)   flags |= MAV_POWER_STATUS_BRICK_VALID;
-            if (system_power.servo_valid)   flags |= MAV_POWER_STATUS_SERVO_VALID;
-            if (system_power.periph_5V_OC)  flags |= MAV_POWER_STATUS_PERIPH_OVERCURRENT;
-            if (system_power.hipower_5V_OC) flags |= MAV_POWER_STATUS_PERIPH_HIPOWER_OVERCURRENT;
-            if (_power_flags != 0 && _power_flags != flags) {
-                // the power status has changed since boot
-                flags |= MAV_POWER_STATUS_CHANGED;
-            }
-            _power_flags = flags;
         }
     }
 #endif
