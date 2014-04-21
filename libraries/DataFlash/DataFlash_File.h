@@ -10,7 +10,7 @@
 #ifndef DataFlash_File_h
 #define DataFlash_File_h
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 #include <systemlib/perf_counter.h>
 #else
 #define perf_begin(x)
@@ -83,7 +83,7 @@ private:
 
     void _io_timer(void);
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
     // performance counters
     perf_counter_t  _perf_write;
     perf_counter_t  _perf_fsync;

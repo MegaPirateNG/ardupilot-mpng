@@ -32,7 +32,7 @@
 
 #include <vectorN.h>
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 #include <systemlib/perf_counter.h>
 #endif
 
@@ -464,7 +464,7 @@ private:
 	} mag_state;
 
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
     // performance counters
     perf_counter_t  _perf_UpdateFilter;
     perf_counter_t  _perf_CovariancePrediction;
@@ -478,7 +478,7 @@ private:
     bool use_compass(void) const;
 };
 
-#if CONFIG_HAL_BOARD != HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD != HAL_BOARD_PX4 && CONFIG_HAL_BOARD != HAL_BOARD_F4BY
 #define perf_begin(x)
 #define perf_end(x)
 #endif
