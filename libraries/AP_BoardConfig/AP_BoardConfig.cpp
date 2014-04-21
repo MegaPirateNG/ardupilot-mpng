@@ -108,7 +108,7 @@ void AP_BoardConfig::init()
         hal.console->printf("RCOutput: Unable to setup alt PWM to %u channels\n", _pwm_count.get());  
     }   
     close(fd);
-elif CONFIG_HAL_BOARD == HAL_BOARD_F4BY
+#elif CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 	/* configurre the FMU driver for the right number of PWMs */
 
     // ensure only valid values are set, rounding up
