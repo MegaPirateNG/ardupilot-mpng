@@ -113,7 +113,6 @@ void AP_BoardConfig::init()
 
     // ensure only valid values are set, rounding up
     if (_pwm_count > 8) _pwm_count.set(8);
-    if (_pwm_count > 6) _pwm_count.set(6);
     if (_pwm_count < 0) _pwm_count.set(0);
     if (_pwm_count == 1) _pwm_count.set(2);
     if (_pwm_count == 3) _pwm_count.set(4);
