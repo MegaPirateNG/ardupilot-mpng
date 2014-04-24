@@ -318,7 +318,7 @@ static void pre_arm_checks(bool display_failure)
         }
     }
 #if CONFIG_HAL_BOARD != HAL_BOARD_VRBRAIN
-#ifndef CONFIG_ARCH_BOARD_PX4FMU_V1
+#if !defined(CONFIG_ARCH_BOARD_PX4FMU_V1) && !defined(CONFIG_ARCH_BOARD_F4BY)
     // check board voltage
     if ((g.arming_check == ARMING_CHECK_ALL) || (g.arming_check & ARMING_CHECK_VOLTAGE)) {
         if(hal.analogin->board_voltage() < BOARD_VOLTAGE_MIN || hal.analogin->board_voltage() > BOARD_VOLTAGE_MAX) {
