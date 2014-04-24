@@ -154,6 +154,13 @@ void F4BYStorage::_storage_open(void)
 	int fd = open(MTD_PARAMS_FILE, O_RDONLY);
 	if (fd == -1) {
             //hal.scheduler->panic("Failed to open " MTD_PARAMS_FILE);
+            fd = open(MTD_PARAMS_FILE, O_WRONLY | O_CREAT);
+            if(fd != -1)
+            {
+                memset(_buffer, 0, sizeof(_buffer));
+                write(fd, _buffer, sizeof(_buffer));
+                fsync(fd);
+            }
 	}
 	else if (read(fd, _buffer, sizeof(_buffer)) != sizeof(_buffer)) {
             //hal.scheduler->panic("Failed to read " MTD_PARAMS_FILE);
