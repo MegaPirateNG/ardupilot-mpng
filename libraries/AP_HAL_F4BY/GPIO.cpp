@@ -137,9 +137,9 @@ void F4BYGPIO::write(uint8_t pin, uint8_t value)
 #ifdef CONFIG_ARCH_BOARD_F4BY
         case HAL_GPIO_A_LED_PIN:    // Arming LED
             if (value == LOW) {
-                ioctl(_led_fd, LED_OFF, LED_RED);
-            } else {
                 ioctl(_led_fd, LED_ON, LED_RED);
+            } else {
+                ioctl(_led_fd, LED_OFF, LED_RED);
             }
             break;
 
@@ -148,9 +148,9 @@ void F4BYGPIO::write(uint8_t pin, uint8_t value)
 
         case HAL_GPIO_C_LED_PIN:    // GPS LED 
             if (value == LOW) { 
-                ioctl(_led_fd, LED_OFF, LED_BLUE);
-            } else { 
                 ioctl(_led_fd, LED_ON, LED_BLUE);
+            } else { 
+                ioctl(_led_fd, LED_OFF, LED_BLUE);
             }
             break;
 #endif
