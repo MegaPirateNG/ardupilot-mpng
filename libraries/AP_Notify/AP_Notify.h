@@ -27,6 +27,7 @@
 #include <ExternalLED.h>
 #include <Buzzer.h>
 
+
 class AP_Notify
 {
 public:
@@ -45,6 +46,7 @@ public:
 
         // additional flags
         uint16_t external_leds      : 1;    // 1 if external LEDs are enabled (normally only used for copter)
+
     };
 
     // the notify flags are static to allow direct class access
@@ -60,11 +62,13 @@ public:
 private:
     // individual drivers
     AP_BoardLED boardled;
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
     ToshibaLED_PX4 toshibaled;
     ToneAlarm_PX4 tonealarm;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_APM2 
+
     ToshibaLED_I2C toshibaled;
+
     ExternalLED externalled;
     Buzzer buzzer;
 #else
