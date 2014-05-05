@@ -36,7 +36,6 @@ F4BYStorage::F4BYStorage(void) :
     _perf_storage(perf_alloc(PC_ELAPSED, "APM_storage")),
     _perf_errors(perf_alloc(PC_COUNT, "APM_storage_errors"))
 {
-	printf("F4BYStorage::F4BYStorage(void)\n");
 }
 
 /*
