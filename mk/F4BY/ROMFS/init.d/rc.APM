@@ -54,27 +54,12 @@ then
      echo "Created APM directory"
 fi
 
-if [ -f /bin/lsm303d ]
+set deviceC /dev/ttyS1
+if [ -f /fs/microsd/APM/AUXPWM.en ]
 then
-     echo "Detected FMUv2 board"
-     set BOARD FMUv2
+  set deviceD /dev/null
 else
-     echo "Detected FMUv1 board"
-     set BOARD FMUv1
-fi
-
-if [ $BOARD == FMUv1 ]
-then
-   set deviceC /dev/ttyS1
-   if [ -f /fs/microsd/APM/AUXPWM.en ]
-   then
-      set deviceD /dev/null
-   else
-      set deviceD /dev/ttyS3
-   fi
-else
-   set deviceC /dev/ttyS1
-   set deviceD /dev/ttyS3
+  set deviceD /dev/ttyS3
 fi
 
 if uorb start
@@ -84,92 +69,8 @@ else
     sh /etc/init.d/rc.error
 fi
 
-
-# try the px4io start twice. Some FMUv2 board don't
-# come up the first time
-set HAVE_PX4IO false
-if px4io start
-then
-    set HAVE_PX4IO true
-else
-    # it may be in bootloader mode
-    echo Loading /etc/px4io/px4io.bin
-    tone_alarm MBABGP
-    if px4io update /etc/px4io/px4io.bin
-    then
-	echo "upgraded PX4IO firmware OK"
-        tone_alarm MSPAA
-    else
-	echo "Failed to upgrade PX4IO firmware"
-        tone_alarm MNGGG
-    fi
-    sleep 1
-    if px4io start
-    then
-        set HAVE_PX4IO true
-        # play happy tune again
-	tone_alarm start
-    fi
-fi
-
-if [ $HAVE_PX4IO == true ]
-then
-    echo "PX4IO board OK"
-    if px4io checkcrc /etc/px4io/px4io.bin
-    then
-        echo "PX4IO CRC OK"
-    else
-        echo "PX4IO CRC failure"
-        echo "PX4IO CRC failure" >> $logfile    
-        tone_alarm MBABGP
-        if px4io forceupdate 14662 /etc/px4io/px4io.bin
-        then
-               sleep 1
-               if px4io start
-               then
-                  echo "PX4IO restart OK"
-                  echo "PX4IO restart OK" >> $logfile    
-                  tone_alarm MSPAA
-               else
-                  echo "PX4IO restart failed"
-                  echo "PX4IO restart failed" >> $logfile    
-                  tone_alarm MNGGG
-                  sh /etc/init.d/rc.error
-               fi
-        else
-               echo "PX4IO update failed"
-               echo "PX4IO update failed" >> $logfile    
-               tone_alarm MNGGG
-        fi
-    fi
-else
-    echo "No PX4IO board found"
-    echo "No PX4IO board found" >> $logfile
-
-    if [ $BOARD == FMUv2 ]
-    then
-       sh /etc/init.d/rc.error
-    fi
-
-    if [ -f /fs/microsd/APM/mkblctrl ]
-    then
-   	echo "APM/mkblctrl found - switch to MK I2C ESCs"
-   	echo "APM/mkblctrl found - switch to MK I2C ESCs" >> $logfile
-	echo "Setting up mkblctrl driver"
-	echo "Setting up mkblctrl driver" >> $logfile
-	mkblctrl -mkmode x
-    fi
-fi
-
-if [ $BOARD == FMUv1 -a $deviceD == /dev/ttyS1 ]
-then
-        echo "Setting FMU mode_serial"
-        fmu mode_serial
-else
-        echo "Setting FMU mode_pwm"
-        fmu mode_pwm
-fi
-
+echo "Setting FMU mode_pwm"
+fmu mode_pwm
 
 echo "Starting APM sensors"
 if ms5611 start
@@ -186,72 +87,28 @@ else
     sh /etc/init.d/rc.error
 fi
 
-if [ $BOARD == FMUv1 ]
+echo "Starting F4BY sensors"
+if hmc5883 start
 then
-    echo "Starting FMUv1 sensors"
-    if hmc5883 start
-    then
-        echo "hmc5883 started OK"
-        if hmc5883 calibrate
-        then
-          echo "hmc5883 calibrate OK"
-        else 
-          echo "hmc5883 calibrate failed"
-          echo "hmc5883 calibrate failed" >> $logfile
-          sh /etc/init.d/rc.error
-        fi
-    else
-        echo "hmc5883 start failed"
-        echo "hmc5883 start failed" >> $logfile
-        sh /etc/init.d/rc.error
-    fi
-    if mpu6000 start
-    then
-       echo "mpu6000  started OK"
-    else
-       sh /etc/init.d/rc.error
-    fi
-    if l3gd20 start
-    then
-       echo "l3gd20 started OK"
-    else
-       echo "No l3gd20"
-       echo "No l3gd20" >> $logfile
-    fi
+	echo "hmc5883 started OK"
+	if hmc5883 calibrate
+	then
+	  echo "hmc5883 calibrate OK"
+	else 
+	  echo "hmc5883 calibrate failed"
+	  echo "hmc5883 calibrate failed" >> $logfile
+	  sh /etc/init.d/rc.error
+	fi
 else
-    echo "Starting FMUv2 sensors"
-    if hmc5883 start
-    then
-        echo "Using external magnetometer"
-        if hmc5883 calibrate
-        then
-          echo "hmc5883 calibrate OK"
-        else 
-          echo "hmc5883 calibrate failed"
-          echo "hmc5883 calibrate failed" >> $logfile
-          sh /etc/init.d/rc.error
-        fi
-    fi
-
-    if mpu6000 start
-    then
-       echo "Found MPU6000"
-    else
-       echo "No MPU6000"
-       echo "No MPU6000" >> $logfile
-    fi
-    if l3gd20 start
-    then
-       echo "l3gd20 started OK"
-    else
-       sh /etc/init.d/rc.error
-    fi
-    if lsm303d start
-    then
-       echo "lsm303d started OK"
-    else
-       sh /etc/init.d/rc.error
-    fi
+	echo "hmc5883 start failed"
+	echo "hmc5883 start failed" >> $logfile
+	sh /etc/init.d/rc.error
+fi
+if mpu6000 start
+then
+   echo "mpu6000  started OK"
+else
+   sh /etc/init.d/rc.error
 fi
 
 # optional ETS airspeed sensor
@@ -264,8 +121,6 @@ if meas_airspeed start
 then
     echo "Found MEAS airspeed sensor"
 fi
-
-echo "Trying PX4IO board"
 
 if mtd start /fs/mtd
 then
@@ -283,22 +138,6 @@ else
     echo "failed to read mtd"
     echo "failed to read mtd" >> $logfile
     sh /etc/init.d/rc.error           
-fi
-
-if [ $BOARD == FMUv2 ]
-then
-  # the ramtron on FMUv2 is very fast and can handle trillions of
-  # writes. This full rw test on each boot ensures it is working
-  # properly. We have one board that failed this, so
-  # the test is arguably worth having
-  if mtd rwtest /fs/mtd
-  then
-    echo "mtd rwtest OK"
-  else
-    echo "failed to test mtd"
-    echo "failed to test mtd" >> $logfile
-    sh /etc/init.d/rc.error           
-  fi
 fi
 
 echo Starting ArduPilot $deviceA $deviceC $deviceD
