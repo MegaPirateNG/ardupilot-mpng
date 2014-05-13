@@ -19,6 +19,7 @@ MODULES		+= drivers/stm32/tone_alarm
 MODULES		+= drivers/led
 #MODULES		+= drivers/px4io
 MODULES		+= drivers/f4by
+MODULES		+= drivers/f4by/f4by_input
 MODULES		+= drivers/boards/f4by
 MODULES		+= drivers/rgbled
 #MODULES		+= drivers/l3gd20
