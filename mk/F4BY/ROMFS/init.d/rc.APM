@@ -55,12 +55,7 @@ then
 fi
 
 set deviceC /dev/ttyS1
-if [ -f /fs/microsd/APM/AUXPWM.en ]
-then
-  set deviceD /dev/null
-else
-  set deviceD /dev/ttyS3
-fi
+set deviceD /dev/null
 
 if uorb start
 then
