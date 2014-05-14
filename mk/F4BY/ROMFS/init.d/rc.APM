@@ -135,6 +135,16 @@ else
     sh /etc/init.d/rc.error           
 fi
 
+echo "Starting F4BY_INPUT driver"
+if f4by_input start
+then
+	echo "started F4BY_INPUT driver"
+else
+    echo "failed to start F4BY_INPUT driver"
+    echo "failed to start F4BY_INPUT driver" >> $logfile
+    sh /etc/init.d/rc.error           
+fi
+
 echo Starting ArduPilot $deviceA $deviceC $deviceD
 if ArduPilot -d $deviceA -d2 $deviceC -d3 $deviceD start
 then
