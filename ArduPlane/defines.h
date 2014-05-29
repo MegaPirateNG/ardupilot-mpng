@@ -270,6 +270,7 @@ enum log_messages {
 #define HK_RED_MULTIWII_PRO 3
 #define BLACK_VORTEX 4
 #define MULTIWII_PRO_EZ3_BLACK 5
+#define PARIS_V5_OSD 6
 
 // altitude control algorithms
 enum {

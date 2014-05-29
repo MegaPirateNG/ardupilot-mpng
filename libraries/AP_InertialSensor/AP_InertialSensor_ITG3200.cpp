@@ -10,10 +10,6 @@ extern const AP_HAL::HAL& hal;
 
 #define ITG3200_ADDRESS  	0x68 // 0xD0
 
-// accelerometer scaling
-#define ACCEL_SCALE_1G    	(GRAVITY_MSS / 2730.0)
-
-
 #define GYRO_SMPLRT_50HZ 19 // 1KHz/(divider+1)
 #define GYRO_SMPLRT_100HZ 9 // 1KHz/(divider+1)
 #define GYRO_SMPLRT_200HZ 4 // 1KHz/(divider+1)
@@ -25,7 +21,10 @@ extern const AP_HAL::HAL& hal;
 #define GYRO_DLPF_CFG_98HZ 2
 
 // ITG-3200 14.375 LSB/degree/s
-const float AP_InertialSensor_ITG3200::_gyro_scale = 0.0012141421; // ToRad(1/14.375)
+float AP_InertialSensor_ITG3200::_gyro_scale = 0.0012141421; // ToRad(1/14.375)
+float AP_InertialSensor_ITG3200::_accel_scale_1G = (GRAVITY_MSS / 2730.0f); // 2730 LSB = 1G
+	
+	
 
 uint8_t AP_InertialSensor_ITG3200::_gyro_data_index[3] = { 1, 2, 0 };
 uint8_t AP_InertialSensor_ITG3200::_accel_data_index[3] = { 4, 5, 6 };
@@ -35,6 +34,7 @@ int8_t AP_InertialSensor_ITG3200::_accel_data_sign[3] = { 1, 1, -1 };
 const uint8_t AP_InertialSensor_ITG3200::_temp_data_index = 3;
 
 uint8_t AP_InertialSensor_ITG3200::_accel_addr = 0x40;
+uint8_t AP_InertialSensor_ITG3200::_board_type = 0;
 uint16_t AP_InertialSensor_ITG3200::_micros_per_sample = 9500; // 100Hz
 
 /* Static I2C device driver */
@@ -45,10 +45,20 @@ static volatile uint32_t _ins_timer = 0;
 AP_InertialSensor_ITG3200::AP_InertialSensor_ITG3200(uint8_t board_type): AP_InertialSensor()
 {
 	_initialised = false;
+	_board_type = board_type;
 
-	if (board_type == BLACK_VORTEX) {
+	if (_board_type == BLACK_VORTEX) {
 		_accel_addr = 0x41;
-	} 
+		_accel_scale_1G = (GRAVITY_MSS / 1024.0f); // BMA280 - 1024 LSB = 1G
+	} else if (_board_type == PARIS_V5_OSD) {
+		_accel_addr = 0x18;
+		_gyro_scale = 0.0010642251536551; // ITG3050 - 16.4 LSB/degree/s = ToRad(1/16.4)
+		_accel_scale_1G = (GRAVITY_MSS / 1024.0f); // BMA280 - 1024 LSB = 1G
+		_gyro_data_index[0] = 2; _gyro_data_index[1] = 1; _gyro_data_index[2] = 0;
+		_accel_data_index[0] = 4; _accel_data_index[1] = 5; _accel_data_index[2] = 6;
+		_gyro_data_sign[0] = -1; _gyro_data_sign[1] = 1; _gyro_data_sign[2] = -1;
+		_accel_data_sign[0] = 1; _accel_data_sign[1] = 1; _accel_data_sign[2] = -1;
+	}
 }
 
 uint16_t AP_InertialSensor_ITG3200::_init_sensor(Sample_rate sample_rate)
@@ -152,7 +162,7 @@ bool AP_InertialSensor_ITG3200::update( void )
 					  _accel_data_sign[2] * sum[_accel_data_index[2]]);
 	
 	_accel.rotate(_board_orientation);
-    _accel *= count_scale * ACCEL_SCALE_1G;
+    _accel *= count_scale * _accel_scale_1G;
     _accel.x *= accel_scale.x;
     _accel.y *= accel_scale.y;
     _accel.z *= accel_scale.z;
@@ -248,7 +258,7 @@ void AP_InertialSensor_ITG3200::_read_data_transaction()
 		
 	memset(raw,0,6);
 	hal.i2c->readRegisters(_accel_addr, 0x02, 6, raw);
-	_sum[4] += (int16_t)(((uint16_t)raw[3] << 8) | raw[2]) >> 2;
+	_sum[4] += (int16_t)(((uint16_t)raw[3] << 8) | raw[2]) >> 2; // Lower 2 bits has no data, we just cut it
 	_sum[5] += (int16_t)(((uint16_t)raw[1] << 8) | raw[0]) >> 2;
 	_sum[6] += (int16_t)(((uint16_t)raw[5] << 8) | raw[4]) >> 2;
 	
@@ -329,13 +339,19 @@ bool AP_InertialSensor_ITG3200::hardware_init(Sample_rate sample_rate)
 	hal.i2c->writeRegister(ITG3200_ADDRESS, 0x3E, 0x03);
 	hal.scheduler->delay(10);
 			
-	hal.i2c->writeRegister(_accel_addr, 0x0D, 1<<4);
-	hal.scheduler->delay(1);
-	hal.i2c->writeRegister(_accel_addr, 0x35, 3<<1);
-	hal.scheduler->delay(1);
-	hal.i2c->writeRegister(_accel_addr, 0x20, 0<<4);
+	if (_board_type == PARIS_V5_OSD) {
+		hal.i2c->writeRegister(_accel_addr, 0x10, 0x09); // acceleration data filter bandwidth = 15,63Hz
+		hal.scheduler->delay(5);
+		hal.i2c->writeRegister(_accel_addr, 0x0F, 0x08); // range = 8G
+	} else {
+		hal.i2c->writeRegister(_accel_addr, 0x0D, 1<<4);
+		hal.scheduler->delay(1);
+		hal.i2c->writeRegister(_accel_addr, 0x35, 3<<1); // range = 8G
+		hal.scheduler->delay(1);
+		hal.i2c->writeRegister(_accel_addr, 0x20, 0<<4);
+  }
 	hal.scheduler->delay(10);
-	
+
 	_i2c_sem->give();
 	
   return true;

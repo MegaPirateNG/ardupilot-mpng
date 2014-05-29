@@ -15,6 +15,8 @@
 #define RCTIMER_CRIUS_V2 2
 #define HK_RED_MULTIWII_PRO 3
 #define BLACK_VORTEX 4
+#define MULTIWII_PRO_EZ3_BLACK 5
+#define PARIS_V5_OSD 6
 
 class AP_InertialSensor_ITG3200 : public AP_InertialSensor
 {
@@ -54,7 +56,8 @@ private:
   
   float 				_temp_to_celsius( uint16_t );
 
-  static const float 	_gyro_scale;
+  static float 	_gyro_scale;
+  static float 	_accel_scale_1G;
 
   static uint8_t 		_gyro_data_index[3];
   static int8_t 		_gyro_data_sign[3];
@@ -65,6 +68,7 @@ private:
   static const uint8_t 		_temp_data_index;
   
   static uint8_t _accel_addr;
+  static uint8_t _board_type;
   static uint16_t _micros_per_sample;
   
  // ensure we can't initialise twice
