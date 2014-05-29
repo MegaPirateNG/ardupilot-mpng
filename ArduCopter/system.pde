@@ -143,7 +143,7 @@ static void init_ardupilot()
 #endif
 
     // init the GCS
-    gcs0.init(hal.uartA);
+    gcs[0].init(hal.uartA);
 
     // Register the mavlink service callback. This will run
     // anytime there are more than 5ms remaining in a call to
@@ -159,8 +159,14 @@ static void init_ardupilot()
     // we have a 2nd serial port for telemetry on all boards except
     // APM2. We actually do have one on APM2 but it isn't necessary as
     // a MUX is used
-    hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
-    gcs3.init(hal.uartC);
+    hal.uartC->begin(map_baudrate(g.serial1_baud, SERIAL1_BAUD), 128, 128);
+    gcs[1].init(hal.uartC);
+#endif
+#if MAVLINK_COMM_NUM_BUFFERS > 2
+    if (hal.uartD != NULL) {
+        hal.uartD->begin(map_baudrate(g.serial2_baud, SERIAL2_BAUD), 128, 128);
+        gcs[2].init(hal.uartD);
+    }
 #endif
 
     // identify ourselves correctly with the ground station
@@ -175,7 +181,7 @@ static void init_ardupilot()
     } else if (DataFlash.NeedErase()) {
         gcs_send_text_P(SEVERITY_LOW, PSTR("ERASING LOGS"));
         do_erase_logs();
-        gcs0.reset_cli_timeout();
+        gcs[0].reset_cli_timeout();
     }
 #endif
 
@@ -223,8 +229,11 @@ static void init_ardupilot()
 #if CLI_ENABLED == ENABLED
     const prog_char_t *msg = PSTR("\nPress ENTER 3 times to start interactive setup\n");
     cliSerial->println_P(msg);
-    if (gcs3.initialised) {
+    if (gcs[1].initialised) {
         hal.uartC->println_P(msg);
+    }
+    if (num_gcs > 2 && gcs[2].initialised) {
+        hal.uartD->println_P(msg);
     }
 #endif // CLI_ENABLED
 
@@ -456,7 +465,7 @@ static bool set_mode(uint8_t mode)
             set_yaw_mode(YAW_DRIFT);
             set_roll_pitch_mode(ROLL_PITCH_DRIFT);
             set_nav_mode(NAV_NONE);
-            set_throttle_mode(THROTTLE_MANUAL_TILT_COMPENSATED);
+            set_throttle_mode(DRIFT_THR);
             break;
 
         case SPORT:
@@ -536,7 +545,7 @@ static uint32_t map_baudrate(int8_t rate, uint32_t default_baud)
     case 111:  return 111100;
     case 115:  return 115200;
     }
-    //cliSerial->println_P(PSTR("Invalid SERIAL3_BAUD"));
+    //cliSerial->println_P(PSTR("Invalid baudrate"));
     return default_baud;
 }
 
@@ -554,11 +563,11 @@ static void check_usb_mux(void)
     // the APM2 has a MUX setup where the first serial port switches
     // between USB and a TTL serial connection. When on USB we use
     // SERIAL0_BAUD, but when connected as a TTL serial port we run it
-    // at SERIAL3_BAUD.
+    // at SERIAL1_BAUD.
     if (ap.usb_connected) {
         hal.uartA->begin(SERIAL0_BAUD);
     } else {
-        hal.uartA->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD));
+        hal.uartA->begin(map_baudrate(g.serial1_baud, SERIAL1_BAUD));
     }
 #endif
 }

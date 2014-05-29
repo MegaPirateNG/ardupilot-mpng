@@ -135,25 +135,29 @@
 /////////////////////////////////////////////////////////////////////////////////
 // TradHeli defaults
 #if FRAME_CONFIG == HELI_FRAME
-  # define RC_FAST_SPEED                125
-  # define WP_YAW_BEHAVIOR_DEFAULT      WP_YAW_BEHAVIOR_LOOK_AHEAD
-  # define RATE_INTEGRATOR_LEAK_RATE    0.02f
-  # define RATE_ROLL_D                  0
-  # define RATE_PITCH_D                 0
-  # define HELI_PITCH_FF                0
-  # define HELI_ROLL_FF                 0
-  # define HELI_YAW_FF                  0  
-  # define STABILIZE_THR                THROTTLE_MANUAL_HELI
-  # define MPU6K_FILTER                 10
-  # define HELI_STAB_COLLECTIVE_MIN_DEFAULT   0
-  # define HELI_STAB_COLLECTIVE_MAX_DEFAULT   1000
-  # define THR_MIN_DEFAULT              0
+  # define RC_FAST_SPEED                        125
+  # define WP_YAW_BEHAVIOR_DEFAULT              WP_YAW_BEHAVIOR_LOOK_AHEAD
+  # define RATE_INTEGRATOR_LEAK_RATE            0.02f
+  # define RATE_ROLL_D                          0
+  # define RATE_PITCH_D                         0
+  # define HELI_PITCH_FF                        0
+  # define HELI_ROLL_FF                         0
+  # define HELI_YAW_FF                          0  
+  # define STABILIZE_THR                        THROTTLE_MANUAL_HELI
+  # define DRIFT_THR                            THROTTLE_MANUAL_HELI
+  # define MPU6K_FILTER                         10
+  # define HELI_STAB_COLLECTIVE_MIN_DEFAULT     0
+  # define HELI_STAB_COLLECTIVE_MAX_DEFAULT     1000
+  # define THR_MIN_DEFAULT                      0
+  # define AUTOTUNE                             DISABLED
+  
   # ifndef HELI_CC_COMP
     #define HELI_CC_COMP DISABLED
   #endif
   # ifndef HELI_PIRO_COMP
     #define HELI_PIRO_COMP DISABLED
   #endif
+  
 #endif
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -376,8 +380,11 @@
 #ifndef SERIAL0_BAUD
  # define SERIAL0_BAUD                   115200
 #endif
-#ifndef SERIAL3_BAUD
- # define SERIAL3_BAUD                    57600
+#ifndef SERIAL1_BAUD
+ # define SERIAL1_BAUD                    57600
+#endif
+#ifndef SERIAL2_BAUD
+ # define SERIAL2_BAUD                    57600
 #endif
 
 
@@ -607,6 +614,11 @@
 
 #ifndef ACRO_LEVEL_MAX_ANGLE
  # define ACRO_LEVEL_MAX_ANGLE      3000
+#endif
+
+// Drift Mode
+#ifndef DRIFT_THR
+ # define DRIFT_THR                 THROTTLE_MANUAL_TILT_COMPENSATED
 #endif
 
 // Sport Mode
