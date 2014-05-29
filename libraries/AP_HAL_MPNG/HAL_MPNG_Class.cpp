@@ -41,6 +41,7 @@ HAL_MPNG::HAL_MPNG() :
         &avrUart0Driver, /* phys UART0 -> uartA */
         &avrUart2Driver, /* phys UART2 -> uartB */
         &avrUart3Driver, /* phys UART3 -> uartC */
+        &avrUart1Driver, /* phys UART1 -> uartD */
         &avrI2CDriver,
         &mpngSPIDriver,
         &avrAnalogIn,
@@ -51,7 +52,7 @@ HAL_MPNG::HAL_MPNG() :
         &mpngRCOutput,
         &avrScheduler,
         &avrUtil )
-{uartD = &avrUart1Driver;}
+{}
 
 void HAL_MPNG::init(int argc, char * const argv[]) const {
 

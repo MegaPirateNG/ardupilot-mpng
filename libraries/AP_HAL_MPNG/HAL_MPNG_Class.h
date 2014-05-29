@@ -20,7 +20,6 @@
 class HAL_MPNG : public AP_HAL::HAL {
 public:
     HAL_MPNG();
-    AP_HAL::UARTDriver* uartD;
     void init(int argc, char * const argv[]) const;
 };
 
