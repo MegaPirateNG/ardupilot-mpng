@@ -17,17 +17,14 @@ extern const HAL& hal;
 //#define SERIAL_PPM SERIAL_PPM_ENABLED
 /*
 	SERIAL_PPM_DISABLED				// Separated channel signal (PWM) on A8-A15 pins
-	SERIAL_PPM_ENABLED				// For all boards, PPM_SUM pin is A8
+	SERIAL_PPM_ENABLED				// DEFAULT!!! For all boards, PPM_SUM pin is A8
 	SERIAL_PPM_ENABLED_PL1		// Use for RCTIMER CRIUS AIOP Pro v2 ONLY, connect your receiver into PPM SUM pin
 */   
-#ifndef SERIAL_PPM
-# define SERIAL_PPM SERIAL_PPM_ENABLED
-#endif
 
-// Uncomment line below in order to use not Standard channel mapping
+// Uncomment line below in order to use non Standard channel mapping
 //#define RC_MAPPING RC_MAP_STANDARD
 /*
-	RC_MAP_STANDARD 1
+	RC_MAP_STANDARD 1   // DEFAULT!!!
 	RC_MAP_GRAUPNER 2
 	RC_MAP_HITEC 3
 	RC_MAP_MULTIWII 4
@@ -52,6 +49,10 @@ extern const HAL& hal;
 # error Wrong RC_MAPPING
 #endif
 
+#ifndef SERIAL_PPM
+# define SERIAL_PPM SERIAL_PPM_ENABLED
+#endif
+
 // PPM_SUM filtering
 #define FILTER FILTER_DISABLED
 /*
@@ -71,6 +72,8 @@ extern const HAL& hal;
 #define MIN_PULSEWIDTH 1800 // 900
 #define MAX_PULSEWIDTH 4200 // 2100
 #define MIN_PPM_SYNCHWIDTH  5000 //2500
+
+#define calcWidth(newEdge, oldEdge) ((newEdge < oldEdge) ? newEdge + 40000 - oldEdge : newEdge-oldEdge) 
 
 
 /* private variables to communicate with input capture isr */
@@ -92,7 +95,9 @@ void MPNGRCInput::_ppmsum_PL1_isr(void) {
     static uint8_t  channel_ctr;
 
     const uint16_t icr5_current = ICR5;
-    uint16_t pulse_width = icr5_current - icr5_prev;;
+
+    /* ICR5 rolls over at TOP=40000 */
+    uint16_t pulse_width = calcWidth(icr5_current,icr5_prev);
 	
     if (pulse_width > MIN_PPM_SYNCHWIDTH) {
         // sync pulse detected.  Pass through values if at least a minimum number of channels received
@@ -133,11 +138,8 @@ void MPNGRCInput::_ppmsum_A8_isr(void)
 	if (mask & 1) { // Ensure pin A8(PPM_SUM) changed
 		if (pin & 1) { // Rising edge?
 
-//			hal.gpio->write(46,1);
-//			hal.gpio->write(46,0);
-	
-			// it should be guaranteed to wrap around - do not need to check. (unsigned values)
-			period_time = curr_time-last_time;
+      /* ICR5 rolls over at TOP=40000 */
+      period_time = calcWidth(curr_time,last_time);
 			last_time = curr_time; // Save edge time
 				
 			// Process channel pulse
@@ -219,42 +221,42 @@ void MPNGRCInput::_pwm_A8_A15_isr(void)
 	
 	if (mask & 1<<0) {
 		if (!(pin & 1<<0)) {
-			dTime = (cTime-edgeTime[0]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[0] = dTime;
+			dTime = calcWidth(cTime,edgeTime[0]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[0] = dTime;
 		} else edgeTime[0] = cTime;
 	}
 	if (mask & 1<<1) {
 		if (!(pin & 1<<1)) {
-			dTime = (cTime-edgeTime[1]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[1] = dTime;
+			dTime = calcWidth(cTime,edgeTime[1]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[1] = dTime;
 		} else edgeTime[1] = cTime;
 	}
 	if (mask & 1<<2) {
 		if (!(pin & 1<<2)) {
-			dTime = (cTime-edgeTime[2]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[2] = dTime;
+			dTime = calcWidth(cTime,edgeTime[2]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[2] = dTime;
 		} else edgeTime[2] = cTime;
 	}
 	if (mask & 1<<3) {
 		if (!(pin & 1<<3)) {
-			dTime = (cTime-edgeTime[3]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[3] = dTime;
+			dTime = calcWidth(cTime,edgeTime[3]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[3] = dTime;
 		} else edgeTime[3] = cTime;
 	}
 	if (mask & 1<<4) {
 		if (!(pin & 1<<4)) {
-			dTime = (cTime-edgeTime[4]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[4] = dTime;
+			dTime = calcWidth(cTime,edgeTime[4]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[4] = dTime;
 		} else edgeTime[4] = cTime;
 	}
 	if (mask & 1<<5) {
 		if (!(pin & 1<<5)) {
-			dTime = (cTime-edgeTime[5]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[5] = dTime;
+			dTime = calcWidth(cTime,edgeTime[5]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[5] = dTime;
 		} else edgeTime[5] = cTime;
 	}
 	if (mask & 1<<6) {
 		if (!(pin & 1<<6)) {
-			dTime = (cTime-edgeTime[6]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[6] = dTime;
+			dTime = calcWidth(cTime,edgeTime[6]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[6] = dTime;
 		} else edgeTime[6] = cTime;
 	}
 	if (mask & 1<<7) {
 		if (!(pin & 1<<7)) {
-			dTime = (cTime-edgeTime[7]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[7] = dTime;
+			dTime = calcWidth(cTime,edgeTime[7]); if (MIN_PULSEWIDTH<dTime && dTime<MAX_PULSEWIDTH) _pulse_capt[7] = dTime;
 		} else edgeTime[7] = cTime;
 	}
 	
@@ -272,9 +274,11 @@ void MPNGRCInput::init(void* _isrregistry) {
 //	hal.gpio->pinMode(46, GPIO_OUTPUT); // ICP5 pin (PL1) (PPM input) CRIUS v2
 //	hal.gpio->write(46,0);
 
-	//Timer5 already configured in Scheduler
-	//TCCR5A = 0; //standard mode with overflow at A and OC B and C interrupts
-	//TCCR5B = (1<<CS11); //Prescaler set to 8, resolution of 0.5us
+  TCCR5A = (1<<WGM51)|(1<<WGM50);
+  TCCR5B = (1<<WGM53)|(1<<WGM52)|(1<<CS51); //Prescaler set to 8, resolution of 0.5us
+  OCR5B = 0xFFFF;
+  OCR5C = 0xFFFF;
+  OCR5A = 40000;
 
 #if SERIAL_PPM == SERIAL_PPM_DISABLED
 		FireISRRoutine = _pwm_A8_A15_isr;
@@ -291,8 +295,8 @@ void MPNGRCInput::init(void* _isrregistry) {
 		hal.gpio->pinMode(48, GPIO_INPUT); // ICP5 pin (PL1) (PPM input) CRIUS v2
 		ISRRegistry* isrregistry = (ISRRegistry*) _isrregistry;
 		isrregistry->register_signal(ISR_REGISTRY_TIMER5_CAPT, _ppmsum_PL1_isr);
-		TCCR5B |= (1<<ICES5); // Enable input capture on rising edge 
-		TIMSK5 |= (1<<ICIE5); // Enable input capture interrupt. Timer interrupt mask  
+		TCCR5B |= (1<<ICES5); // Input capture on rising edge 
+		TIMSK5 |= (1<<ICIE5); // Enable Input Capture interrupt. Timer interrupt mask  
 		PCMSK2 = 0;	// Disable INT for pin A8-A15
 #else
 #error You must check SERIAL_PPM mode, something wrong

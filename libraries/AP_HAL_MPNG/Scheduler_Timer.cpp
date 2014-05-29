@@ -38,7 +38,7 @@ void AVRTimer::init() {
     // Set timer 8x prescaler fast PWM mode toggle compare at OCRA
     AVR_TIMER_TCCRA = _BV( AVR_TIMER_WGM0 ) | _BV( AVR_TIMER_WGM1 );
     AVR_TIMER_TCCRB |= _BV( AVR_TIMER_WGM3 ) | _BV( AVR_TIMER_WGM2 ) | _BV( AVR_TIMER_CS1 );
-    AVR_TIMER_OCRA  = 0xFFFF; // -1 to correct for wrap
+    AVR_TIMER_OCRA  = 40000 - 1; // -1 to correct for wrap
 
     // Enable overflow interrupt
     AVR_TIMER_TIMSK |= _BV( AVR_TIMER_TOIE );
@@ -65,8 +65,8 @@ void AVRTimer::init() {
 SIGNAL( AVR_TIMER_OVF_VECT)
 {
     // Hardcoded for AVR@16MHZ and 8x pre-scale 16-bit timer overflow at 40000
-    timer_micros_counter += 0xFFFF / 2; // 32768us each overflow
-    timer_millis_counter += 0xFFFF >> 11; // 32ms each overlflow
+    timer_micros_counter += 40000 / 2; // 20000us each overflow
+    timer_millis_counter += 40000 / 2000; // 20ms each overlflow
 }
 
 uint32_t AVRTimer::micros() {
@@ -81,9 +81,9 @@ uint32_t AVRTimer::micros() {
     uint16_t tcnt = AVR_TIMER_TCNT;
 
     // Check for  imminent timer overflow interrupt and pre-increment counter
-    if ( AVR_TIMER_TIFR & 1 && tcnt < 0xFFFF )
+    if ( AVR_TIMER_TIFR & 1 && tcnt < 39999 )
 {
-            time_micros += 0xFFFF / 2;
+            time_micros += 40000 / 2;
 }
 	SREG = oldSREG;
 
@@ -101,9 +101,9 @@ uint32_t AVRTimer::millis() {
     uint16_t tcnt = AVR_TIMER_TCNT;
 
     // Check for imminent timer overflow interrupt and pre-increment counter
-    if ( AVR_TIMER_TIFR & 1 && tcnt < 0xFFFF )
+    if ( AVR_TIMER_TIFR & 1 && tcnt < 39999 )
     {
-            time_millis += 0xFFFF >> 11;
+            time_millis += 40000 / 2000;
     }
 	SREG = oldSREG;
 	

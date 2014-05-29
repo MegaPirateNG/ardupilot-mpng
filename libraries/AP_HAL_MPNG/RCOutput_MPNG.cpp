@@ -51,6 +51,11 @@ void MPNGRCOutput::init(void* machtnichts) {
   OCR4B = 0xFFFF;
   OCR4C = 0xFFFF;
   ICR4 = 40000; // 0.5us tick => 50hz freq
+
+  // --------------------- TIMER5: CH_5, CH_6 ---------------------
+  // Timer5 already initialized in RCInput.cpp
+  hal.gpio->pinMode(44, GPIO_OUTPUT); // CH_5 (PL5/OC5C)
+  hal.gpio->pinMode(45, GPIO_OUTPUT); // CH_6 (PL4/OC5B)
 }
 
 /* Output freq (1/period) control */
@@ -87,6 +92,10 @@ uint16_t MPNGRCOutput::get_freq(uint8_t ch) {
         case CH_8:
             icr = ICR4;
             break;
+        case CH_5:
+        case CH_6:
+            icr = ICR5;
+            break;
         default:
             return 0;
     }
@@ -102,10 +111,13 @@ void MPNGRCOutput::enable_ch(uint8_t ch) {
 		case 1: TCCR4A |= (1<<COM4A1); break; // CH_2
 		case 2: TCCR3A |= (1<<COM3B1); break; // CH_3
 		case 3: TCCR3A |= (1<<COM3C1); break; // CH_4
-			// 4,5
+
+		case 4: TCCR5A |= (1<<COM5C1); break; // CH_5
+		case 5: TCCR5A |= (1<<COM5B1); break; // CH_6
+
 		case 6: TCCR4A |= (1<<COM4B1); break; // CH_7
 		case 7: TCCR4A |= (1<<COM4C1); break; // CH_8
-			// 8
+
 		case 9: TCCR1A |= (1<<COM1A1); break; // CH_10
 		case 10: TCCR1A |= (1<<COM1B1); break; // CH_11
 	}
@@ -125,10 +137,13 @@ void MPNGRCOutput::disable_ch(uint8_t ch) {
 		case 1: TCCR4A &= ~(1<<COM4A1); break; // CH_2
 		case 2: TCCR3A &= ~(1<<COM3B1); break; // CH_3
 		case 3: TCCR3A &= ~(1<<COM3C1); break; // CH_4
-			// 4,5
+
+		case 4: TCCR5A &= ~(1<<COM5C1); break; // CH_5
+		case 5: TCCR5A &= ~(1<<COM4B1); break; // CH_6
+
 		case 6: TCCR4A &= ~(1<<COM4B1); break; // CH_7
 		case 7: TCCR4A &= ~(1<<COM4C1); break; // CH_8
-			// 8
+
 		case 9: TCCR1A &= ~(1<<COM1A1); break; // CH_10
 		case 10: TCCR1A &= ~(1<<COM1B1); break; // CH_11
 	}
@@ -161,10 +176,12 @@ void MPNGRCOutput::write(uint8_t ch, uint16_t period_us) {
 		case 1:  OCR4A = pwm; break; //6
 		case 2:  OCR3B = pwm; break; //2
 		case 3:  OCR3C = pwm; break; //3
+		case 4:  OCR5C = pwm; break; //5
+		case 5:  OCR5B = pwm; break; //6
 		case 6:  OCR4B = pwm; break; //7
 		case 7:  OCR4C = pwm; break; //8
-		case 9:  OCR1A = pwm; break;// d11
-		case 10: OCR1B = pwm; break;// d12
+		case 9:  OCR1A = pwm; break; //10
+		case 10: OCR1B = pwm; break; //11
 	}
 }
 
@@ -184,10 +201,12 @@ uint16_t MPNGRCOutput::read(uint8_t ch) {
 		case 1:  pwm=OCR4A; break;  //ch2
 		case 2:  pwm=OCR3B; break;  //ch3
 		case 3:  pwm=OCR3C; break;  //ch4
+		case 4:  pwm=OCR5C; break;  //ch5
+		case 5:  pwm=OCR5B; break;  //ch6
 		case 6:  pwm=OCR4B; break;  //ch7
 		case 7:  pwm=OCR4C; break;  //ch8
 		case 9:  pwm=OCR1A; break;  //ch10
-		case 10: pwm=OCR1B; break;  //ch111
+		case 10: pwm=OCR1B; break;  //ch11
 	}
   /* scale from 0.5us resolution (timer units) to 1us units */
   return pwm>>1;
