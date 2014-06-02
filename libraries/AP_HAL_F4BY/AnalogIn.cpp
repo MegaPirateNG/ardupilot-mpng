@@ -43,8 +43,8 @@ static const struct {
 #ifdef CONFIG_ARCH_BOARD_F4BY
     // F4BY has 4 FMU analog input pins
     
-    { 10, 16.8f/4096  }, // analog3, on SPI port pin 4                       // 5.7:1 scaling
-    { 11,  6.6f/4096  }, // analog airspeed input, 2:1 scaling
+    { 10, 3.3f/4096  }, // analog3, on SPI port pin 4                       // 5.7:1 scaling
+    { 11,  3.3f/4096  }, // analog airspeed input, 2:1 scaling
     { 12,  3.3f/4096  }, // analog2, on SPI port pin 3
     { 13, (5.7*3.3)/4096 }, // FMU battery on multi-connector pin 5,
 #else
