@@ -33,16 +33,13 @@ public:
 private:
     int _fd;
     volatile bool _initialised;
-    void _storage_create(void);
     void _storage_open(void);
     void _mark_dirty(uint16_t loc, uint16_t length);
     uint8_t _buffer[F4BY_STORAGE_SIZE] __attribute__((aligned(4)));
     volatile uint32_t _dirty_mask;
     perf_counter_t  _perf_storage;
     perf_counter_t  _perf_errors;
-    bool _have_mtd;
-    void _upgrade_to_mtd(void);
-    uint32_t _mtd_signature(void);
+    const char* _mtd_file_path;
     void _mtd_write_signature(void);
 };
 
