@@ -42,6 +42,12 @@ void F4BYGPIO::init()
     if (ioctl(_led_fd, LED_OFF, LED_RED) != 0) {
          hal.console->printf("GPIO: Unable to setup GPIO LED RED\n");
     }
+    if (ioctl(_led_fd, LED_OFF, LED_GREEN) != 0) {
+         hal.console->printf("GPIO: Unable to setup GPIO LED RED\n");
+    }
+    if (ioctl(_led_fd, LED_OFF, LED_YELLOW) != 0) {
+         hal.console->printf("GPIO: Unable to setup GPIO LED RED\n");
+    }
 #endif
     _tone_alarm_fd = open("/dev/tone_alarm", O_WRONLY);
     if (_tone_alarm_fd == -1) {
@@ -144,6 +150,11 @@ void F4BYGPIO::write(uint8_t pin, uint8_t value)
             break;
 
         case HAL_GPIO_B_LED_PIN:    // not used yet 
+            if (value == LOW) { 
+                ioctl(_led_fd, LED_ON, LED_GREEN);
+            } else { 
+                ioctl(_led_fd, LED_OFF, LED_GREEN);
+            }
             break;
 
         case HAL_GPIO_C_LED_PIN:    // GPS LED 
@@ -153,6 +164,14 @@ void F4BYGPIO::write(uint8_t pin, uint8_t value)
                 ioctl(_led_fd, LED_OFF, LED_BLUE);
             }
             break;
+
+        case HAL_GPIO_D_LED_PIN:    // GPS LED 
+            if (value == LOW) { 
+                ioctl(_led_fd, LED_ON, LED_YELLOW);
+            } else { 
+                ioctl(_led_fd, LED_OFF, LED_YELLOW);
+            }
+            break;            
 #endif
 
         case F4BY_GPIO_PIEZO_PIN:    // Piezo beeper 
