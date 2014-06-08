@@ -1,5 +1,19 @@
 ArduCopter Release Notes:
 ------------------------------------------------------------------
+ArduCopter 3.1.5 27-May-2014 / 3.1.5-rc2 20-May-2014
+Changes from 3.1.5-rc1
+1) Bug Fix to broken loiter (pixhawk only)
+2) Workaround to read from FRAM in 128byte chunks to resolve a few users boot issues (Pixhawk only)
+------------------------------------------------------------------
+ArduCopter 3.1.5-rc1 14-May-2014
+Changes from 3.1.4
+1) Bug Fix to ignore roll and pitch inputs to loiter controller when in radio failsafe
+2) Bug Fix to allow compassmot to work on Pixhawk
+------------------------------------------------------------------
+ArduCopter 3.1.4 8-May-2014 / 3.1.4-rc1 2-May-2014
+Changes from 3.1.3
+1) Bug Fix for Pixhawk/PX4 NuttX I2C memory corruption when errors are found on I2C bus
+------------------------------------------------------------------
 ArduCopter 3.1.3 7-Apr-2014
 Changes from 3.1.2
 1) Stability patch fix which could cause motors to go to min at full throttle and with large roll/pitch inputs
