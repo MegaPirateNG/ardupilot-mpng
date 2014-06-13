@@ -60,7 +60,7 @@ void HAL_MPNG::init(int argc, char * const argv[]) const {
 
     /* uartA is the serial port used for the console, so lets make sure
      * it is initialized at boot */
-    uartA->begin(115200);
+    uartA->begin(115200, 128, 128);
     /* The AVR RCInput drivers take an AP_HAL_MPNG::ISRRegistry*
      * as the init argument */
     rcin->init((void*)&isrRegistry);
@@ -83,7 +83,7 @@ void HAL_MPNG::init(int argc, char * const argv[]) const {
     PORTE |= _BV(0); // S0
     PORTD |= _BV(2); // S1
     PORTH |= _BV(0); // S2
-    PORTJ |= _BV(0); // S3
+    PORTJ |= _BV(0); // S3    
 };
 
 const HAL_MPNG AP_HAL_MPNG;

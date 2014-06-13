@@ -204,10 +204,10 @@ uint16_t AP_InertialSensor_MPU6000_I2C::_init_sensor(Sample_rate sample_rate )
     _ins_timer = hal.scheduler->micros();
 
     _read_data_transaction();    
-		hal.gpio->pinMode(46, GPIO_OUTPUT); // Debug output
-		hal.gpio->write(46,0); 
-		hal.gpio->pinMode(45, GPIO_OUTPUT); // Debug output
-		hal.gpio->write(45,0); 
+//		hal.gpio->pinMode(46, GPIO_OUTPUT); // Debug output
+//		hal.gpio->write(46,0); 
+//		hal.gpio->pinMode(45, GPIO_OUTPUT); // Debug output
+//		hal.gpio->write(45,0); 
 
     // start the timer process to read samples
     hal.scheduler->register_timer_process(AP_HAL_MEMBERPROC(&AP_InertialSensor_MPU6000_I2C::_poll_data));
@@ -287,7 +287,7 @@ float AP_InertialSensor_MPU6000_I2C::_temp_to_celsius ( uint16_t regval )
 
 void AP_InertialSensor_MPU6000_I2C::_poll_data(void)
 {
-	hal.gpio->write(46,1); 
+//	hal.gpio->write(46,1); 
 
 	uint32_t now = hal.scheduler->micros();
 	
@@ -315,7 +315,7 @@ void AP_InertialSensor_MPU6000_I2C::_poll_data(void)
 	      }
 	  }
 	}
-  hal.gpio->write(46,0); 
+//  hal.gpio->write(46,0); 
 }
 
 // return the MPU6k gyro drift rate in radian/s/s

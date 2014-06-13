@@ -278,7 +278,7 @@ void MPNGRCInput::init(void* _isrregistry) {
   TCCR5B = (1<<WGM53)|(1<<WGM52)|(1<<CS51); //Prescaler set to 8, resolution of 0.5us
   OCR5B = 0xFFFF;
   OCR5C = 0xFFFF;
-  OCR5A = 40000;
+  OCR5A = 40000-1;
 
 #if SERIAL_PPM == SERIAL_PPM_DISABLED
 		FireISRRoutine = _pwm_A8_A15_isr;

@@ -26,6 +26,9 @@ void AVRSPI0DeviceDriver::init() {
     hal.gpio->pinMode(SPI0_MOSI_PIN, GPIO_OUTPUT);
     hal.gpio->pinMode(SPI0_SCK_PIN, GPIO_OUTPUT);
 
+		// Fixed boot hang, thanks to Chris_kmn    
+    hal.gpio->write(SPI0_MISO_PIN, 1);
+
     _cs_pin->mode(GPIO_OUTPUT);
     _cs_pin->write(1);
 
