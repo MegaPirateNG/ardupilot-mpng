@@ -79,15 +79,11 @@
   #define MPNG_BOARD_TYPE RCTIMER_CRIUS_V2
  #endif
 
- #ifndef LOGGING_ENABLED
-   #define LOGGING_ENABLED DISABLED
- #endif
-
  #define PIEZO_PIN AN3
  
  #if MPNG_BOARD_TYPE == HK_RED_MULTIWII_PRO || MPNG_BOARD_TYPE == BLACK_VORTEX
 	 # define CONFIG_IMU_TYPE   CONFIG_IMU_ITG3200
-	 # define CONFIG_BARO       AP_BARO_BMP085_MPNG
+	 # define CONFIG_BARO       AP_BARO_BMP085
  #elif MPNG_BOARD_TYPE == PARIS_V5_OSD
 	 # define CONFIG_IMU_TYPE   CONFIG_IMU_ITG3200
 	 # define CONFIG_BARO       AP_BARO_MS5611
@@ -97,6 +93,11 @@
 	 # define CONFIG_BARO       AP_BARO_MS5611
 	 # define CONFIG_MS5611_SERIAL AP_BARO_MS5611_I2C
  #endif
+
+#if MPNG_BOARD_TYPE == RCTIMER_CRIUS_V2 && !defined(LOGGING_ENABLED)
+ # define LOGGING_ENABLED                ENABLED
+#endif
+
  
  # define CONFIG_ADC        DISABLED
  # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
@@ -1039,7 +1040,7 @@
 // Dataflash logging control
 //
 #ifndef LOGGING_ENABLED
- # define LOGGING_ENABLED                ENABLED
+ # define LOGGING_ENABLED                DISABLED
 #endif
 
 
