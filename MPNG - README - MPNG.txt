@@ -1,9 +1,5 @@
 Release Notes for MegaPirateNG 3.1 Beta (ArduPilot 3.1)
 
-IMPORTANT NOTICE!!!
-Datalogging disabled for all platforms. We running out of flash. Can be manually enabled in APM_Config.h for Crius V2, 
-if some other parts of code will be disabeld (for example CLI)
-
 === How to compile MegaPirateNG ===
 Follow instructions at: http://docs.megapirateng.com
 
@@ -21,7 +17,6 @@ A2-A7
 *** Voltage & Current sensor ***
 A0 - Voltage
 A1 - Current
-
 
 *** Sonar ***
 Currently sonar is not supported
