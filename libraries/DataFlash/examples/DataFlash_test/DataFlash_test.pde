@@ -7,6 +7,7 @@
 // Libraries
 #include <AP_HAL.h>
 #include <AP_HAL_AVR.h>
+#include <AP_HAL_MPNG.h>
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_Empty.h>
 #include <AP_HAL_PX4.h>
@@ -38,6 +39,8 @@ const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
 DataFlash_APM2 DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM1
 DataFlash_APM1 DataFlash;
+#elif CONFIG_HAL_BOARD == HAL_BOARD_MPNG
+DataFlash_MPNG DataFlash;
 #else
 DataFlash_Empty DataFlash;
 #endif
