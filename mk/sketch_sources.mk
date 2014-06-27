@@ -63,7 +63,7 @@ v =
 endif
 
 showflags:
-	@echo "HAL_BOARD=$(HAL_BOARD) TOOLCHAIN=$(TOOLCHAIN) EXTRAFLAGS=$(EXTRAFLAGS)"
+	@echo HAL_BOARD=$(HAL_BOARD) TOOLCHAIN=$(TOOLCHAIN) EXTRAFLAGS=$(EXTRAFLAGS)
 
 #
 # Build the sketch.cpp file
