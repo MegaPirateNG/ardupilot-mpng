@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduRover v2.45"
+#define THISFIRMWARE "ArduRover v2.46beta2"
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -299,11 +299,8 @@ static GCS_MAVLINK gcs[MAVLINK_COMM_NUM_BUFFERS];
 AP_HAL::AnalogSource *rssi_analog_source;
 
 ////////////////////////////////////////////////////////////////////////////////
-// SONAR selection
-////////////////////////////////////////////////////////////////////////////////
-//
-static AP_RangeFinder_analog sonar;
-static AP_RangeFinder_analog sonar2;
+// SONAR
+static RangeFinder sonar;
 
 // relay support
 AP_Relay relay;

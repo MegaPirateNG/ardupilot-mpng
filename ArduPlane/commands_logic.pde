@@ -114,6 +114,13 @@ start_command(const AP_Mission::Mission_Command& cmd)
                                          cmd.content.repeat_relay.cycle_time * 1000.0f);
         break;
 
+    case MAV_CMD_DO_INVERTED_FLIGHT:
+        if (cmd.p1 == 0 || cmd.p1 == 1) {
+            auto_state.inverted_flight = (bool)cmd.p1;
+            gcs_send_text_fmt(PSTR("Set inverted %u"), cmd.p1);
+        }
+        break;
+
 #if CAMERA == ENABLED
     case MAV_CMD_DO_CONTROL_VIDEO:                      // Control on-board camera capturing. |Camera ID (-1 for all)| Transmission: 0: disabled, 1: enabled compressed, 2: enabled raw| Transmission mode: 0: video stream, >0: single images every n seconds (decimal)| Recording: 0: disabled, 1: enabled compressed, 2: enabled raw| Empty| Empty| Empty|
         break;
@@ -136,13 +143,16 @@ start_command(const AP_Mission::Mission_Command& cmd)
     // system to control the vehicle attitude and the attitude of various
     // devices such as cameras.
     //    |Region of interest mode. (see MAV_ROI enum)| Waypoint index/ target ID. (see MAV_ROI enum)| ROI index (allows a vehicle to manage multiple cameras etc.)| Empty| x the location of the fixed ROI (see MAV_FRAME)| y| z|
-    case MAV_CMD_NAV_ROI:
- #if 0
-        // send the command to the camera mount
-        camera_mount.set_roi_cmd(&cmd.content.location);
- #else
-        gcs_send_text_P(SEVERITY_LOW, PSTR("DO_SET_ROI not supported"));
- #endif
+    case MAV_CMD_DO_SET_ROI:
+        if (cmd.content.location.alt == 0 && cmd.content.location.lat == 0 && cmd.content.location.lng == 0) {
+            // switch off the camera tracking if enabled
+            if (camera_mount.get_mode() == MAV_MOUNT_MODE_GPS_POINT) {
+                camera_mount.set_mode_to_default();
+            }
+        } else {
+            // send the command to the camera mount
+            camera_mount.set_roi_cmd(&cmd.content.location);
+        }
         break;
 
     case MAV_CMD_DO_MOUNT_CONFIGURE:                    // Mission command to configure a camera mount |Mount operation mode (see MAV_CONFIGURE_MOUNT_MODE enum)| stabilize roll? (1 = yes, 0 = no)| stabilize pitch? (1 = yes, 0 = no)| stabilize yaw? (1 = yes, 0 = no)| Empty| Empty| Empty|
@@ -219,6 +229,7 @@ static bool verify_command(const AP_Mission::Mission_Command& cmd)        // Ret
     case MAV_CMD_NAV_ROI:
     case MAV_CMD_DO_MOUNT_CONFIGURE:
     case MAV_CMD_DO_MOUNT_CONTROL:
+    case MAV_CMD_DO_INVERTED_FLIGHT:
         return true;
 
     default:
@@ -295,7 +306,7 @@ static void do_loiter_unlimited(const AP_Mission::Mission_Command& cmd)
 static void do_loiter_turns(const AP_Mission::Mission_Command& cmd)
 {
     set_next_WP(cmd.content.location);
-    loiter.total_cd = cmd.p1 * 36000UL;
+    loiter.total_cd = (uint32_t)(LOWBYTE(cmd.p1)) * 36000UL;
     loiter_set_direction_wp(cmd);
 }
 
@@ -413,7 +424,7 @@ static bool verify_nav_wp()
         return false;
     }
     
-    if (wp_distance <= nav_controller->turn_distance(g.waypoint_radius)) {
+    if (wp_distance <= nav_controller->turn_distance(g.waypoint_radius, auto_state.next_turn_angle)) {
         gcs_send_text_fmt(PSTR("Reached Waypoint #%i dist %um"),
                           (unsigned)mission.get_current_nav_cmd().index,
                           (unsigned)get_distance(current_loc, next_WP_loc));
@@ -588,7 +599,7 @@ static void do_take_picture()
 #if CAMERA == ENABLED
     camera.trigger_pic();
     if (should_log(MASK_LOG_CAMERA)) {
-        Log_Write_Camera();
+        DataFlash.Log_Write_Camera(ahrs, gps, current_loc);
     }
 #endif
 }

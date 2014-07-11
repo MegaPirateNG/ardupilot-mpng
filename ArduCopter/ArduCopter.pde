@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduCopter V3.2-rc1"
+#define THISFIRMWARE "ArduCopter V3.2-rc3"
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@
  *  Jean-Louis Naudin   :Auto Landing
  *  John Arne Birkeland	:PPM Encoder
  *  Jose Julio          :Stabilization Control laws, MPU6k driver
- *  Julien Dubois       :Hybrid flight mode
+ *  Julien Dubois       :PosHold flight mode
  *  Julian Oes          :Pixhawk
  *  Jonathan Challinger :Inertial Navigation, CompassMot, Spin-When-Armed
  *  Kevin Hester        :Andropilot GCS
@@ -65,7 +65,7 @@
  *  Robert Lefebvre     :Heli Support, Copter LEDs
  *  Roberto Navoni      :Library testing, Porting to VRBrain
  *  Sandro Benigno      :Camera support, MinimOSD
- *  Sandro Tognana      :Hybrid flight mode
+ *  Sandro Tognana      :PosHold flight mode
  *  ..and many more.
  *
  *  Code commit statistics can be found here: https://github.com/diydrones/ardupilot/graphs/contributors
@@ -116,6 +116,7 @@
 #include <AP_Mission.h>         // Mission command library
 #include <AP_Rally.h>           // Rally point library
 #include <AC_PID.h>             // PID library
+#include <AC_HELI_PID.h>        // Heli specific Rate PID library
 #include <AC_P.h>               // P library
 #include <AC_AttitudeControl.h> // Attitude control library
 #include <AC_AttitudeControl_Heli.h> // Attitude control library for traditional helicopter
@@ -165,6 +166,9 @@ static AP_Vehicle::MultiCopter aparm;
 
 // Local modules
 #include "Parameters.h"
+
+// Heli modules
+#include "heli.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // cliSerial
@@ -355,13 +359,10 @@ static const uint8_t num_gcs = MAVLINK_COMM_NUM_BUFFERS;
 static GCS_MAVLINK gcs[MAVLINK_COMM_NUM_BUFFERS];
 
 ////////////////////////////////////////////////////////////////////////////////
-// SONAR selection
-////////////////////////////////////////////////////////////////////////////////
-//
-ModeFilterInt16_Size3 sonar_mode_filter(1);
+// SONAR
 #if CONFIG_SONAR == ENABLED
-static AP_HAL::AnalogSource *sonar_analog_source;
-static AP_RangeFinder_MaxsonarXL *sonar;
+static RangeFinder sonar;
+static bool sonar_enabled = true; // enable user switch for sonar
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -515,6 +516,11 @@ static uint8_t land_state;              // records state of land (flying to loca
 static AutoMode auto_mode;   // controls which auto controller is run
 
 ////////////////////////////////////////////////////////////////////////////////
+// Guided
+////////////////////////////////////////////////////////////////////////////////
+static GuidedMode guided_mode;  // controls which controller is run (pos or vel)
+
+////////////////////////////////////////////////////////////////////////////////
 // RTL
 ////////////////////////////////////////////////////////////////////////////////
 RTLState rtl_state;  // records state of rtl (initial climb, returning home, etc)
@@ -558,6 +564,10 @@ static float acro_level_mix;                // scales back roll, pitch and yaw i
 static uint16_t loiter_time_max;                // How long we should stay in Loiter Mode for mission scripting (time in seconds)
 static uint32_t loiter_time;                    // How long have we been loitering - The start time in millis
 
+////////////////////////////////////////////////////////////////////////////////
+// Flip
+////////////////////////////////////////////////////////////////////////////////
+static Vector3f flip_orig_attitude;         // original copter attitude before flip
 
 ////////////////////////////////////////////////////////////////////////////////
 // Battery Sensors
@@ -581,8 +591,6 @@ static int32_t baro_alt;
 ////////////////////////////////////////////////////////////////////////////////
 // 3D Location vectors
 ////////////////////////////////////////////////////////////////////////////////
-static const struct  Location &home = ahrs.get_home();
-
 // Current location of the copter
 static struct   Location current_loc;
 
@@ -745,6 +753,16 @@ static AP_Parachute parachute(relay);
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
+// Nav Guided - allows external computer to control the vehicle during missions
+////////////////////////////////////////////////////////////////////////////////
+#if NAV_GUIDED == ENABLED
+static struct {
+    uint32_t start_time;        // system time in milliseconds that control was handed to the external computer
+    Vector3f start_position;    // vehicle position when control was ahnded to the external computer
+} nav_guided;
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
 // function definitions to keep compiler from complaining about undeclared functions
 ////////////////////////////////////////////////////////////////////////////////
 static void pre_arm_checks(bool display_failure);
@@ -827,6 +845,15 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
   should be listed here, along with how often they should be called
   (in 10ms units) and the maximum time they are expected to take (in
   microseconds)
+  1    = 100hz
+  2    = 50hz
+  4    = 25hz
+  10   = 10hz
+  20   = 5hz
+  33   = 3hz
+  50   = 2hz
+  100  = 1hz
+  1000 = 0.1hz
  */
 static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { rc_loop,               1,     100 },
@@ -967,6 +994,10 @@ static void fast_loop()
 
     // run low level rate controllers that only require IMU data
     attitude_control.rate_controller_run();
+    
+#if FRAME_CONFIG == HELI_FRAME
+    update_heli_control_dynamics();
+#endif //HELI_FRAME
 
     // write out the servo PWM values
     // ------------------------------
@@ -1261,6 +1292,15 @@ static void update_GPS(void)
                 }
             }
 
+            //If we are not currently armed, and we're ready to 
+            //enter RTK mode, then capture current state as home,
+            //and enter RTK fixes!
+            if (!motors.armed() && gps.can_calculate_base_pos()) {
+
+                gps.calculate_base_pos();
+
+            }
+
 #if CAMERA == ENABLED
             if (camera.update_location(current_loc) == true) {
                 do_take_picture();
@@ -1473,6 +1513,18 @@ static void tuning(){
     case CH6_HELI_EXTERNAL_GYRO:
         motors.ext_gyro_gain(g.rc_6.control_in);
         break;
+
+    case CH6_RATE_PITCH_FF:
+        g.pid_rate_pitch.ff(tuning_value);
+        break;
+        
+    case CH6_RATE_ROLL_FF:
+        g.pid_rate_roll.ff(tuning_value);
+        break;
+        
+    case CH6_RATE_YAW_FF:
+        g.pid_rate_yaw.ff(tuning_value);
+        break;        
 #endif
 
     case CH6_OPTFLOW_KP:
@@ -1540,6 +1592,30 @@ static void tuning(){
     case CH6_RC_FEEL_RP:
         // roll-pitch input smoothing
         g.rc_feel_rp = g.rc_6.control_in / 10;
+        break;
+    
+    case CH6_RATE_PITCH_KP:
+        g.pid_rate_pitch.kP(tuning_value);
+        break;
+        
+    case CH6_RATE_PITCH_KI:
+        g.pid_rate_pitch.kI(tuning_value);
+        break;
+        
+    case CH6_RATE_PITCH_KD:
+        g.pid_rate_pitch.kD(tuning_value);
+        break;
+        
+    case CH6_RATE_ROLL_KP:
+        g.pid_rate_roll.kP(tuning_value);
+        break;
+        
+    case CH6_RATE_ROLL_KI:
+        g.pid_rate_roll.kI(tuning_value);
+        break;
+        
+    case CH6_RATE_ROLL_KD:
+        g.pid_rate_roll.kD(tuning_value);
         break;
     }
 }

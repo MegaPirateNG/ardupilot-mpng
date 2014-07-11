@@ -23,9 +23,10 @@
 extern const AP_HAL::HAL& hal;
 
 uint32_t GCS_MAVLINK::last_radio_status_remrssi_ms;
+bool GCS_MAVLINK::mavlink_active = false;
 
 GCS_MAVLINK::GCS_MAVLINK() :
-    waypoint_receive_timeout(1000)
+    waypoint_receive_timeout(5000)
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
@@ -53,6 +54,41 @@ GCS_MAVLINK::init(AP_HAL::UARTDriver *port)
     reset_cli_timeout();
 }
 
+
+/*
+  setup a UART, handling begin() and init()
+ */
+void
+GCS_MAVLINK::setup_uart(AP_HAL::UARTDriver *port, uint32_t baudrate, uint16_t rxS, uint16_t txS)
+{
+    if (port == NULL) {
+        return;
+    }
+
+    /*
+      Now try to cope with SiK radios that may be stuck in bootloader
+      mode because CTS was held while powering on. This tells the
+      bootloader to wait for a firmware. It affects any SiK radio with
+      CTS connected that is externally powered. To cope we send 0x30
+      0x20 at 115200 on startup, which tells the bootloader to reset
+      and boot normally
+     */
+    port->begin(115200, rxS, txS);
+    AP_HAL::UARTDriver::flow_control old_flow_control = port->get_flow_control();
+    port->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+    for (uint8_t i=0; i<3; i++) {
+        hal.scheduler->delay(1);
+        port->write(0x30);
+        port->write(0x20);
+    }
+    port->set_flow_control(old_flow_control);
+
+    // now change to desired baudrate
+    port->begin(baudrate);
+
+    // and init the gcs instance
+    init(port);
+}
 
 uint16_t
 GCS_MAVLINK::_count_parameters()
@@ -683,7 +719,7 @@ void GCS_MAVLINK::handle_mission_item(mavlink_message_t *msg, AP_Mission &missio
         // waypoint and not for the mission
         handle_guided_request(cmd);
 
-        // verify we recevied the command
+        // verify we received the command
         result = 0;
         goto mission_ack;
     }
@@ -816,4 +852,183 @@ void GCS_MAVLINK::send_message(enum ap_message id)
         deferred_messages[nextid] = id;
         num_deferred_messages++;
     }
+}
+
+void
+GCS_MAVLINK::update(void (*run_cli)(AP_HAL::UARTDriver *))
+{
+    // receive new packets
+    mavlink_message_t msg;
+    mavlink_status_t status;
+    status.packet_rx_drop_count = 0;
+
+    // process received bytes
+    uint16_t nbytes = comm_get_available(chan);
+    for (uint16_t i=0; i<nbytes; i++)
+    {
+        uint8_t c = comm_receive_ch(chan);
+
+        if (run_cli != NULL) {
+            /* allow CLI to be started by hitting enter 3 times, if no
+             *  heartbeat packets have been received */
+            if (!mavlink_active && (hal.scheduler->millis() - _cli_timeout) < 20000 && 
+                comm_is_idle(chan)) {
+                if (c == '\n' || c == '\r') {
+                    crlf_count++;
+                } else {
+                    crlf_count = 0;
+                }
+                if (crlf_count == 3) {
+                    run_cli(_port);
+                }
+            }
+        }
+
+        // Try to get a new message
+        if (mavlink_parse_char(chan, c, &msg, &status)) {
+            // we exclude radio packets to make it possible to use the
+            // CLI over the radio
+            if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
+                mavlink_active = true;
+            }
+            handleMessage(&msg);
+        }
+    }
+
+    if (!waypoint_receiving) {
+        return;
+    }
+
+    uint32_t tnow = hal.scheduler->millis();
+    uint32_t wp_recv_time = 1000U + (stream_slowdown*20);
+
+    if (waypoint_receiving &&
+        waypoint_request_i <= waypoint_request_last &&
+        tnow - waypoint_timelast_request > wp_recv_time) {
+        waypoint_timelast_request = tnow;
+        send_message(MSG_NEXT_WAYPOINT);
+    }
+
+    // stop waypoint receiving if timeout
+    if (waypoint_receiving && (tnow - waypoint_timelast_receive) > wp_recv_time+waypoint_receive_timeout) {
+        waypoint_receiving = false;
+    }
+}
+
+
+/*
+  send raw GPS position information (GPS_RAW_INT, GPS2_RAW, GPS_RTK and GPS2_RTK).
+  returns true if messages fit into transmit buffer, false otherwise.
+ */
+bool GCS_MAVLINK::send_gps_raw(AP_GPS &gps)
+{
+
+    int16_t payload_space = comm_get_txspace(chan) - MAVLINK_NUM_NON_PAYLOAD_BYTES;
+    if (payload_space >= MAVLINK_MSG_ID_GPS_RAW_INT_LEN) {
+        gps.send_mavlink_gps_raw(chan);
+    } else {
+        return false;
+    }
+
+#if GPS_RTK_AVAILABLE
+    if (gps.highest_supported_status(0) > AP_GPS::GPS_OK_FIX_3D) {
+        payload_space = comm_get_txspace(chan) - MAVLINK_NUM_NON_PAYLOAD_BYTES;
+        if (payload_space >= MAVLINK_MSG_ID_GPS_RTK_LEN) {
+            gps.send_mavlink_gps_rtk(chan);
+        }
+
+    }
+#endif
+
+#if GPS_MAX_INSTANCES > 1
+
+    if (gps.num_sensors() > 1 && gps.status(1) > AP_GPS::NO_GPS) {
+
+        payload_space = comm_get_txspace(chan) - MAVLINK_NUM_NON_PAYLOAD_BYTES;
+        if (payload_space >= MAVLINK_MSG_ID_GPS2_RAW_LEN) {
+            gps.send_mavlink_gps2_raw(chan);
+        }
+
+#if GPS_RTK_AVAILABLE
+        if (gps.highest_supported_status(1) > AP_GPS::GPS_OK_FIX_3D) {
+            payload_space = comm_get_txspace(chan) - MAVLINK_NUM_NON_PAYLOAD_BYTES;
+            if (payload_space >= MAVLINK_MSG_ID_GPS2_RTK_LEN) {
+                gps.send_mavlink_gps2_rtk(chan);
+            }
+        }
+#endif
+    }
+#endif
+
+    //TODO: Should check what else managed to get through...
+    return true;
+
+}
+
+
+/*
+  send the SYSTEM_TIME message
+ */
+void GCS_MAVLINK::send_system_time(AP_GPS &gps)
+{
+    mavlink_msg_system_time_send(
+        chan,
+        gps.time_epoch_usec(),
+        hal.scheduler->millis());
+}
+
+
+/*
+  send RC_CHANNELS_RAW, and RC_CHANNELS messages
+ */
+void GCS_MAVLINK::send_radio_in(uint8_t receiver_rssi)
+{
+    uint32_t now = hal.scheduler->millis();
+
+    uint16_t values[8];
+    memset(values, 0, sizeof(values));
+    hal.rcin->read(values, 8);
+
+    mavlink_msg_rc_channels_raw_send(
+        chan,
+        now,
+        0, // port
+        values[0],
+        values[1],
+        values[2],
+        values[3],
+        values[4],
+        values[5],
+        values[6],
+        values[7],
+        receiver_rssi);
+
+#if HAL_CPU_CLASS > HAL_CPU_CLASS_16
+    if (hal.rcin->num_channels() > 8 && 
+        comm_get_txspace(chan) >= MAVLINK_MSG_ID_RC_CHANNELS_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) {
+        mavlink_msg_rc_channels_send(
+            chan,
+            now,
+            hal.rcin->num_channels(),
+            hal.rcin->read(CH_1),
+            hal.rcin->read(CH_2),
+            hal.rcin->read(CH_3),
+            hal.rcin->read(CH_4),
+            hal.rcin->read(CH_5),
+            hal.rcin->read(CH_6),
+            hal.rcin->read(CH_7),
+            hal.rcin->read(CH_8),
+            hal.rcin->read(CH_9),
+            hal.rcin->read(CH_10),
+            hal.rcin->read(CH_11),
+            hal.rcin->read(CH_12),
+            hal.rcin->read(CH_13),
+            hal.rcin->read(CH_14),
+            hal.rcin->read(CH_15),
+            hal.rcin->read(CH_16),
+            hal.rcin->read(CH_17),
+            hal.rcin->read(CH_18),
+            receiver_rssi);        
+    }
+#endif
 }

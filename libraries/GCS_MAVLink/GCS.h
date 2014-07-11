@@ -142,8 +142,9 @@ class GCS_MAVLINK : public GCS_Class
 {
 public:
     GCS_MAVLINK();
-    void        update(void);
+    void        update(void (*run_cli)(AP_HAL::UARTDriver *));
     void        init(AP_HAL::UARTDriver *port);
+    void        setup_uart(AP_HAL::UARTDriver *port, uint32_t baudrate, uint16_t rxS, uint16_t txS);
     void        send_message(enum ap_message id);
     void        send_text(gcs_severity severity, const char *str);
     void        send_text_P(gcs_severity severity, const prog_char_t *str);
@@ -186,6 +187,9 @@ public:
     void send_meminfo(void);
     void send_power_status(void);
     void send_ahrs2(AP_AHRS &ahrs);
+    bool send_gps_raw(AP_GPS &gps);
+    void send_system_time(AP_GPS &gps);
+    void send_radio_in(uint8_t receiver_rssi);
 
 private:
     void        handleMessage(mavlink_message_t * msg);
@@ -284,6 +288,8 @@ private:
     enum ap_message deferred_messages[MSG_RETRY_DEFERRED];
     uint8_t next_deferred_message;
     uint8_t num_deferred_messages;
+
+    static bool mavlink_active;
 
     // vehicle specific message send function
     bool try_send_message(enum ap_message id);

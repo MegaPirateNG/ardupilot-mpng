@@ -3,11 +3,14 @@
 *.d
 *.dll
 *.elf
+*.hex
+*.dfu
 *.exe
 *.lst
 *.o
 *.obj
 *.px4
+*.vrx
 *.pyc
 *.tlog
 *.tlog.raw

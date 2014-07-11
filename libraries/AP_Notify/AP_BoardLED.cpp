@@ -22,11 +22,11 @@ extern const AP_HAL::HAL& hal;
 void AP_BoardLED::init(void)
 {
     // setup the main LEDs as outputs
-    hal.gpio->pinMode(HAL_GPIO_A_LED_PIN, GPIO_OUTPUT);
-    hal.gpio->pinMode(HAL_GPIO_B_LED_PIN, GPIO_OUTPUT);
-    hal.gpio->pinMode(HAL_GPIO_C_LED_PIN, GPIO_OUTPUT);
+    hal.gpio->pinMode(HAL_GPIO_A_LED_PIN, HAL_GPIO_OUTPUT);
+    hal.gpio->pinMode(HAL_GPIO_B_LED_PIN, HAL_GPIO_OUTPUT);
+    hal.gpio->pinMode(HAL_GPIO_C_LED_PIN, HAL_GPIO_OUTPUT);
 #if CONFIG_HAL_BOARD == HAL_BOARD_F4BY
-	hal.gpio->pinMode(HAL_GPIO_D_LED_PIN, GPIO_OUTPUT);
+	hal.gpio->pinMode(HAL_GPIO_D_LED_PIN, HAL_GPIO_OUTPUT);
 #endif
 
     // turn all lights off

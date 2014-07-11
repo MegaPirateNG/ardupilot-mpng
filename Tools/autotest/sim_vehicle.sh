@@ -6,6 +6,7 @@ TRACKER_LOCATION="CMAC_PILOTSBOX"
 VEHICLE=""
 BUILD_TARGET="sitl"
 FRAME=""
+NUM_PROCS=1
 
 # check the instance number to allow for multiple copies of the sim running at once
 INSTANCE=0
@@ -15,6 +16,7 @@ USE_GDB_STOPPED=0
 CLEAN_BUILD=0
 START_ANTENNA_TRACKER=0
 WIPE_EEPROM=0
+REVERSE_THROTTLE=0
 
 usage()
 {
@@ -32,9 +34,11 @@ Options:
     -L               select start location from Tools/autotest/locations.txt
     -c               do a make clean before building
     -w               wipe EEPROM and reload parameters
+    -R               reverse throttle in plane
     -f FRAME         set aircraft frame type
                      for copters can choose +, X, quad or octa
                      for planes can choose elevon or vtail
+    -j NUM_PROC      number of processors to use during build (default 1)
 
 mavproxy_options:
     --map            start with a map
@@ -51,7 +55,7 @@ EOF
 
 
 # parse options. Thanks to http://wiki.bash-hackers.org/howto/getopts_tutorial
-while getopts ":I:VgGcTL:v:hwf:" opt; do
+while getopts ":I:VgGcj:TL:v:hwf:R" opt; do
   case $opt in
     v)
       VEHICLE=$OPTARG
@@ -64,6 +68,9 @@ while getopts ":I:VgGcTL:v:hwf:" opt; do
       ;;
     T)
       START_ANTENNA_TRACKER=1
+      ;;
+    R)
+      REVERSE_THROTTLE=1
       ;;
     G)
       USE_GDB=1
@@ -83,6 +90,9 @@ while getopts ":I:VgGcTL:v:hwf:" opt; do
       ;;
     c)
       CLEAN_BUILD=1
+      ;;
+    j)
+      NUM_PROCS=$OPTARG
       ;;
     w)
       WIPE_EEPROM=1
@@ -178,9 +188,9 @@ pushd $autotest/../../$VEHICLE || {
 if [ $CLEAN_BUILD == 1 ]; then
     make clean
 fi
-make $BUILD_TARGET -j4 || {
+make $BUILD_TARGET -j$NUM_PROCS || {
     make clean
-    make $BUILD_TARGET -j4
+    make $BUILD_TARGET -j$NUM_PROCS
 }
 popd
 
@@ -206,9 +216,9 @@ if [ $START_ANTENNA_TRACKER == 1 ]; then
     if [ $CLEAN_BUILD == 1 ]; then
         make clean
     fi
-    make sitl -j4 || {
+    make sitl -j$NUM_PROCS || {
         make clean
-        make sitl -j4
+        make sitl -j$NUM_PROCS
     }
     TRACKER_INSTANCE=1
     TRACKIN_PORT="127.0.0.1:"$((5502+10*$TRACKER_INSTANCE))
@@ -227,6 +237,9 @@ fi
 
 case $VEHICLE in
     ArduPlane)
+        [ "$REVERSE_THROTTLE" == 1 ] && {
+            EXTRA_SIM="$EXTRA_SIM --revthr"
+        }
         RUNSIM="nice $autotest/jsbsim/runsim.py --home=$SIMHOME --simin=$SIMIN_PORT --simout=$SIMOUT_PORT --fgout=$FG_PORT $EXTRA_SIM"
         PARMS="ArduPlane.parm"
         if [ $WIPE_EEPROM == 1 ]; then

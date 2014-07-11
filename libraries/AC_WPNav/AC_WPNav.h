@@ -30,6 +30,8 @@
 
 #define WPNAV_LEASH_LENGTH_MIN          100.0f      // minimum leash lengths in cm
 
+#define WPNAV_WP_FAST_OVERSHOOT_MAX     200.0f      // 2m overshoot is allowed during fast waypoints to allow for smooth transitions to next waypoint
+
 #if HAL_CPU_CLASS < HAL_CPU_CLASS_75 || CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
  # define WPNAV_LOITER_UPDATE_TIME      0.095f      // 10hz update rate on low speed CPUs (APM1, APM2)
  # define WPNAV_WP_UPDATE_TIME          0.095f      // 10hz update rate on low speed CPUs (APM1, APM2)
@@ -39,6 +41,8 @@
 #endif
 
 #define WPNAV_LOITER_ACTIVE_TIMEOUT_MS     200      // loiter controller is considered active if it has been called within the past 200ms (0.2 seconds)
+
+#define WPNAV_YAW_DIST_MIN                 200      // minimum track length which will lead to target yaw being updated to point at next waypoint.  Under this distance the yaw target will be frozen at the current heading
 
 class AC_WPNav
 {
@@ -58,9 +62,9 @@ public:
     /// loiter controller
     ///
 
-    /// set_loiter_target in cm from home
+    /// init_loiter_target to a position in cm from home
     ///     caller can set reset_I to false to preserve I term since previous time loiter controller ran.  Should only be false when caller is sure that not too much time has passed to invalidate the I terms
-    void set_loiter_target(const Vector3f& position, bool reset_I=true);
+    void init_loiter_target(const Vector3f& position, bool reset_I=true);
 
     /// init_loiter_target - initialize's loiter position and feed-forward velocity from current pos and velocity
     void init_loiter_target();
@@ -223,6 +227,7 @@ protected:
         uint8_t fast_waypoint           : 1;    // true if we should ignore the waypoint radius and consider the waypoint complete once the intermediate target has reached the waypoint
         uint8_t slowing_down            : 1;    // true when target point is slowing down before reaching the destination
         uint8_t recalc_wp_leash         : 1;    // true if we need to recalculate the leash lengths because of changes in speed or acceleration
+        uint8_t new_wp_destination      : 1;    // true if we have just received a new destination.  allows us to freeze the position controller's xy feed forward
         SegmentType segment_type        : 1;    // active segment is either straight or spline
     } _flags;
 
@@ -289,7 +294,8 @@ protected:
     float       _slow_down_dist;        // vehicle should begin to slow down once it is within this distance from the destination
 
     // spline variables
-    float		_spline_time;           // current spline time between origin and destination
+    float       _spline_time;           // current spline time between origin and destination
+    float       _spline_time_scale;     // current spline time between origin and destination
     Vector3f    _spline_origin_vel;     // the target velocity vector at the origin of the spline segment
     Vector3f    _spline_destination_vel;// the target velocity vector at the destination point of the spline segment
     Vector3f    _hermite_spline_solution[4]; // array describing spline path between origin and destination

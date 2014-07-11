@@ -40,15 +40,25 @@ static const struct {
     uint8_t pin;
     float scaling;
 } pin_scaling[] = {
-#ifdef CONFIG_ARCH_BOARD_VRBRAIN_V4
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V40)
     {  0, 3.3f/4096 },
     { 10, 3.3f/4096 },
     { 11, 3.3f/4096 },
-#elif CONFIG_ARCH_BOARD_VRBRAIN_V5
+#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V45)
     {  0, 3.3f/4096 },
     { 10, 3.3f/4096 },
     { 11, 3.3f/4096 },
-#elif CONFIG_ARCH_BOARD_VRHERO_V1
+#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V50)
+    {  0, 3.3f/4096 },
+    { 10, 3.3f/4096 },
+    { 11, 3.3f/4096 },
+#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V51)
+    {  0, 3.3f/4096 },
+    { 10, 3.3f/4096 },
+    { 11, 3.3f/4096 },
+#elif defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51)
+    { 10, 3.3f/4096 },
+#elif defined(CONFIG_ARCH_BOARD_VRHERO_V10)
     { 10, 3.3f/4096 },
     { 11, 3.3f/4096 },
     { 14, 3.3f/4096 },
@@ -69,11 +79,6 @@ VRBRAINAnalogSource::VRBRAINAnalogSource(int16_t pin, float initial_value) :
     _sum_value(0),
     _sum_ratiometric(0)
 {
-
-
-
-
-
 }
 
 float VRBRAINAnalogSource::read_average()
@@ -214,15 +219,6 @@ void VRBRAINAnalogIn::_timer_tick(void)
     if (ret > 0) {
         // match the incoming channels to the currently active pins
         for (uint8_t i=0; i<ret/sizeof(buf_adc[0]); i++) {
-
-
-
-
-
-
-
-        }
-        for (uint8_t i=0; i<ret/sizeof(buf_adc[0]); i++) {
             Debug("chan %u value=%u\n",
                   (unsigned)buf_adc[i].am_channel,
                   (unsigned)buf_adc[i].am_data);
@@ -234,7 +230,6 @@ void VRBRAINAnalogIn::_timer_tick(void)
             }
         }
     }
-
 
     // check for new battery data on FMUv1
     if (_battery_handle != -1) {
@@ -259,51 +254,6 @@ void VRBRAINAnalogIn::_timer_tick(void)
             }
         }
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }
 
 AP_HAL::AnalogSource* VRBRAINAnalogIn::channel(int16_t pin)

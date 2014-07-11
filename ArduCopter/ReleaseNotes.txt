@@ -1,5 +1,35 @@
 ArduCopter Release Notes:
 ------------------------------------------------------------------
+ArduCopter 3.2-rc3 11-Jul-2014
+Changes from 3.2-rc2
+1) Hybrid renamed to PosHold
+2) Sonar (analog, i2c) and PulsedLight Range Finders enabled on Pixhawk (Allyson, Tridge)
+3) Landing changes:
+    a) disable pilot repositioning while landing in RTL, Auto (set LAND_REPOSITION to 1 to re-enable) (JonathanC)
+    b) delay 4 seconds before landing due to failsafe (JonathanC)
+4) Secondary compass calibration enabled, pre-arm check that offsets match current devices (Randy, Tridge, MichaelO)
+5) TradHeli improvements (RobL):
+    a) bug fix to use full collective range in stabilize and acro flight modes
+    b) filter added to main rotor input (ch8) to ensure momentary blip doesn't affect main rotor speed 
+6) Other features:
+    a) ch7/ch8 option to retract mount (svefro)
+    b) Do-Set-ROI supported in Guided, RTL mode
+    c) Condition-Yaw accepted in Guided, RTL modes (MoussSS)
+    d) CAMERA dataflash message includes relative and absolute altitude (Craig)
+7) Red Balloon Popper support (Randy, Leonard):
+    a) Velocity controller added to Guided mode
+    b) NAV_GUIDED mission command added
+8) Bug fixes:
+    a) bug fix to flip on take-off in stabilize mode when landing flag cleared slowly (JonathanC)
+    b) allow disarming in AutoTune (JonathanC)
+------------------------------------------------------------------
+ArduCopter 3.2-rc2 27-May-2014
+Changes from 3.2-rc1
+1) Hybrid mode initialisation bug fix
+2) Throttle pulsing bug fix on Pixhawk
+3) Parachute enabled on Pixhawk
+4) Rally Points enabled on Pixhawk
+------------------------------------------------------------------
 ArduCopter 3.2-rc1 9-May-2014
 Changes from 3.1.4
 1) Hybrid mode - position hold mode but with direct response to pilot input during repositioning (JulienD, SandroT)
@@ -41,7 +71,16 @@ Changes from 3.1.4
     a) Individual motor tests (see MP's Initial Setup > Optional Hardware > Motor Test)
     b) compassmot (see MP's Initial Setup > Optional Hardware > Compass/Motor Calib)
     c) parameter reset to factory defautls (see MP's Config/Tuning > Full Parameter List > Reset to Default)
-  
+------------------------------------------------------------------
+ArduCopter 3.1.5 27-May-2014 / 3.1.5-rc2 20-May-2014
+Changes from 3.1.5-rc1
+1) Bug Fix to broken loiter (pixhawk only)
+2) Workaround to read from FRAM in 128byte chunks to resolve a few users boot issues (Pixhawk only)
+------------------------------------------------------------------
+ArduCopter 3.1.5-rc1 14-May-2014
+Changes from 3.1.4
+1) Bug Fix to ignore roll and pitch inputs to loiter controller when in radio failsafe
+2) Bug Fix to allow compassmot to work on Pixhawk
 ------------------------------------------------------------------
 ArduCopter 3.1.4 8-May-2014 / 3.1.4-rc1 2-May-2014
 Changes from 3.1.3

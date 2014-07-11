@@ -59,6 +59,8 @@
  # define CONFIG_IMU_TYPE   CONFIG_IMU_MPU6000
  # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
  # define MAGNETOMETER ENABLED
+ # define PARACHUTE DISABLED
+ # define AC_RALLY DISABLED
  # ifdef APM2_BETA_HARDWARE
   #  define CONFIG_BARO     AP_BARO_BMP085
  # else // APM2 Production Hardware (default)
@@ -69,13 +71,11 @@
  # define CONFIG_IMU_TYPE   CONFIG_IMU_SITL
  # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
  # define MAGNETOMETER ENABLED
- # define OPTFLOW DISABLED
 #elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
  # define CONFIG_IMU_TYPE   CONFIG_IMU_PX4
  # define CONFIG_BARO       AP_BARO_PX4
  # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
  # define MAGNETOMETER ENABLED
- # define OPTFLOW DISABLED
 #elif CONFIG_HAL_BOARD == HAL_BOARD_F4BY
  # define CONFIG_IMU_TYPE   CONFIG_IMU_PX4
  # define CONFIG_BARO       AP_BARO_PX4
@@ -89,7 +89,6 @@
  # define CONFIG_ADC        DISABLED
  # define MAGNETOMETER ENABLED
  # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
- # define OPTFLOW DISABLED
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
  # define CONFIG_IMU_TYPE CONFIG_IMU_L3G4200D
  # define CONFIG_BARO AP_BARO_BMP085
@@ -97,13 +96,11 @@
  # define CONFIG_ADC        DISABLED
  # define MAGNETOMETER ENABLED
  # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
- # define OPTFLOW DISABLED
 #elif CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
  # define CONFIG_IMU_TYPE   CONFIG_IMU_VRBRAIN
  # define CONFIG_BARO       AP_BARO_VRBRAIN
  # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
  # define MAGNETOMETER ENABLED
- # define OPTFLOW DISABLED
 #endif
 
 #if HAL_CPU_CLASS < HAL_CPU_CLASS_75 || CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
@@ -149,13 +146,6 @@
   # define RATE_YAW_P                   0.150f
   # define RATE_YAW_I                   0.015f
 #endif
-
-
-// optical flow doesn't work in SITL yet
-#ifdef DESKTOP_BUILD
-# define OPTFLOW DISABLED
-#endif
-
 
 //////////////////////////////////////////////////////////////////////////////
 // IMU Selection
@@ -419,7 +409,13 @@
 //////////////////////////////////////////////////////////////////////////////
 // Parachute release
 #ifndef PARACHUTE
- # define PARACHUTE DISABLED
+ # define PARACHUTE ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+// Nav-Guided - allows external nav computer to control vehicle
+#ifndef NAV_GUIDED
+ # define NAV_GUIDED DISABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -470,6 +466,12 @@
 #endif
 #ifndef LAND_REQUIRE_MIN_THROTTLE_TO_DISARM // require pilot to reduce throttle to minimum before vehicle will disarm
  # define LAND_REQUIRE_MIN_THROTTLE_TO_DISARM ENABLED
+#endif
+#ifndef LAND_REPOSITION_DEFAULT
+ # define LAND_REPOSITION_DEFAULT   0   // by default the pilot cannot override roll/pitch during landing
+#endif
+#ifndef LAND_WITH_DELAY_MS
+ # define LAND_WITH_DELAY_MS        4000    // default delay (in milliseconds) when a land-with-delay is triggered during a failsafe event
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -576,6 +578,7 @@
 //////////////////////////////////////////////////////////////////////////////
 // Rate controller gains
 //
+
 #ifndef RATE_ROLL_P
  # define RATE_ROLL_P        		0.150f
 #endif
@@ -639,16 +642,16 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
-// Hybrid parameter defaults
+// PosHold parameter defaults
 //
-#ifndef HYBRID_ENABLED
- # define HYBRID_ENABLED                ENABLED // hybrid flight mode enabled by default
+#ifndef POSHOLD_ENABLED
+ # define POSHOLD_ENABLED               ENABLED // PosHold flight mode enabled by default
 #endif
-#ifndef HYBRID_BRAKE_RATE_DEFAULT
- # define HYBRID_BRAKE_RATE_DEFAULT     8       // default HYBRID_BRAKE_RATE param value.  Rotation rate during braking in deg/sec
+#ifndef POSHOLD_BRAKE_RATE_DEFAULT
+ # define POSHOLD_BRAKE_RATE_DEFAULT    8       // default POSHOLD_BRAKE_RATE param value.  Rotation rate during braking in deg/sec
 #endif
-#ifndef HYBRID_BRAKE_ANGLE_DEFAULT
- # define HYBRID_BRAKE_ANGLE_DEFAULT    3000    // default HYBRID_BRAKE_ANGLE param value.  Max lean angle during braking in centi-degrees
+#ifndef POSHOLD_BRAKE_ANGLE_DEFAULT
+ # define POSHOLD_BRAKE_ANGLE_DEFAULT   3000    // default POSHOLD_BRAKE_ANGLE param value.  Max lean angle during braking in centi-degrees
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -713,7 +716,6 @@
  # define THROTTLE_ACCEL_IMAX 500
 #endif
 
-
 //////////////////////////////////////////////////////////////////////////////
 // Dataflash logging control
 //
@@ -759,7 +761,7 @@
 #endif
 
 #ifndef AC_RALLY
- #define AC_RALLY               DISABLED
+ #define AC_RALLY   ENABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
