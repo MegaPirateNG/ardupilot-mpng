@@ -14,7 +14,7 @@
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_LINUX || CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
 #define INS_MAX_INSTANCES 3
 #elif CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
-#define INS_MAX_INSTANCES 2
+#define INS_MAX_INSTANCES 3
 #else
 #define INS_MAX_INSTANCES 1
 #endif
@@ -34,6 +34,9 @@ class AP_InertialSensor
 {
 public:
     AP_InertialSensor();
+
+    // empty virtual destructor
+    virtual ~AP_InertialSensor() {}
 
     enum Start_style {
         COLD_START = 0,

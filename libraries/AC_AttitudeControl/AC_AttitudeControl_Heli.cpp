@@ -3,8 +3,6 @@
 #include "AC_AttitudeControl_Heli.h"
 #include <AP_HAL.h>
 
-extern const AP_HAL::HAL& hal;
-
 // table of user settable parameters
 const AP_Param::GroupInfo AC_AttitudeControl_Heli::var_info[] PROGMEM = {
 
@@ -92,7 +90,7 @@ void AC_AttitudeControl_Heli::rate_bf_to_motor_roll_pitch(float rate_roll_target
     float pitch_pd, pitch_i, pitch_ff;          // used to capture pid values
     float rate_roll_error, rate_pitch_error;    // simply target_rate - current_rate
     float roll_out, pitch_out;
-    const Vector3f& gyro = _ins.get_gyro();     // get current rates
+    const Vector3f& gyro = _ahrs.get_gyro();     // get current rates
 
     // calculate error
     rate_roll_error = rate_roll_target_cds - gyro.x * AC_ATTITUDE_CONTROL_DEGX100;
@@ -146,13 +144,13 @@ void AC_AttitudeControl_Heli::rate_bf_to_motor_roll_pitch(float rate_roll_target
     pitch_out = pitch_pd + pitch_i + pitch_ff;
 
     // constrain output and update limit flags
-    if (fabs(roll_out) > AC_ATTITUDE_RATE_RP_CONTROLLER_OUT_MAX) {
+    if ((float)fabs(roll_out) > AC_ATTITUDE_RATE_RP_CONTROLLER_OUT_MAX) {
         roll_out = constrain_float(roll_out,-AC_ATTITUDE_RATE_RP_CONTROLLER_OUT_MAX,AC_ATTITUDE_RATE_RP_CONTROLLER_OUT_MAX);
         _flags_heli.limit_roll = true;
     }else{
         _flags_heli.limit_roll = false;
     }
-    if (fabs(pitch_out) > AC_ATTITUDE_RATE_RP_CONTROLLER_OUT_MAX) {
+    if ((float)fabs(pitch_out) > AC_ATTITUDE_RATE_RP_CONTROLLER_OUT_MAX) {
         pitch_out = constrain_float(pitch_out,-AC_ATTITUDE_RATE_RP_CONTROLLER_OUT_MAX,AC_ATTITUDE_RATE_RP_CONTROLLER_OUT_MAX);
         _flags_heli.limit_pitch = true;
     }else{
@@ -253,7 +251,7 @@ float AC_AttitudeControl_Heli::rate_bf_to_motor_yaw(float rate_target_cds)
 
     // get current rate
     // To-Do: make getting gyro rates more efficient?
-    current_rate = (_ins.get_gyro().z * AC_ATTITUDE_CONTROL_DEGX100);
+    current_rate = (_ahrs.get_gyro().z * AC_ATTITUDE_CONTROL_DEGX100);
 
     // calculate error and call pid controller
     rate_error  = rate_target_cds - current_rate;
@@ -277,7 +275,7 @@ float AC_AttitudeControl_Heli::rate_bf_to_motor_yaw(float rate_target_cds)
     yaw_out = pd + i + ff;
 
     // constrain output and update limit flag
-    if (fabs(yaw_out) > AC_ATTITUDE_RATE_YAW_CONTROLLER_OUT_MAX) {
+    if ((float)fabs(yaw_out) > AC_ATTITUDE_RATE_YAW_CONTROLLER_OUT_MAX) {
         yaw_out = constrain_float(yaw_out,-AC_ATTITUDE_RATE_YAW_CONTROLLER_OUT_MAX,AC_ATTITUDE_RATE_YAW_CONTROLLER_OUT_MAX);
         _flags_heli.limit_yaw = true;
     }else{
