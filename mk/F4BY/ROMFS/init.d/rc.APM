@@ -83,10 +83,10 @@ else
 fi
 
 echo "Starting F4BY sensors"
-if hmc5883 start
+if hmc5883 -I start
 then
 	echo "hmc5883 started OK"
-	if hmc5883 calibrate
+	if hmc5883 -I calibrate
 	then
 	  echo "hmc5883 calibrate OK"
 	else 
