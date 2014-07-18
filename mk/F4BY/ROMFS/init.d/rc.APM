@@ -83,22 +83,24 @@ else
 fi
 
 echo "Starting F4BY sensors"
-if hmc5883 -I start
+
+if hmc5883 -X -C start
 then
-	echo "hmc5883 started OK"
-	if hmc5883 -I calibrate
-	then
-	  echo "hmc5883 calibrate OK"
-	else 
-	  echo "hmc5883 calibrate failed"
-	  echo "hmc5883 calibrate failed" >> $logfile
-	  sh /etc/init.d/rc.error
-	fi
+	echo "External hmc5883 started OK"
 else
-	echo "hmc5883 start failed"
-	echo "hmc5883 start failed" >> $logfile
+	echo "External hmc5883 start failed"
+	echo "External hmc5883 start failed" >> $logfile
+fi
+
+if hmc5883 -I -C start
+then
+	echo "Internal hmc5883 started OK"
+else
+	echo "Internal hmc5883 start failed"
+	echo "Internal hmc5883 start failed" >> $logfile
 	sh /etc/init.d/rc.error
 fi
+
 if mpu6000 start
 then
    echo "mpu6000  started OK"

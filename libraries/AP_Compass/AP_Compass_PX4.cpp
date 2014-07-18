@@ -73,7 +73,7 @@ bool AP_Compass_PX4::init(void)
         if (_is_external[i]) {
             hal.console->printf("Using external compass[%u]\n", (unsigned)i);
         }
-        _count[0] = 0;
+        _count[i] = 0;
         _sum[i].zero();
         _healthy[i] = false;
     }

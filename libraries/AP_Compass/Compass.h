@@ -51,13 +51,13 @@
 #elif CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
 #define COMPASS_MAX_INSTANCES 2
 #elif CONFIG_HAL_BOARD == HAL_BOARD_F4BY
-#define COMPASS_MAX_INSTANCES 2
+#define COMPASS_MAX_INSTANCES 3
 #else
 #define COMPASS_MAX_INSTANCES 1
 #endif
 
 // default compass device ids for each board type to most common set-up to reduce eeprom usage
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_F4BY
 # define COMPASS_EXPECTED_DEV_ID  73225 // external hmc5883
 # define COMPASS_EXPECTED_DEV_ID2 -1    // internal ldm303d
 # define COMPASS_EXPECTED_DEV_ID3 0
