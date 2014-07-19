@@ -1,10 +1,12 @@
-# Release Notes for MegaPirateNG 3.0.1 R4 (based on ArduPilot 3.0.1)
+# Release MegaPirateNG 3.0.1 R4 (powered by: ArduPilot 3.0.1)
+# Approuved by machine-volante.com
 
-## How to compile and configure MegaPirateNG
-Follow instructions at: http://docs.megapirateng.com
 
-## Sonar
+## Comment compiler et configurer MegaPirateNG
+Suivre les infos du site (UK): http://docs.megapirateng.com
+
+## Concernant le Sonar
 Currently sonar is not supported
 
-## Motor mapping
-Look motor mapping at: http://code.google.com/p/megapirateng/wiki/confighw?wl=en
+## Mappage des moteurs MegapirateNG
+schema de cablage multirotor : http://code.google.com/p/megapirateng/wiki/confighw?wl=en
