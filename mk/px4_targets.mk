@@ -79,7 +79,7 @@ px4-v2: $(BUILDROOT)/make.flags $(PX4_ROOT)/Archives/px4fmu-v2.export $(SKETCHCP
 	$(v) cp $(PX4_ROOT)/Images/px4fmu-v2_APM.px4 $(SKETCH)-v2.px4
 	$(v) echo "PX4 $(SKETCH) Firmware is in $(SKETCH)-v2.px4"
 
-f4by: showflags $(PX4_ROOT)/Archives/f4by.export $(SKETCHCPP) module_mk
+f4by: $(BUILDROOT)/make.flags $(PX4_ROOT)/Archives/f4by.export $(SKETCHCPP) module_mk
 	$(RULEHDR)
 	$(v) rm -f $(PX4_ROOT)/makefiles/$(F4BY_CONFIG_FILE)
 	$(v) cp $(PWD)/$(F4BY_CONFIG_FILE) $(PX4_ROOT)/makefiles/
