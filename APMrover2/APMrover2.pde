@@ -72,6 +72,7 @@
 #include <AP_AHRS.h>         // ArduPilot Mega DCM Library
 #include <AP_NavEKF.h>
 #include <AP_Mission.h>     // Mission command library
+#include <AP_Terrain.h>
 #include <PID.h>            // PID library
 #include <RC_Channel.h>     // RC Channel Library
 #include <AP_RangeFinder.h>	// Range finder library
@@ -96,6 +97,7 @@
 #include <APM_Control.h>
 #include <AP_L1_Control.h>
 #include <AP_BoardConfig.h>
+#include <AP_Frsky_Telem.h>
 
 #include <AP_HAL_AVR.h>
 #include <AP_HAL_AVR_SITL.h>
@@ -435,6 +437,13 @@ static bool ch7_flag;
 static AP_BattMonitor battery;
 
 ////////////////////////////////////////////////////////////////////////////////
+// Battery Sensors
+////////////////////////////////////////////////////////////////////////////////
+#if FRSKY_TELEM_ENABLED == ENABLED
+static AP_Frsky_Telem frsky_telemetry(ahrs, battery);
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
 // Navigation control variables
 ////////////////////////////////////////////////////////////////////////////////
 // The instantaneous desired lateral acceleration in m/s/s
@@ -537,7 +546,10 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { gcs_failsafe_check,     5,    600 },
     { compass_accumulate,     1,    900 },
     { update_notify,          1,    300 },
-    { one_second_loop,       50,   3000 }
+    { one_second_loop,       50,   3000 },
+#if FRSKY_TELEM_ENABLED == ENABLED
+    { telemetry_send,        10,    100 }	
+#endif
 };
 
 

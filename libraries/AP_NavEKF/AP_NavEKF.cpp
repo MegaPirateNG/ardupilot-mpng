@@ -733,35 +733,40 @@ void NavEKF::SelectVelPosFusion()
 // select fusion of magnetometer data
 void NavEKF::SelectMagFusion()
 {
-    // check for and read new magnetometer measurements
-    readMagData();
+    if(!magFailed) {
+        // check for and read new magnetometer measurements
+        readMagData();
 
-    // If we are using the compass and the magnetometer has been unhealthy for too long we declare it failed
-    if (magHealth) {
-        lastHealthyMagTime_ms = hal.scheduler->millis();
-    } else {
-        if ((hal.scheduler->millis() - lastHealthyMagTime_ms) > _magFailTimeLimit_ms && use_compass()) {
-            magTimeout = true;
+        // If we are using the compass and the magnetometer has been unhealthy for too long we declare a timeout
+        // If we have a vehicle that can fly without a compass (a vehicle that doesn't have significant sideslip) then the compass is permanently failed and will not be used until the filter is reset
+        if (magHealth) {
+            lastHealthyMagTime_ms = hal.scheduler->millis();
         } else {
-            magTimeout = false;
+            if ((hal.scheduler->millis() - lastHealthyMagTime_ms) > _magFailTimeLimit_ms && use_compass()) {
+                magTimeout = true;
+                if (assume_zero_sideslip()) {
+                    magFailed = true;
+                }
+            } else {
+                magTimeout = false;
+            }
         }
-    }
 
-    // determine if conditions are right to start a new fusion cycle
-    bool dataReady = statesInitialised && use_compass() && newDataMag;
-    if (dataReady)
-    {
-        MAGmsecPrev = IMUmsec;
-        fuseMagData = true;
-    }
-    else
-    {
-        fuseMagData = false;
-    }
+        // determine if conditions are right to start a new fusion cycle
+        bool dataReady = statesInitialised && use_compass() && newDataMag;
+        if (dataReady)
+        {
+            MAGmsecPrev = IMUmsec;
+            fuseMagData = true;
+        }
+        else
+        {
+            fuseMagData = false;
+        }
 
-    // call the function that performs fusion of magnetometer data
-    FuseMagnetometer();
-
+        // call the function that performs fusion of magnetometer data
+        FuseMagnetometer();
+    }
 }
 
 // select fusion of true airspeed measurements
@@ -2807,6 +2812,8 @@ bool NavEKF::getLLH(struct Location &loc) const
     loc.lat = _ahrs->get_home().lat;
     loc.lng = _ahrs->get_home().lng;
     loc.alt = _ahrs->get_home().alt - states[9]*100;
+    loc.flags.relative_alt = 0;
+    loc.flags.terrain_alt = 0;
     location_offset(loc, states[7], states[8]);
     return true;
 }
@@ -3302,6 +3309,9 @@ void NavEKF::ZeroVariables()
     posTimeout = false;
     hgtTimeout = false;
     filterDiverged = false;
+    magTimeout = false;
+    magFailed = false;
+    lastHealthyMagTime_ms = hal.scheduler->millis();
     lastStateStoreTime_ms = 0;
     lastFixTime_ms = 0;
     secondLastFixTime_ms = 0;
@@ -3361,7 +3371,7 @@ bool NavEKF::static_mode_demanded(void) const
 // return true if we should use the compass
 bool NavEKF::use_compass(void) const
 {
-    return _ahrs->get_compass() && _ahrs->get_compass()->use_for_yaw();
+    return _ahrs->get_compass() && _ahrs->get_compass()->use_for_yaw() && !magFailed;
 }
 
 // decay GPS horizontal position offset to close to zero at a rate of 1 m/s

@@ -121,16 +121,6 @@ void AP_InertialNav::update(float dt)
 // XY Axis specific methods
 //
 
-// set time constant - set timeconstant used by complementary filter
-void AP_InertialNav::set_time_constant_xy( float time_constant_in_seconds )
-{
-    // ensure it's a reasonable value
-    if (time_constant_in_seconds > 0.0f && time_constant_in_seconds < 30.0f) {
-        _time_constant_xy = time_constant_in_seconds;
-        update_gains();
-    }
-}
-
 // position_ok - return true if position has been initialised and have received gps data within 3 seconds
 bool AP_InertialNav::position_ok() const
 {
@@ -195,8 +185,6 @@ void AP_InertialNav::correct_with_gps(uint32_t now, int32_t lon, int32_t lat)
         // reset the inertial nav position and velocity to gps values
         if (_flags.gps_glitching) {
             set_position_xy(x,y);
-            set_velocity_xy(_ahrs.get_gps().velocity().x * 100.0f,
-                            _ahrs.get_gps().velocity().y * 100.0f);
             _position_error.x = 0.0f;
             _position_error.y = 0.0f;
         }else{
@@ -303,16 +291,6 @@ float AP_InertialNav::get_velocity_xy() const
 // Z Axis methods
 //
 
-// set time constant - set timeconstant used by complementary filter
-void AP_InertialNav::set_time_constant_z( float time_constant_in_seconds )
-{
-    // ensure it's a reasonable value
-    if (time_constant_in_seconds > 0.0f && time_constant_in_seconds < 30.0f) {
-        _time_constant_z = time_constant_in_seconds;
-        update_gains();
-    }
-}
-
 // check_baro - check if new baro readings have arrived and use them to correct vertical accelerometer offsets
 void AP_InertialNav::check_baro()
 {
@@ -345,17 +323,33 @@ void AP_InertialNav::correct_with_baro(float baro_alt, float dt)
         first_reads++;
     }
 
-    // 3rd order samples (i.e. position from baro) are delayed by 150ms (15 iterations at 100hz)
-    // so we should calculate error using historical estimates
-    float hist_position_base_z;
-    if( _hist_position_estimate_z.is_full() ) {
-        hist_position_base_z = _hist_position_estimate_z.front();
+    // sanity check the baro position.  Relies on the main code calling Baro_Glitch::check_alt() immediatley after a baro update
+    if (_baro_glitch.glitching()) {
+        // failed sanity check so degrate position_error to 10% over 2 seconds (assumes 10hz update rate)
+        _position_error.z *= 0.89715f;
     }else{
-        hist_position_base_z = _position_base.z;
+        // if our internal baro glitching flag (from previous iteration) is true we have just recovered from a glitch
+        // reset the inertial nav alt to baro alt
+        if (_flags.baro_glitching) {
+            set_altitude(baro_alt);
+            _position_error.z = 0.0f;
+        }else{
+            // 3rd order samples (i.e. position from baro) are delayed by 150ms (15 iterations at 100hz)
+            // so we should calculate error using historical estimates
+            float hist_position_base_z;
+            if (_hist_position_estimate_z.is_full()) {
+                hist_position_base_z = _hist_position_estimate_z.front();
+            } else {
+                hist_position_base_z = _position_base.z;
+            }
+
+            // calculate error in position from baro with our estimate
+            _position_error.z = baro_alt - (hist_position_base_z + _position_correction.z);
+        }
     }
 
-    // calculate error in position from baro with our estimate
-    _position_error.z = baro_alt - (hist_position_base_z + _position_correction.z);
+    // update our internal record of glitching flag so that we can notice a change
+    _flags.baro_glitching = _baro_glitch.glitching();
 }
 
 // set_altitude - set base altitude estimate in cm

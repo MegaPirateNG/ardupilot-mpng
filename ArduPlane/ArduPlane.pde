@@ -51,6 +51,7 @@
 #include <AP_Relay.h>       // APM relay
 #include <AP_Camera.h>          // Photo or video camera
 #include <AP_Airspeed.h>
+#include <AP_Terrain.h>
 
 #include <APM_OBC.h>
 #include <APM_Control.h>
@@ -78,6 +79,7 @@
 
 #include <AP_Arming.h>
 #include <AP_BoardConfig.h>
+#include <AP_Frsky_Telem.h>
 #include <AP_ServoRelayEvents.h>
 
 #include <AP_Rally.h>
@@ -461,9 +463,21 @@ static int32_t altitude_error_cm;
 static AP_BattMonitor battery;
 
 ////////////////////////////////////////////////////////////////////////////////
+// FrSky telemetry support
+#if FRSKY_TELEM_ENABLED == ENABLED
+static AP_Frsky_Telem frsky_telemetry(ahrs, battery);
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
 // Airspeed Sensors
 ////////////////////////////////////////////////////////////////////////////////
 AP_Airspeed airspeed(aparm);
+
+////////////////////////////////////////////////////////////////////////////////
+// terrain handling
+#if AP_TERRAIN_AVAILABLE
+AP_Terrain terrain(ahrs);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // ACRO controller state
@@ -649,12 +663,25 @@ static struct Location guided_WP_loc;
 static struct AP_Mission::Mission_Command auto_rtl_command;
 
 ////////////////////////////////////////////////////////////////////////////////
-// Altitude / Climb rate control
-////////////////////////////////////////////////////////////////////////////////
-// The current desired altitude.  Altitude is linearly ramped between waypoints.  Centimeters
-static int32_t target_altitude_cm;
-// Altitude difference between previous and current waypoint.  Centimeters
-static int32_t offset_altitude_cm;
+// Altitude control
+static struct {
+    // target altitude above sea level in cm. Used for barometric
+    // altitude navigation
+    int32_t amsl_cm;
+
+    // Altitude difference between previous and current waypoint in
+    // centimeters. Used for glide slope handling
+    int32_t offset_cm;
+
+#if AP_TERRAIN_AVAILABLE
+    // are we trying to follow terrain?
+    bool terrain_following;
+
+    // target altitude above terrain in cm, valid if terrain_following
+    // is set
+    int32_t terrain_alt_cm;
+#endif
+} target_altitude;
 
 ////////////////////////////////////////////////////////////////////////////////
 // INS variables
@@ -727,7 +754,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { update_compass,         5,   1200 },
     { read_airspeed,          5,   1200 },
     { update_alt,             5,   3400 },
-    { calc_altitude_error,    5,   1000 },
+    { adjust_altitude_target, 5,   1000 },
     { obc_fs_check,           5,   1000 },
     { gcs_update,             1,   1700 },
     { gcs_data_stream_send,   1,   3000 },
@@ -747,6 +774,10 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { compass_save,        3000,   2500 },
     { update_logging1,        5,   1700 },
     { update_logging2,        5,   1700 },
+#if FRSKY_TELEM_ENABLED == ENABLED
+    { telemetry_send,        10,    100 },	
+#endif
+
 };
 
 // setup the var_info table
@@ -973,6 +1004,10 @@ static void one_second_loop()
     // update notify flags
     AP_Notify::flags.pre_arm_check = arming.pre_arm_checks(false);
     AP_Notify::flags.armed = arming.is_armed() || arming.arming_required() == AP_Arming::NO;
+
+#if AP_TERRAIN_AVAILABLE
+    terrain.update();
+#endif
 }
 
 static void log_perf_info()
@@ -1246,6 +1281,7 @@ static void update_flight_mode(void)
         } else {
             nav_pitch_cd = -(pitch_input * pitch_limit_min_cd);
         }
+        adjust_nav_pitch_throttle();
         nav_pitch_cd = constrain_int32(nav_pitch_cd, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
         if (fly_inverted()) {
             nav_pitch_cd = -nav_pitch_cd;
@@ -1403,7 +1439,7 @@ static void update_alt()
             update_flight_stage(AP_SpdHgtControl::FLIGHT_NORMAL);
         }
 
-        SpdHgt_Controller->update_pitch_throttle(target_altitude_cm - home.alt + (int32_t(g.alt_offset)*100), 
+        SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),
                                                  target_airspeed_cm,
                                                  flight_stage,
                                                  auto_state.takeoff_pitch_cd,

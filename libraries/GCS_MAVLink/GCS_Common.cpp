@@ -23,7 +23,7 @@
 extern const AP_HAL::HAL& hal;
 
 uint32_t GCS_MAVLINK::last_radio_status_remrssi_ms;
-bool GCS_MAVLINK::mavlink_active = false;
+uint8_t GCS_MAVLINK::mavlink_active = 0;
 
 GCS_MAVLINK::GCS_MAVLINK() :
     waypoint_receive_timeout(5000)
@@ -787,7 +787,8 @@ void GCS_MAVLINK::handle_mission_item(mavlink_message_t *msg, AP_Mission &missio
     } else {
         waypoint_timelast_request = hal.scheduler->millis();
         // if we have enough space, then send the next WP immediately
-        if (comm_get_txspace(chan) - MAVLINK_NUM_NON_PAYLOAD_BYTES >= MAVLINK_MSG_ID_MISSION_ITEM_LEN) {
+        if (comm_get_txspace(chan) >= 
+            MAVLINK_NUM_NON_PAYLOAD_BYTES+MAVLINK_MSG_ID_MISSION_ITEM_LEN) {
             queued_waypoint_send();
         } else {
             send_message(MSG_NEXT_WAYPOINT);
@@ -871,7 +872,7 @@ GCS_MAVLINK::update(void (*run_cli)(AP_HAL::UARTDriver *))
         if (run_cli != NULL) {
             /* allow CLI to be started by hitting enter 3 times, if no
              *  heartbeat packets have been received */
-            if (!mavlink_active && (hal.scheduler->millis() - _cli_timeout) < 20000 && 
+            if ((mavlink_active==0) && (hal.scheduler->millis() - _cli_timeout) < 20000 && 
                 comm_is_idle(chan)) {
                 if (c == '\n' || c == '\r') {
                     crlf_count++;
@@ -889,7 +890,7 @@ GCS_MAVLINK::update(void (*run_cli)(AP_HAL::UARTDriver *))
             // we exclude radio packets to make it possible to use the
             // CLI over the radio
             if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
-                mavlink_active = true;
+                mavlink_active |= (1U<<chan);
             }
             handleMessage(&msg);
         }
@@ -922,9 +923,8 @@ GCS_MAVLINK::update(void (*run_cli)(AP_HAL::UARTDriver *))
  */
 bool GCS_MAVLINK::send_gps_raw(AP_GPS &gps)
 {
-
-    int16_t payload_space = comm_get_txspace(chan) - MAVLINK_NUM_NON_PAYLOAD_BYTES;
-    if (payload_space >= MAVLINK_MSG_ID_GPS_RAW_INT_LEN) {
+    if (comm_get_txspace(chan) >= 
+        MAVLINK_MSG_ID_GPS_RAW_INT_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) {
         gps.send_mavlink_gps_raw(chan);
     } else {
         return false;
@@ -932,8 +932,7 @@ bool GCS_MAVLINK::send_gps_raw(AP_GPS &gps)
 
 #if GPS_RTK_AVAILABLE
     if (gps.highest_supported_status(0) > AP_GPS::GPS_OK_FIX_3D) {
-        payload_space = comm_get_txspace(chan) - MAVLINK_NUM_NON_PAYLOAD_BYTES;
-        if (payload_space >= MAVLINK_MSG_ID_GPS_RTK_LEN) {
+        if (comm_get_txspace(chan) >= MAVLINK_NUM_NON_PAYLOAD_BYTES+MAVLINK_MSG_ID_GPS_RTK_LEN) {
             gps.send_mavlink_gps_rtk(chan);
         }
 
@@ -944,15 +943,14 @@ bool GCS_MAVLINK::send_gps_raw(AP_GPS &gps)
 
     if (gps.num_sensors() > 1 && gps.status(1) > AP_GPS::NO_GPS) {
 
-        payload_space = comm_get_txspace(chan) - MAVLINK_NUM_NON_PAYLOAD_BYTES;
-        if (payload_space >= MAVLINK_MSG_ID_GPS2_RAW_LEN) {
+        if (comm_get_txspace(chan) >= MAVLINK_NUM_NON_PAYLOAD_BYTES+MAVLINK_MSG_ID_GPS2_RAW_LEN) {
             gps.send_mavlink_gps2_raw(chan);
         }
 
 #if GPS_RTK_AVAILABLE
         if (gps.highest_supported_status(1) > AP_GPS::GPS_OK_FIX_3D) {
-            payload_space = comm_get_txspace(chan) - MAVLINK_NUM_NON_PAYLOAD_BYTES;
-            if (payload_space >= MAVLINK_MSG_ID_GPS2_RTK_LEN) {
+            if (comm_get_txspace(chan) >= 
+                MAVLINK_NUM_NON_PAYLOAD_BYTES+MAVLINK_MSG_ID_GPS2_RTK_LEN) {
                 gps.send_mavlink_gps2_rtk(chan);
             }
         }

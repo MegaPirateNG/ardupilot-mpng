@@ -103,7 +103,9 @@ static void auto_disarm_check()
     }
 
     // allow auto disarm in manual flight modes or Loiter/AltHold if we're landed
-    if(manual_flight_mode(control_mode) || (ap.land_complete && (control_mode == LOITER || control_mode == ALT_HOLD || control_mode == POSHOLD || control_mode == AUTOTUNE))) {
+    if (manual_flight_mode(control_mode) || (ap.land_complete && (control_mode == ALT_HOLD || control_mode == LOITER || control_mode == OF_LOITER ||
+                                                                  control_mode == DRIFT || control_mode == SPORT || control_mode == AUTOTUNE ||
+                                                                  control_mode == POSHOLD))) {
         auto_disarming_counter++;
 
         if(auto_disarming_counter >= AUTO_DISARMING_DELAY) {
@@ -129,6 +131,13 @@ static void init_arm_motors()
 
     // disable inertial nav errors temporarily
     inertial_nav.ignore_next_error();
+
+    // notify that arming will occur (we do this early to give plenty of warning)
+    AP_Notify::flags.armed = true;
+    // call update_notify a few times to ensure the message gets out
+    for (uint8_t i=0; i<=10; i++) {
+        update_notify();
+    }
 
 #if LOGGING_ENABLED == ENABLED
     // start dataflash
@@ -178,6 +187,8 @@ static void init_arm_motors()
     if (g.rc_3.control_in > g.throttle_cruise && g.throttle_cruise > 100) {
         motors.output_min();
         failsafe_enable();
+        AP_Notify::flags.armed = false;
+        AP_Notify::flags.arming_failed = false;
         return;
     }
 
@@ -194,6 +205,9 @@ static void init_arm_motors()
 
     // log arming to dataflash
     Log_Write_Event(DATA_ARMED);
+
+    // log flight mode in case it was changed while vehicle was disarmed
+    Log_Write_Mode(control_mode);
 
     // reenable failsafe
     failsafe_enable();

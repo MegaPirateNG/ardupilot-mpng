@@ -58,6 +58,7 @@ print_log_menu(void)
     return(true);
 }
 
+#if CLI_ENABLED == ENABLED
 static int8_t
 dump_log(uint8_t argc, const Menu::arg *argv)
 {
@@ -86,6 +87,7 @@ dump_log(uint8_t argc, const Menu::arg *argv)
     Log_Read((uint16_t)dump_log, dump_log_start, dump_log_end);
     return (0);
 }
+#endif
 
 static int8_t
 erase_logs(uint8_t argc, const Menu::arg *argv)
@@ -704,6 +706,7 @@ static const struct LogStructure log_structure[] PROGMEM = {
       "ERR",   "BB",         "Subsys,ECode" },
 };
 
+#if CLI_ENABLED == ENABLED
 // Read the DataFlash log memory
 static void Log_Read(uint16_t log_num, uint16_t start_page, uint16_t end_page)
 {
@@ -721,6 +724,7 @@ static void Log_Read(uint16_t log_num, uint16_t start_page, uint16_t end_page)
                              print_flight_mode,
                              cliSerial);
 }
+#endif // CLI_ENABLED
 
 // start a new log
 static void start_logging() 

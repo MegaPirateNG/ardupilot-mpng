@@ -398,13 +398,17 @@ static void report_compass()
     cliSerial->printf_P(PSTR("Mag Dec: %4.4f\n"),
                     degrees(compass.get_declination()));
 
-    Vector3f offsets = compass.get_offsets();
-
     // mag offsets
-    cliSerial->printf_P(PSTR("Mag off: %4.4f, %4.4f, %4.4f\n"),
-                    offsets.x,
-                    offsets.y,
-                    offsets.z);
+    Vector3f offsets;
+    for (uint8_t i=0; i<compass.get_count(); i++) {
+        offsets = compass.get_offsets(i);
+        // mag offsets
+        cliSerial->printf_P(PSTR("Mag%d off: %4.4f, %4.4f, %4.4f\n"),
+                        (int)i,
+                        offsets.x,
+                        offsets.y,
+                        offsets.z);
+    }
 
     // motor compensation
     cliSerial->print_P(PSTR("Motor Comp: "));
@@ -417,11 +421,15 @@ static void report_compass()
         if( compass.motor_compensation_type() == AP_COMPASS_MOT_COMP_CURRENT ) {
             cliSerial->print_P(PSTR("Current"));
         }
-        Vector3f motor_compensation = compass.get_motor_compensation();
-        cliSerial->printf_P(PSTR("\nComp Vec: %4.2f, %4.2f, %4.2f\n"),
+        Vector3f motor_compensation;
+        for (uint8_t i=0; i<compass.get_count(); i++) {
+            motor_compensation = compass.get_motor_compensation(i);
+            cliSerial->printf_P(PSTR("\nComMot%d: %4.2f, %4.2f, %4.2f\n"),
+                        (int)i,
                         motor_compensation.x,
                         motor_compensation.y,
                         motor_compensation.z);
+        }
     }
     print_blanks(1);
 }
@@ -460,14 +468,24 @@ init_esc()
     // reduce update rate to motors to 50Hz
     motors.set_update_rate(50);
 
-    // we enable the motors directly here instead of calling output_min because output_min would send a low signal to the ESC and disrupt the calibration process
-    motors.enable();
-    motors.armed(true);
+    uint32_t last_print_ms = 0;
     while(1) {
+        motors.armed(true);
+        motors.enable();
         read_radio();
-        delay(100);
+        delay(10);
         AP_Notify::flags.esc_calibration = true;
         motors.throttle_pass_through();
+        
+        uint32_t now = hal.scheduler->millis();
+        if (now - last_print_ms > 1000) {
+            hal.console->printf_P(PSTR("ESC cal input: %u %u %u %u  output: %u %u %u %u\n"),
+                                  (unsigned)hal.rcin->read(0), (unsigned)hal.rcin->read(1), 
+                                  (unsigned)hal.rcin->read(2), (unsigned)hal.rcin->read(3),
+                                  (unsigned)hal.rcout->read(0), (unsigned)hal.rcout->read(1), 
+                                  (unsigned)hal.rcout->read(2), (unsigned)hal.rcout->read(3));
+            last_print_ms = now;
+        }
     }
 }
 

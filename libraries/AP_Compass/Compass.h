@@ -132,11 +132,11 @@ public:
 
     /// Return the current field as a Vector3f
     const Vector3f &get_field(uint8_t i) const { return _field[i]; }
-    const Vector3f &get_field(void) const { return get_field(_get_primary()); }
+    const Vector3f &get_field(void) const { return get_field(get_primary()); }
 
     /// Return the health of a compass
     bool healthy(uint8_t i) const { return _healthy[i]; }
-    bool healthy(void) const { return healthy(_get_primary()); }
+    bool healthy(void) const { return healthy(get_primary()); }
 
     /// set the current field as a Vector3f
     void set_field(const Vector3f &field) { _field[0] = field; }
@@ -146,7 +146,7 @@ public:
     /// @returns                    The current compass offsets.
     ///
     const Vector3f &get_offsets(uint8_t i) const { return _offset[i]; }
-    const Vector3f &get_offsets(void) const { return get_offsets(_get_primary()); }
+    const Vector3f &get_offsets(void) const { return get_offsets(get_primary()); }
 
     /// Sets the initial location used to get declination
     ///
@@ -199,7 +199,9 @@ public:
         if (_motor_comp_type <= AP_COMPASS_MOT_COMP_CURRENT && _motor_comp_type != (int8_t)comp_type) {
             _motor_comp_type = (int8_t)comp_type;
             _thr_or_curr = 0;                               // set current current or throttle to zero
-            set_motor_compensation(Vector3f(0,0,0));        // clear out invalid compensation vector
+            for (uint8_t i=0; i<COMPASS_MAX_INSTANCES; i++) {
+                set_motor_compensation(i, Vector3f(0,0,0)); // clear out invalid compensation vectors
+            }
         }
     }
 
@@ -210,13 +212,14 @@ public:
 
     /// Set the motor compensation factor x/y/z values.
     ///
+    /// @param  i                   instance of compass
     /// @param  offsets             Offsets multiplied by the throttle value and added to the raw mag_ values.
     ///
-    void set_motor_compensation(const Vector3f &motor_comp_factor, uint8_t i=0);
+    void set_motor_compensation(uint8_t i, const Vector3f &motor_comp_factor);
 
     /// get motor compensation factors as a vector
     const Vector3f& get_motor_compensation(uint8_t i) const { return _motor_compensation[i]; }
-    const Vector3f& get_motor_compensation(void) const { return get_motor_compensation(0); }
+    const Vector3f& get_motor_compensation(void) const { return get_motor_compensation(get_primary()); }
 
     /// Saves the current motor compensation x/y/z values.
     ///
@@ -229,7 +232,7 @@ public:
     /// @returns                    The current compass offsets.
     ///
     const Vector3f &get_motor_offsets(uint8_t i) const { return _motor_offset[i]; }
-    const Vector3f &get_motor_offsets(void) const { return get_motor_offsets(0); }
+    const Vector3f &get_motor_offsets(void) const { return get_motor_offsets(get_primary()); }
 
     /// Set the throttle as a percentage from 0.0 to 1.0
     /// @param thr_pct              throttle expressed as a percentage from 0 to 1.0
@@ -254,13 +257,18 @@ public:
     bool configured(uint8_t i);
     bool configured(void);
 
+    /// Returns the instance of the primary compass
+    ///
+    /// @returns                    the instance number of the primary compass
+    ///
+    virtual uint8_t get_primary(void) const { return 0; }
+
     static const struct AP_Param::GroupInfo var_info[];
 
     // settable parameters
     AP_Int8 _learn;                             ///<enable calibration learning
 
 protected:
-    virtual uint8_t _get_primary(void) const { return 0; }
 
     bool _healthy[COMPASS_MAX_INSTANCES];
     Vector3f _field[COMPASS_MAX_INSTANCES];     ///< magnetic field strength
