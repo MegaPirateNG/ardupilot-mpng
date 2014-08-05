@@ -522,11 +522,21 @@ static struct {
 ////////////////////////////////////////////////////////////////////////////////
 static struct {
     // Flag for using gps ground course instead of INS yaw.  Set false when takeoff command in process.
-    bool takeoff_complete;
+    bool takeoff_complete:1;
 
     // Flag to indicate if we have landed.
     // Set land_complete if we are within 2 seconds distance or within 3 meters altitude of touchdown
-    bool land_complete;
+    bool land_complete:1;
+
+    // should we fly inverted?
+    bool inverted_flight:1;
+
+    // should we disable cross-tracking for the next waypoint?
+    bool next_wp_no_crosstrack:1;
+
+    // should we use cross-tracking for this waypoint?
+    bool no_crosstrack:1;
+
     // Altitude threshold to complete a takeoff command in autonomous modes.  Centimeters
     int32_t takeoff_altitude_cm;
 
@@ -542,18 +552,17 @@ static struct {
 
     // turn angle for next leg of mission
     float next_turn_angle;
-
-    // should we fly inverted?
-    bool inverted_flight;
 } auto_state = {
     takeoff_complete : true,
     land_complete : false,
+    inverted_flight  : false,
+    next_wp_no_crosstrack : true,
+    no_crosstrack : true,
     takeoff_altitude_cm : 0,
     takeoff_pitch_cd : 0,
     highest_airspeed : 0,
     initial_pitch_cd : 0,
-    next_turn_angle  : 90.0f,
-    inverted_flight  : false
+    next_turn_angle  : 90.0f
 };
 
 // true if we are in an auto-throttle mode, which means
@@ -1393,10 +1402,14 @@ static void update_navigation()
     }
 }
 
-static void update_flight_stage(AP_SpdHgtControl::FlightStage fs) {
+/*
+  set the flight stage
+ */
+static void set_flight_stage(AP_SpdHgtControl::FlightStage fs) 
+{
     //if just now entering land flight stage
     if (fs == AP_SpdHgtControl::FLIGHT_LAND_APPROACH &&
-            flight_stage != AP_SpdHgtControl::FLIGHT_LAND_APPROACH) {
+        flight_stage != AP_SpdHgtControl::FLIGHT_LAND_APPROACH) {
 
 #if GEOFENCE_ENABLED == ENABLED 
         if (g.fence_autoenable == 1) {
@@ -1407,7 +1420,6 @@ static void update_flight_stage(AP_SpdHgtControl::FlightStage fs) {
             }
         }
 #endif
-
     }
     
     flight_stage = fs;
@@ -1422,21 +1434,29 @@ static void update_alt()
 
     geofence_check(true);
 
+    update_flight_stage();
+}
+
+/*
+  recalculate the flight_stage
+ */
+static void update_flight_stage(void)
+{
     // Update the speed & height controller states
     if (auto_throttle_mode && !throttle_suppressed) {        
         if (control_mode==AUTO) {
             if (auto_state.takeoff_complete == false) {
-                update_flight_stage(AP_SpdHgtControl::FLIGHT_TAKEOFF);
+                set_flight_stage(AP_SpdHgtControl::FLIGHT_TAKEOFF);
             } else if (mission.get_current_nav_cmd().id == MAV_CMD_NAV_LAND && 
                        auto_state.land_complete == true) {
-                update_flight_stage(AP_SpdHgtControl::FLIGHT_LAND_FINAL);
+                set_flight_stage(AP_SpdHgtControl::FLIGHT_LAND_FINAL);
             } else if (mission.get_current_nav_cmd().id == MAV_CMD_NAV_LAND) {
-                update_flight_stage(AP_SpdHgtControl::FLIGHT_LAND_APPROACH); 
+                set_flight_stage(AP_SpdHgtControl::FLIGHT_LAND_APPROACH); 
             } else {
-                update_flight_stage(AP_SpdHgtControl::FLIGHT_NORMAL);
+                set_flight_stage(AP_SpdHgtControl::FLIGHT_NORMAL);
             }
         } else {
-            update_flight_stage(AP_SpdHgtControl::FLIGHT_NORMAL);
+            set_flight_stage(AP_SpdHgtControl::FLIGHT_NORMAL);
         }
 
         SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),

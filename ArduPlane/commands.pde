@@ -6,11 +6,19 @@
 /*
  *  set_next_WP - sets the target location the vehicle should fly to
  */
-static void set_next_WP(const struct Location& loc)
+static void set_next_WP(const struct Location &loc)
 {
-    // copy the current WP into the OldWP slot
-    // ---------------------------------------
-    prev_WP_loc = next_WP_loc;
+    if (auto_state.next_wp_no_crosstrack) {
+        // we should not try to cross-track for this waypoint
+        prev_WP_loc = current_loc;
+        // use cross-track for the next waypoint
+        auto_state.next_wp_no_crosstrack = false;
+        auto_state.no_crosstrack = true;
+    } else {
+        // copy the current WP into the OldWP slot
+        prev_WP_loc = next_WP_loc;
+        auto_state.no_crosstrack = false;
+    }
 
     // Load the next_WP slot
     // ---------------------
@@ -48,7 +56,7 @@ static void set_next_WP(const struct Location& loc)
 
     // used to control FBW and limit the rate of climb
     // -----------------------------------------------
-    set_target_altitude_current();
+    set_target_altitude_location(next_WP_loc);
 
     // zero out our loiter vals to watch for missed waypoints
     loiter_angle_reset();
@@ -79,6 +87,7 @@ static void set_guided_WP(void)
     // -----------------------------------------------
     set_target_altitude_current();
 
+    update_flight_stage();
     setup_glide_slope();
     setup_turn_angle();
 

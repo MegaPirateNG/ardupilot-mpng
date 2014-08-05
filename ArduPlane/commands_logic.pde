@@ -250,10 +250,12 @@ static bool verify_command(const AP_Mission::Mission_Command& cmd)        // Ret
 
 static void do_RTL(void)
 {
-    control_mode    = RTL;
+    auto_state.next_wp_no_crosstrack = true;
+    auto_state.no_crosstrack = true;
     prev_WP_loc = current_loc;
     next_WP_loc = rally.calc_best_rally_or_home_location(current_loc, get_RTL_altitude());
     setup_terrain_target_alt(next_WP_loc);
+    set_target_altitude_location(next_WP_loc);
 
     if (g.loiter_radius < 0) {
         loiter.direction = -1;
@@ -261,6 +263,7 @@ static void do_RTL(void)
         loiter.direction = 1;
     }
 
+    update_flight_stage();
     setup_glide_slope();
     setup_turn_angle();
 
@@ -272,7 +275,7 @@ static void do_takeoff(const AP_Mission::Mission_Command& cmd)
 {
     set_next_WP(cmd.content.location);
     // pitch in deg, airspeed  m/s, throttle %, track WP 1 or 0
-    auto_state.takeoff_pitch_cd        = (int)cmd.p1 * 100;
+    auto_state.takeoff_pitch_cd        = (int16_t)cmd.p1 * 100;
     auto_state.takeoff_altitude_cm     = next_WP_loc.alt;
     next_WP_loc.lat = home.lat + 10;
     next_WP_loc.lng = home.lng + 10;
@@ -357,13 +360,18 @@ static bool verify_takeoff()
         }
 #endif
 
+        // don't cross-track on completion of takeoff, as otherwise we
+        // can end up doing too sharp a turn
+        auto_state.next_wp_no_crosstrack = true;
         return true;
     } else {
         return false;
     }
 }
 
-// we are executing a landing
+/*
+  update navigation for landing
+ */
 static bool verify_land()
 {
     // we don't 'verify' landing in the sense that it never completes,
@@ -411,11 +419,19 @@ static bool verify_land()
     return false;
 }
 
+/*
+  update navigation for normal mission waypoints. Return true when the
+  waypoint is complete
+ */
 static bool verify_nav_wp()
 {
     steer_state.hold_course_cd = -1;
 
-    nav_controller->update_waypoint(prev_WP_loc, next_WP_loc);
+    if (auto_state.no_crosstrack) {
+        nav_controller->update_waypoint(current_loc, next_WP_loc);
+    } else {
+        nav_controller->update_waypoint(prev_WP_loc, next_WP_loc);
+    }
 
     // see if the user has specified a maximum distance to waypoint
     if (g.waypoint_max_radius > 0 && wp_distance > (uint16_t)g.waypoint_max_radius) {
@@ -643,6 +659,7 @@ static void exit_mission_callback()
             rally.calc_best_rally_or_home_location(current_loc, get_RTL_altitude());
         auto_rtl_command.id = MAV_CMD_NAV_LOITER_UNLIM;
         setup_terrain_target_alt(auto_rtl_command.content.location);
+        update_flight_stage();
         setup_glide_slope();
         setup_turn_angle();
         start_command(auto_rtl_command);
