@@ -19,6 +19,7 @@
 
 #include <AP_Common.h>
 #include <AP_HAL.h>
+#include <DataFlash.h>
 
 #if HAL_OS_POSIX_IO && defined(HAL_BOARD_TERRAIN_DIRECTORY)
 #define AP_TERRAIN_AVAILABLE 1
@@ -30,6 +31,8 @@
 
 #include <AP_Param.h>
 #include <AP_AHRS.h>
+#include <AP_Mission.h>
+#include <AP_Rally.h>
 
 #define TERRAIN_DEBUG 0
 
@@ -77,7 +80,7 @@
 class AP_Terrain
 {
 public:
-    AP_Terrain(AP_AHRS &_ahrs);
+    AP_Terrain(AP_AHRS &_ahrs, const AP_Mission &_mission, const AP_Rally &_rally);
 
     enum TerrainStatus {
         TerrainStatusDisabled  = 0, // not enabled
@@ -97,7 +100,7 @@ public:
     void send_request(mavlink_channel_t chan);
 
     // handle terrain data and reports from GCS
-    void send_terrain_report(mavlink_channel_t chan, const Location &loc);
+    void send_terrain_report(mavlink_channel_t chan, const Location &loc, bool extrapolate);
     void handle_data(mavlink_channel_t chan, mavlink_message_t *msg);
     void handle_terrain_check(mavlink_channel_t chan, mavlink_message_t *msg);
     void handle_terrain_data(mavlink_message_t *msg);
@@ -108,17 +111,21 @@ public:
 
     /* 
        find difference between home terrain height and the terrain
-       height at a given location in meters. A positive result means
-       the terrain is higher than home.
+       height at the current location in meters. A positive result
+       means the terrain is higher than home.
 
-       return false is terrain at the given location or at home
+       return false is terrain at the current location or at home
        location is not available
+
+       If extrapolate is true then allow return of an extrapolated
+       terrain altitude based on the last available data       
     */
-    bool height_terrain_difference_home(const Location &loc, float &terrain_difference);
+    bool height_terrain_difference_home(float &terrain_difference, 
+                                        bool extrapolate = false);
 
     /* 
        return estimated equivalent relative-to-home altitude in meters
-       of a given height above the terrain for a given location.
+       of a given height above the terrain at the current location
        
        This function allows existing height controllers which work on
        barometric altitude (relative to home) to be used with terrain
@@ -127,30 +134,36 @@ public:
        
        return false if terrain data is not available either at the given
        location or at the home location.  
+
+       If extrapolate is true then allow return of an extrapolated
+       terrain altitude based on the last available data
     */
-    bool height_relative_home_equivalent(const Location &loc, float terrain_altitude, float &relative_altitude);
+    bool height_relative_home_equivalent(float terrain_altitude, 
+                                         float &relative_altitude, 
+                                         bool extrapolate = false);
 
     /* 
-       return estimated height above the terrain in meters given a
-       relative-to-home altitude (such as barometric altitude) for a
-       given location
-       
-       return false if terrain data is not available either at the given
-       location or at the home location.  
-    */
-    bool height_above_terrain(const Location &loc, float relative_home_altitude, float &terrain_altitude);
+       return current height above terrain at current AHRS
+       position. 
 
-    /* 
-       alternative interface to height_above_terrain where
-       relative_altitude is taken from loc.alt (in centimeters)
-    */
-    bool height_above_terrain(const Location &loc, float &terrain_altitude);
+       If extrapolate is true then extrapolate from most recently
+       available terrain data is terrain data is not available for the
+       current location.
 
-    /* 
-       convert a Location altitude to a relative-to-home altitude in meters
-       This obeys the relative_alt and terrain_alt flags in Location.flags
+       Return true if height is available, otherwise false.
     */
-    bool location_to_relative_home(const Location &loc, float &relative_altitude);
+    bool height_above_terrain(float &terrain_altitude, bool extrapolate = false);
+
+    /*
+      calculate lookahead rise in terrain. This returns extra altitude
+      needed to clear upcoming terrain in meters
+     */
+    float lookahead(float bearing, float distance, float climb_ratio);
+
+    /*
+      log terrain status to DataFlash
+     */
+    void log_terrain_data(DataFlash_Class &dataflash);
 
 private:
     // allocate the terrain subsystem data
@@ -297,6 +310,17 @@ private:
     void write_block(void);
     void read_block(void);
 
+    /*
+      check for missing mission terrain data
+     */
+    void update_mission_data(void);
+
+    /*
+      check for missing rally data
+     */
+    void update_rally_data(void);
+
+
     // parameters
     AP_Int8  enable;
     AP_Int16 grid_spacing; // meters between grid points
@@ -304,6 +328,14 @@ private:
     // reference to AHRS, so we can ask for our position,
     // heading and speed
     AP_AHRS &ahrs;
+
+    // reference to AP_Mission, so we can ask preload terrain data for 
+    // all waypoints
+    const AP_Mission &mission;
+
+    // reference to AP_Rally, so we can ask preload terrain data for 
+    // all rally points
+    const AP_Rally &rally;
 
     // cache of grids in memory, LRU
     struct grid_cache cache[TERRAIN_GRID_BLOCK_CACHE_SIZE];
@@ -343,6 +375,30 @@ private:
     // cache the home altitude, as it is needed so often
     float home_height;
     Location home_loc;
+
+    // cache the last terrain height (AMSL) of the AHRS current
+    // location. This is used for extrapolation when terrain data is
+    // temporarily unavailable
+    bool have_current_loc_height;
+    float last_current_loc_height;
+
+    // next mission command to check
+    uint16_t next_mission_index;
+
+    // last time the mission changed
+    uint32_t last_mission_change_ms;
+
+    // grid spacing during mission check
+    uint16_t last_mission_spacing;
+
+    // next rally command to check
+    uint16_t next_rally_index;
+
+    // last time the rally points changed
+    uint32_t last_rally_change_ms;
+
+    // grid spacing during rally check
+    uint16_t last_rally_spacing;
 };
 #endif // AP_TERRAIN_AVAILABLE
 #endif // __AP_TERRAIN_H__

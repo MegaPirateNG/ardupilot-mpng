@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduPlane V3.0.4-beta3"
+#define THISFIRMWARE "ArduPlane V3.1.0-beta1"
 /*
    Lead developer: Andrew Tridgell
  
@@ -474,12 +474,6 @@ static AP_Frsky_Telem frsky_telemetry(ahrs, battery);
 AP_Airspeed airspeed(aparm);
 
 ////////////////////////////////////////////////////////////////////////////////
-// terrain handling
-#if AP_TERRAIN_AVAILABLE
-AP_Terrain terrain(ahrs);
-#endif
-
-////////////////////////////////////////////////////////////////////////////////
 // ACRO controller state
 ////////////////////////////////////////////////////////////////////////////////
 static struct {
@@ -600,6 +594,12 @@ AP_Mission mission(ahrs,
                    MISSION_START_BYTE, MISSION_END_BYTE);
 
 ////////////////////////////////////////////////////////////////////////////////
+// terrain handling
+#if AP_TERRAIN_AVAILABLE
+AP_Terrain terrain(ahrs, mission, rally);
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
 // Outback Challenge Failsafe Support
 ////////////////////////////////////////////////////////////////////////////////
 #if OBC_FAILSAFE == ENABLED
@@ -689,6 +689,9 @@ static struct {
     // target altitude above terrain in cm, valid if terrain_following
     // is set
     int32_t terrain_alt_cm;
+
+    // lookahead value for height error reporting
+    float lookahead;
 #endif
 } target_altitude;
 
@@ -1016,6 +1019,9 @@ static void one_second_loop()
 
 #if AP_TERRAIN_AVAILABLE
     terrain.update();
+    if (should_log(MASK_LOG_GPS)) {
+        terrain.log_terrain_data(DataFlash);
+    }
 #endif
 }
 

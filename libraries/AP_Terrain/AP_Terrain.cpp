@@ -19,6 +19,7 @@
 #include <AP_Math.h>
 #include <GCS_MAVLink.h>
 #include <GCS.h>
+#include <DataFlash.h>
 #include "AP_Terrain.h"
 
 #if AP_TERRAIN_AVAILABLE
@@ -36,10 +37,10 @@ extern const AP_HAL::HAL& hal;
 // table of user settable parameters
 const AP_Param::GroupInfo AP_Terrain::var_info[] PROGMEM = {
     // @Param: ENABLE
-    // @DisplayName: Terrain following enable
-    // @Description: enable terrain following. This enables the vehicle storing a database of terrain data on the SD card. The terrain data is requested from the ground station as needed, and stored for later use on the SD card. To be useful the ground station must support TERRAIN_REQUEST messages and have access to a terrain database, such as the SRTM database.
+    // @DisplayName: Terrain data enable
+    // @Description: enable terrain data. This enables the vehicle storing a database of terrain data on the SD card. The terrain data is requested from the ground station as needed, and stored for later use on the SD card. To be useful the ground station must support TERRAIN_REQUEST messages and have access to a terrain database, such as the SRTM database.
     // @Values: 0:Disable,1:Enable
-    AP_GROUPINFO("ENABLE",    0, AP_Terrain, enable, 0),
+    AP_GROUPINFO("ENABLE",    0, AP_Terrain, enable, 1),
 
     // @Param: SPACING
     // @DisplayName: Terrain grid spacing
@@ -52,8 +53,10 @@ const AP_Param::GroupInfo AP_Terrain::var_info[] PROGMEM = {
 };
 
 // constructor
-AP_Terrain::AP_Terrain(AP_AHRS &_ahrs) :
+AP_Terrain::AP_Terrain(AP_AHRS &_ahrs, const AP_Mission &_mission, const AP_Rally &_rally) :
     ahrs(_ahrs),
+    mission(_mission),
+    rally(_rally),
     disk_io_state(DiskIoIdle),
     last_request_time_ms(0),
     fd(-1),
@@ -62,7 +65,9 @@ AP_Terrain::AP_Terrain(AP_AHRS &_ahrs) :
     file_lon_degrees(0),
     io_failure(false),
     directory_created(false),
-    home_height(0)
+    home_height(0),
+    have_current_loc_height(false),
+    last_current_loc_height(0)
 {
     AP_Param::setup_object_defaults(this, var_info);
     memset(&home_loc, 0, sizeof(home_loc));
@@ -75,6 +80,8 @@ AP_Terrain::AP_Terrain(AP_AHRS &_ahrs) :
 
   This is the base function that other height calculations are derived
   from. The functions below are more convenient for most uses
+
+  This function costs about 20 microseconds on Pixhawk
  */
 bool AP_Terrain::height_amsl(const Location &loc, float &height)
 {
@@ -148,7 +155,7 @@ bool AP_Terrain::height_amsl(const Location &loc, float &height)
    return false is terrain at the given location or at home
    location is not available
 */
-bool AP_Terrain::height_terrain_difference_home(const Location &loc, float &terrain_difference)
+bool AP_Terrain::height_terrain_difference_home(float &terrain_difference, bool extrapolate)
 {
     float height_home, height_loc;
     if (!height_amsl(ahrs.get_home(), height_home)) {
@@ -156,9 +163,22 @@ bool AP_Terrain::height_terrain_difference_home(const Location &loc, float &terr
         return false;
     }
 
-    if (!height_amsl(loc, height_loc)) {
-        // we don't know the height of the given location
+    Location loc;
+    if (!ahrs.get_position(loc)) {
+        // we don't know where we are
         return false;
+    }
+
+    if (!height_amsl(loc, height_loc)) {
+        if (!extrapolate || !have_current_loc_height) {
+            // we don't know the height of the given location
+            return false;
+        }
+        // we don't have data at the current location, but the caller
+        // has asked for extrapolation, so use the last available
+        // terrain height. This can be used to fill in while new data
+        // is fetched. It should be very rarely used
+        height_loc = last_current_loc_height;
     }
 
     terrain_difference = height_loc - height_home;
@@ -167,83 +187,102 @@ bool AP_Terrain::height_terrain_difference_home(const Location &loc, float &terr
 }
 
 /* 
-   return estimated height above the terrain given a relative-to-home
-   altitude (such as a barometric altitude) for a given location
-       
-   return false if terrain data is not available either at the given
-   location or at the home location.  
+   return current height above terrain at current AHRS
+   position. 
+   
+   If extrapolate is true then extrapolate from most recently
+   available terrain data is terrain data is not available for the
+   current location.
+   
+   Return true if height is available, otherwise false.
 */
-bool AP_Terrain::height_above_terrain(const Location &loc, float relative_home_altitude, float &terrain_altitude)
+bool AP_Terrain::height_above_terrain(float &terrain_altitude, bool extrapolate)
 {
     float terrain_difference;
-    if (!height_terrain_difference_home(loc, terrain_difference)) {
+    if (!height_terrain_difference_home(terrain_difference, extrapolate)) {
         return false;
+    }
+    Location loc;
+    if (!ahrs.get_position(loc)) {
+        // we don't know where we are
+        return false;
+    }
+    float relative_home_altitude = loc.alt*0.01f;
+    if (!loc.flags.relative_alt) {
+        // loc.alt has home altitude added, remove it
+        relative_home_altitude -= ahrs.get_home().alt*0.01f;
     }
     terrain_altitude = relative_home_altitude - terrain_difference;
     return true;
 }
 
 /* 
-   alternative interface to height_above_terrain where
-   relative_altitude is taken from loc.alt (in centimeters)
-*/
-bool AP_Terrain::height_above_terrain(const Location &loc, float &terrain_altitude)
-{
-    float relative_home_altitude = loc.alt*0.01f;
-    if (!loc.flags.relative_alt) {
-        // loc.alt has home altitude added, remove it
-        relative_home_altitude -= ahrs.get_home().alt*0.01f;
-    }
-    return height_above_terrain(loc, relative_home_altitude, terrain_altitude);
-}
-
-/* 
-   return estimated equivalent relative-to-home altitude in meters of
-   a given height above the terrain for a given location.
-
+   return estimated equivalent relative-to-home altitude in meters
+   of a given height above the terrain at the current location
+       
    This function allows existing height controllers which work on
    barometric altitude (relative to home) to be used with terrain
    based target altitude, by translating the "above terrain" altitude
    into an equivalent barometric relative height.
-
+   
    return false if terrain data is not available either at the given
    location or at the home location.  
+   
+   If extrapolate is true then allow return of an extrapolated
+   terrain altitude based on the last available data
 */
-bool AP_Terrain::height_relative_home_equivalent(const Location &loc, float terrain_altitude, float &relative_home_altitude)
+bool AP_Terrain::height_relative_home_equivalent(float terrain_altitude, 
+                                                 float &relative_home_altitude,
+                                                 bool extrapolate)
 {
     float terrain_difference;
-    if (!height_terrain_difference_home(loc, terrain_difference)) {
+    if (!height_terrain_difference_home(terrain_difference, extrapolate)) {
         return false;
     }
     relative_home_altitude = terrain_altitude + terrain_difference;
     return true;
 }
 
-/* 
-   convert a Location altitude to a relative-to-home altitude in meters
-   This obeys the relative_alt and terrain_alt flags in Location.flags
+
+/*
+  calculate lookahead rise in terrain. This returns extra altitude
+  needed to clear upcoming terrain in meters
 */
-bool AP_Terrain::location_to_relative_home(const Location &loc, float &relative_altitude)
+float AP_Terrain::lookahead(float bearing, float distance, float climb_ratio)
 {
-    if (!loc.flags.terrain_alt) {
-        // its not a terrain alt
-        relative_altitude = loc.alt*0.01f;
-        if (!loc.flags.relative_alt) {
-            relative_altitude -= ahrs.get_home().alt*0.01f;
+    if (!enable || grid_spacing <= 0) {
+        return 0;
+    }
+
+    Location loc;
+    if (!ahrs.get_position(loc)) {
+        // we don't know where we are
+        return 0;
+    }
+    float base_height;
+    if (!height_amsl(loc, base_height)) {
+        // we don't know our current terrain height
+        return 0;
+    }
+
+    float climb = 0;
+    float lookahead_estimate = 0;
+
+    // check for terrain at grid spacing intervals
+    while (distance > 0) {
+        location_update(loc, bearing, grid_spacing);
+        climb += climb_ratio * grid_spacing;
+        distance -= grid_spacing;
+        float height;
+        if (height_amsl(loc, height)) {
+            float rise = (height - base_height) - climb;
+            if (rise > lookahead_estimate) {
+                lookahead_estimate = rise;
+            }
         }
-        return true;
     }
 
-    if (!height_relative_home_equivalent(loc, loc.alt*0.01f, relative_altitude)) {
-        return false;
-    }
-
-    // if terrain_alt is set and relative_alt is not set then Location
-    // is still offset by home alt
-    if (!loc.flags.relative_alt) {
-        relative_altitude -= ahrs.get_home().alt*0.01f;
-    }
-    return true;
+    return lookahead_estimate;
 }
 
 
@@ -260,6 +299,19 @@ void AP_Terrain::update(void)
     // try to ensure the home location is populated
     float height;
     height_amsl(ahrs.get_home(), height);
+
+    // update the cached current location height
+    Location loc;
+    if (ahrs.get_position(loc) && height_amsl(loc, height)) {
+        last_current_loc_height = height;
+        have_current_loc_height = true;
+    }
+
+    // check for pending mission data
+    update_mission_data();
+
+    // check for pending rally data
+    update_rally_data();
 }
 
 /*
@@ -281,6 +333,42 @@ enum AP_Terrain::TerrainStatus AP_Terrain::status(void)
         return TerrainStatusUnhealthy;        
     }
     return TerrainStatusOK; 
+}
+
+/*
+  log terrain data to dataflash log
+ */
+void AP_Terrain::log_terrain_data(DataFlash_Class &dataflash)
+{
+    if (!enable) {
+        return;
+    }
+    Location loc;
+    if (!ahrs.get_position(loc)) {
+        // we don't know where we are
+        return;
+    }
+    float terrain_height = 0;
+    float current_height = 0;
+    uint16_t pending, loaded;
+
+    height_amsl(loc, terrain_height);
+    height_above_terrain(current_height, true);
+    get_statistics(pending, loaded);
+
+    struct log_TERRAIN pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_TERRAIN_MSG),
+        time_ms        : hal.scheduler->millis(),
+        status         : (uint8_t)status(),
+        lat            : loc.lat,
+        lng            : loc.lng,
+        spacing        : grid_spacing,
+        terrain_height : terrain_height,
+        current_height : current_height,
+        pending        : pending,
+        loaded         : loaded
+    };
+    dataflash.WriteBlock(&pkt, sizeof(pkt));
 }
 
 #endif // AP_TERRAIN_AVAILABLE

@@ -118,8 +118,10 @@ public:
         k_param_sonar,
         k_param_terrain,
         k_param_terrain_follow,
-        k_param_stab_pitch_down_cd,
+        k_param_stab_pitch_down_cd_old, // deprecated
         k_param_glide_slope_threshold,
+        k_param_stab_pitch_down,
+        k_param_terrain_lookahead,
 
         // 100: Arming parameters
         k_param_arming = 100,
@@ -326,7 +328,7 @@ public:
     AP_Float kff_throttle_to_pitch;
     AP_Float ground_steer_alt;
     AP_Int16 ground_steer_dps;
-    AP_Int16 stab_pitch_down_cd;
+    AP_Float stab_pitch_down;
 
     // speed used for speed scaling
     AP_Float scaling_speed;
@@ -452,6 +454,7 @@ public:
     AP_Int8 flaperon_output;
 #if AP_TERRAIN_AVAILABLE
     AP_Int8 terrain_follow;
+    AP_Int16 terrain_lookahead;
 #endif
     AP_Int16 glide_slope_threshold;
 
