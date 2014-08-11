@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduPlane V3.1.0-beta1"
+#define THISFIRMWARE "ArduPlane V3.1.0-beta2"
 /*
    Lead developer: Andrew Tridgell
  
@@ -804,8 +804,6 @@ void setup() {
     AP_Notify::flags.failsafe_battery = false;
 
     notify.init(false);
-
-    battery.init();
 
     rssi_analog_source = hal.analogin->channel(ANALOG_INPUT_NONE);
 

@@ -56,6 +56,7 @@
 #define AUX_SWITCH_ATTCON_FEEDFWD   25      // enable/disable the roll and pitch rate feed forward
 #define AUX_SWITCH_ATTCON_ACCEL_LIM 26      // enable/disable the roll, pitch and yaw accel limiting
 #define AUX_SWITCH_RETRACT_MOUNT    27      // Retract Mount
+#define AUX_SWITCH_RELAY            28      // Relay pin on/off (only supports first relay)
 
 // values used by the ap.ch7_opt and ap.ch8_opt flags
 #define AUX_SWITCH_LOW              0       // indicates auxiliar switch is in the low position (pwm <1200)
@@ -126,7 +127,7 @@
 #define CH6_WP_SPEED                    10  // maximum speed to next way point (0 to 10m/s)
 #define CH6_ACRO_RP_KP                  25  // acro controller's P term.  converts pilot input to a desired roll, pitch or yaw rate
 #define CH6_ACRO_YAW_KP                 40  // acro controller's P term.  converts pilot input to a desired roll, pitch or yaw rate
-#define CH6_RELAY                       9   // switch relay on if ch6 high, off if low
+#define CH6_RELAY                       9   // deprecated -- remove
 #define CH6_HELI_EXTERNAL_GYRO          13  // TradHeli specific external tail gyro gain
 #define CH6_OPTFLOW_KP                  17  // optical flow loiter controller's P term (position error to tilt angle)
 #define CH6_OPTFLOW_KI                  18  // optical flow loiter controller's I term (position error to tilt angle)
@@ -374,8 +375,8 @@ enum FlipState {
 // parachute failed to deploy because of low altitude
 #define ERROR_CODE_PARACHUTE_TOO_LOW        2
 // EKF check definitions
-#define ERROR_CODE_EKF_CHECK_BAD_COMPASS    2
-#define ERROR_CODE_EKF_CHECK_BAD_COMPASS_CLEARED    0
+#define ERROR_CODE_EKF_CHECK_BAD_VARIANCE   2
+#define ERROR_CODE_EKF_CHECK_BAD_VARIANCE_CLEARED    0
 // Baro specific error codes
 #define ERROR_CODE_BARO_GLITCH              2
 
