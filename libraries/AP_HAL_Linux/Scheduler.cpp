@@ -4,8 +4,8 @@
 
 #include "Scheduler.h"
 #include "Storage.h"
+#include "RCInput.h"
 #include "UARTDriver.h"
-#include <unistd.h>
 #include <sys/time.h>
 #include <poll.h>
 #include <unistd.h>
@@ -18,8 +18,9 @@ using namespace Linux;
 
 extern const AP_HAL::HAL& hal;
 
-#define APM_LINUX_TIMER_PRIORITY    13
-#define APM_LINUX_UART_PRIORITY     12
+#define APM_LINUX_TIMER_PRIORITY    14
+#define APM_LINUX_UART_PRIORITY     13
+#define APM_LINUX_RCIN_PRIORITY     12
 #define APM_LINUX_MAIN_PRIORITY     11
 #define APM_LINUX_IO_PRIORITY       10
 
@@ -67,7 +68,15 @@ void LinuxScheduler::init(void* machtnichts)
     pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
 
     pthread_create(&_uart_thread_ctx, &thread_attr, (pthread_startroutine_t)&Linux::LinuxScheduler::_uart_thread, this);
-    
+
+    // the RCIN thread runs at a lower medium priority    
+    pthread_attr_init(&thread_attr);
+    param.sched_priority = APM_LINUX_RCIN_PRIORITY;
+    (void)pthread_attr_setschedparam(&thread_attr, &param);
+    pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
+
+    pthread_create(&_rcin_thread_ctx, &thread_attr, (pthread_startroutine_t)&Linux::LinuxScheduler::_rcin_thread, this);
+  
     // the IO thread runs at lower priority
     pthread_attr_init(&thread_attr);
     param.sched_priority = APM_LINUX_IO_PRIORITY;
@@ -91,9 +100,9 @@ void LinuxScheduler::delay(uint16_t ms)
         stopped_clock_usec += 1000UL*ms;
         return;
     }
-    uint32_t start = millis();
+    uint64_t start = millis64();
     
-    while ((millis() - start) < ms) {
+    while ((millis64() - start) < ms) {
         // this yields the CPU to other apps
         _microsleep(1000);
         if (_min_delay_cb_ms <= ms) {
@@ -104,7 +113,7 @@ void LinuxScheduler::delay(uint16_t ms)
     }
 }
 
-uint32_t LinuxScheduler::millis() 
+uint64_t LinuxScheduler::millis64() 
 {
     if (stopped_clock_usec) {
         return stopped_clock_usec/1000;
@@ -116,7 +125,7 @@ uint32_t LinuxScheduler::millis()
                    (_sketch_start_time.tv_nsec*1.0e-9)));
 }
 
-uint32_t LinuxScheduler::micros() 
+uint64_t LinuxScheduler::micros64() 
 {
     if (stopped_clock_usec) {
         return stopped_clock_usec;
@@ -126,6 +135,16 @@ uint32_t LinuxScheduler::micros()
     return 1.0e6*((ts.tv_sec + (ts.tv_nsec*1.0e-9)) - 
                   (_sketch_start_time.tv_sec +
                    (_sketch_start_time.tv_nsec*1.0e-9)));
+}
+
+uint32_t LinuxScheduler::millis() 
+{
+    return millis64() & 0xFFFFFFFF;
+}
+
+uint32_t LinuxScheduler::micros() 
+{
+    return micros64() & 0xFFFFFFFF;
 }
 
 void LinuxScheduler::delay_microseconds(uint16_t us)
@@ -181,7 +200,7 @@ void LinuxScheduler::suspend_timer_procs()
 {
     _timer_suspended = true;
     while (_in_timer_proc) {
-        usleep(1);
+        delay_microseconds(20);
     }
 }
 
@@ -226,12 +245,22 @@ void *LinuxScheduler::_timer_thread(void)
     while (system_initializing()) {
         poll(NULL, 0, 1);        
     }
+    /*
+      this aims to run at an average of 1kHz, so that it can be used
+      to drive 1kHz processes without drift
+     */
+    uint64_t next_run_usec = micros64() + 1000;
     while (true) {
-        _microsleep(1000);
-
+        uint64_t dt = next_run_usec - micros64();
+        if (dt > 2000) {
+            // we've lost sync - restart
+            next_run_usec = micros64();
+        } else {
+            _microsleep(dt);
+        }
+        next_run_usec += 1000;
         // run registered timers
         _run_timers(true);
-
     }
     return NULL;
 }
@@ -253,6 +282,20 @@ void LinuxScheduler::_run_io(void)
     }
 
     _in_io_proc = false;
+}
+
+void *LinuxScheduler::_rcin_thread(void)
+{
+    _setup_realtime(32768);
+    while (system_initializing()) {
+        poll(NULL, 0, 1);        
+    }
+    while (true) {
+        _microsleep(10000);
+
+        ((LinuxRCInput *)hal.rcin)->_timer_tick();
+    }
+    return NULL;
 }
 
 void *LinuxScheduler::_uart_thread(void)
