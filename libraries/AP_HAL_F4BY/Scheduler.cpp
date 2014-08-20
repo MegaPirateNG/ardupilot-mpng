@@ -22,6 +22,7 @@
 #include "Storage.h"
 #include "RCOutput.h"
 #include "RCInput.h"
+#include <AP_Scheduler.h>
 
 using namespace F4BY;
 
@@ -37,8 +38,6 @@ F4BYScheduler::F4BYScheduler() :
 
 void F4BYScheduler::init(void *unused) 
 {
-    _sketch_start_time = hrt_absolute_time();
-
     _main_task_pid = getpid();
 
     // setup the timer thread - this will call tasks at 1kHz
@@ -75,14 +74,24 @@ void F4BYScheduler::init(void *unused)
 	pthread_create(&_io_thread_ctx, &thread_attr, (pthread_startroutine_t)&F4BY::F4BYScheduler::_io_thread, this);
 }
 
+uint64_t F4BYScheduler::micros64() 
+{
+    return hrt_absolute_time();
+}
+
+uint64_t F4BYScheduler::millis64() 
+{
+    return micros64() / 1000;
+}
+
 uint32_t F4BYScheduler::micros() 
 {
-    return (uint32_t)(hrt_absolute_time() - _sketch_start_time);
+    return micros64() & 0xFFFFFFFF;
 }
 
 uint32_t F4BYScheduler::millis() 
 {
-    return hrt_absolute_time() / 1000;
+    return millis64() & 0xFFFFFFFF;
 }
 
 /**
@@ -105,9 +114,9 @@ void F4BYScheduler::delay_microseconds(uint16_t usec)
         perf_end(_perf_delay);
         return;
     }
-	uint32_t start = micros();
-    uint32_t dt;
-	while ((dt=(micros() - start)) < usec) {
+	uint64_t start = micros64();
+    uint64_t dt;
+	while ((dt=(micros64() - start)) < usec) {
 		up_udelay(usec - dt);
 	}
     perf_end(_perf_delay);
@@ -120,9 +129,9 @@ void F4BYScheduler::delay(uint16_t ms)
         return;
     }
     perf_begin(_perf_delay);
-	uint64_t start = hrt_absolute_time();
+	uint64_t start = micros64();
     
-    while ((hrt_absolute_time() - start)/1000 < ms && 
+    while ((micros64() - start)/1000 < ms && 
            !_f4by_thread_should_exit) {
         delay_microseconds_semaphore(1000);
         if (_min_delay_cb_ms <= ms) {
@@ -229,8 +238,11 @@ void F4BYScheduler::_run_timers(bool called_from_timer_thread)
     _in_timer_proc = false;
 }
 
+extern bool f4by_ran_overtime;
+
 void *F4BYScheduler::_timer_thread(void)
 {
+    uint32_t last_ran_overtime = 0;
     while (!_hal_initialized) {
         poll(NULL, 0, 1);        
     }
@@ -247,6 +259,12 @@ void *F4BYScheduler::_timer_thread(void)
 
         // process any pending RC input requests
         ((F4BYRCInput *)hal.rcin)->_timer_tick();
+
+        if (f4by_ran_overtime && millis() - last_ran_overtime > 2000) {
+            last_ran_overtime = millis();
+            printf("Overtime in task %d\n", (int)AP_Scheduler::current_task);
+            hal.console->printf("Overtime in task %d\n", (int)AP_Scheduler::current_task);
+        }
     }
     return NULL;
 }
@@ -283,6 +301,7 @@ void *F4BYScheduler::_uart_thread(void)
         ((F4BYUARTDriver *)hal.uartB)->_timer_tick();
         ((F4BYUARTDriver *)hal.uartC)->_timer_tick();
         ((F4BYUARTDriver *)hal.uartD)->_timer_tick();
+        ((F4BYUARTDriver *)hal.uartE)->_timer_tick();
     }
     return NULL;
 }
