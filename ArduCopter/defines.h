@@ -310,25 +310,6 @@ enum FlipState {
 // Centi-degrees to radians
 #define DEGX100 5729.57795f
 
-// fence points are stored at the end of the EEPROM
-#define MAX_FENCEPOINTS 6
-#define FENCE_WP_SIZE sizeof(Vector2l)
-#define FENCE_START_BYTE (HAL_STORAGE_SIZE_AVAILABLE-(MAX_FENCEPOINTS*FENCE_WP_SIZE))
-
-// rally points shoehorned between fence points and waypoints
-#define MAX_RALLYPOINTS 6
-#define RALLY_START_BYTE (FENCE_START_BYTE-(MAX_RALLYPOINTS*AC_RALLY_WP_SIZE))
-#define RALLY_LIMIT_KM_DEFAULT 2.0  // we'll set a per-vehicle default for this
-
-// parameters get the first 1536 bytes of EEPROM
-// mission commands are stored between these params and the rally points, or fence points if rally disabled
-#define MISSION_START_BYTE   0x600
-#if AC_RALLY == ENABLED
-  #define MISSION_END_BYTE   (RALLY_START_BYTE-1)
-#else
-  #define MISSION_END_BYTE   (FENCE_START_BYTE-1)
-#endif
-
 // mark a function as not to be inlined
 #define NOINLINE __attribute__((noinline))
 
@@ -348,8 +329,8 @@ enum FlipState {
 #define ERROR_SUBSYSTEM_FLIP                13
 #define ERROR_SUBSYSTEM_AUTOTUNE            14
 #define ERROR_SUBSYSTEM_PARACHUTE           15
-#define ERROR_SUBSYSTEM_EKF_CHECK           16
-#define ERROR_SUBSYSTEM_FAILSAFE_EKF        17
+#define ERROR_SUBSYSTEM_EKFINAV_CHECK       16
+#define ERROR_SUBSYSTEM_FAILSAFE_EKFINAV    17
 #define ERROR_SUBSYSTEM_BARO                18
 // general error codes
 #define ERROR_CODE_ERROR_RESOLVED           0
@@ -375,8 +356,8 @@ enum FlipState {
 // parachute failed to deploy because of low altitude
 #define ERROR_CODE_PARACHUTE_TOO_LOW        2
 // EKF check definitions
-#define ERROR_CODE_EKF_CHECK_BAD_VARIANCE   2
-#define ERROR_CODE_EKF_CHECK_BAD_VARIANCE_CLEARED    0
+#define ERROR_CODE_EKFINAV_CHECK_BAD_VARIANCE       2
+#define ERROR_CODE_EKFINAV_CHECK_VARIANCE_CLEARED   0
 // Baro specific error codes
 #define ERROR_CODE_BARO_GLITCH              2
 
