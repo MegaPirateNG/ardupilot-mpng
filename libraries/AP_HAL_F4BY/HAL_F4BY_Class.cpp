@@ -78,7 +78,7 @@ HAL_F4BY::HAL_F4BY() :
 bool _f4by_thread_should_exit = false;        /**< Daemon exit flag */
 static bool thread_running = false;        /**< Daemon status flag */
 static int daemon_task;                /**< Handle of daemon task / thread */
-static bool ran_overtime;
+bool f4by_ran_overtime;
 
 extern const AP_HAL::HAL& hal;
 
@@ -101,7 +101,7 @@ static void set_priority(uint8_t priority)
 static void loop_overtime(void *)
 {
     set_priority(APM_OVERTIME_PRIORITY);
-    ran_overtime = true;
+    f4by_ran_overtime = true;
 }
 
 static int main_loop(int argc, char **argv)
@@ -156,14 +156,14 @@ static int main_loop(int argc, char **argv)
 
         loop();
 
-        if (ran_overtime) {
+        if (f4by_ran_overtime) {
             /*
               we ran over 1s in loop(), and our priority was lowered
               to let a driver run. Set it back to high priority now.
              */
             set_priority(APM_MAIN_PRIORITY);
             perf_count(perf_overrun);
-            ran_overtime = false;
+            f4by_ran_overtime = false;
         }
 
         perf_end(perf_loop);
