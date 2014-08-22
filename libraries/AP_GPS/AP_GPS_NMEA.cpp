@@ -65,9 +65,12 @@ extern const AP_HAL::HAL& hal;
 //
 #define MTK_INIT_MSG \
     "$PMTK314,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0*28\r\n" /* GGA & VTG once every fix */ \
+    "$PMTK397,0*23\r\n" /* Set Nav Threshold (the minimum speed the GPS must be moving to update the position) to 0 m/s */ \
     "$PMTK330,0*2E\r\n"                                 /* datum = WGS84 */ \
     "$PMTK313,1*2E\r\n"                                 /* SBAS on */ \
-    "$PMTK301,2*2E\r\n"                                 /* use SBAS data for DGPS */
+    "$PMTK301,2*2E\r\n"                                 /* use SBAS data for DGPS */ \
+    "$PMTK319,0*25\r\n" /* SBAS_TEST_MODE */ \
+    "$PMTK220,200*2C\r\n" /* Output at 5Hz */
 
 // ublox init messages /////////////////////////////////////////////////////////
 //
