@@ -60,6 +60,7 @@ MODULES         += systemcmds/auth
 MODULES		+= modules/systemlib
 MODULES		+= modules/systemlib/mixer
 MODULES		+= modules/uORB
+MODULES		+= modules/can_esc
 MODULES		+= lib/mathlib/math/filter
 MODULES	        += modules/libtomfastmath
 MODULES         += modules/libtomcrypt
