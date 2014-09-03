@@ -183,6 +183,12 @@ void AP_Mission::update()
         if (_cmd_verify_fn(_nav_cmd)) {
             // market _nav_cmd as complete (it will be started on the next iteration)
             _flags.nav_cmd_loaded = false;
+            // immediately advance to the next mission command
+            if (!advance_current_nav_cmd()) {
+                // failure to advance nav command means mission has completed
+                complete();
+                return;
+            }
         }
     }
 
@@ -460,7 +466,18 @@ bool AP_Mission::mavlink_to_mission_cmd(const mavlink_mission_item_t& packet, AP
 
     case MAV_CMD_NAV_WAYPOINT:                          // MAV ID: 16
         copy_location = true;
-        cmd.p1 = packet.param1;                         // delay at waypoint in seconds
+        /*
+          the 15 byte limit means we can't fit both delay and radius
+          in the cmd structure. When we expand the mission structure
+          we can do this properly
+         */
+#if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
+        // acceptance radius in meters
+        cmd.p1 = packet.param2;
+#else
+        // delay at waypoint in seconds
+        cmd.p1 = packet.param1;                         
+#endif
         break;
 
     case MAV_CMD_NAV_LOITER_UNLIM:                      // MAV ID: 17

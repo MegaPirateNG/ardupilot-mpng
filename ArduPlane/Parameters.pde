@@ -206,6 +206,14 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: User
     GSCALAR(takeoff_throttle_slewrate, "TKOFF_THR_SLEW",  0),
 
+    // @Param: TKOFF_FLAP_PCNT
+    // @DisplayName: Takeoff flap percentage
+    // @Description: The amount of flaps (as a percentage) to apply in automatic takeoff
+    // @Range: 0 100
+    // @Units: Percent
+    // @User: Advanced
+    GSCALAR(takeoff_flap_percent,     "TKOFF_FLAP_PCNT", 0),
+
     // @Param: FBWA_TDRAG_CHAN
     // @DisplayName: FBWA taildragger channel
     // @Description: This is a RC input channel which when it goes above 1700 enables FBWA taildragger takeoff mode. It should be assigned to a momentary switch. Once this feature is enabled it will stay enabled until the aircraft goes above TKOFF_TDRAG_SPD1 airspeed, changes mode, or the pitch goes above the initial pitch when this is engaged or goes below 0 pitch. When enabled the elevator will be forced to TKOFF_TDRAG_ELEV. This option allows for easier takeoffs on taildraggers in FBWA mode, and also makes it easier to test auto-takeoff steering handling in FBWA. Setting it to 0 disables this option.
@@ -226,7 +234,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Description: Used in autoland for planes without airspeed sensors in hundredths of a degree
     // @Units: centi-Degrees
     // @User: Advanced
-    GSCALAR(land_pitch_cd,          "LAND_PITCH_CD",  0),
+    ASCALAR(land_pitch_cd,          "LAND_PITCH_CD",  0),
 
     // @Param: LAND_FLARE_ALT
     // @DisplayName: Landing flare altitude
@@ -417,7 +425,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: THR_MIN
     // @DisplayName: Minimum Throttle
-    // @Description: The minimum throttle setting to which the autopilot will apply.
+    // @Description: The minimum throttle setting (as a percentage) which the autopilot will apply. For the final stage of an automatic landing this is always zero.
     // @Units: Percent
     // @Range: 0 100
     // @Increment: 1
@@ -426,7 +434,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: THR_MAX
     // @DisplayName: Maximum Throttle
-    // @Description: The maximum throttle setting as a percentage which the autopilot will apply.
+    // @Description: The maximum throttle setting (as a percentage) which the autopilot will apply.
     // @Units: Percent
     // @Range: 0 100
     // @Increment: 1
@@ -450,6 +458,15 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Increment: 1
     // @User: Standard
     ASCALAR(throttle_slewrate,      "THR_SLEWRATE",   100),
+
+    // @Param: FLAP_SLEWRATE
+    // @DisplayName: Flap slew rate
+    // @Description: maximum percentage change in flap output per second. A setting of 25 means to not change the flap by more than 25% of the full flap range in one second. A value of 0 means no rate limiting.
+    // @Units: Percent
+    // @Range: 0 100
+    // @Increment: 1
+    // @User: Advanced
+    GSCALAR(flap_slewrate,          "FLAP_SLEWRATE",   75),
 
     // @Param: THR_SUPP_MAN
     // @DisplayName: Throttle suppress manual passthru
@@ -849,6 +866,14 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Advanced
     GSCALAR(flap_2_speed,           "FLAP_2_SPEED",   FLAP_2_SPEED),
 
+    // @Param: LAND_FLAP_PERCNT
+    // @DisplayName: Landing flap percentage
+    // @Description: The amount of flaps (as a percentage) to apply in the landing approach and flare of an automatic landing
+    // @Range: 0 100
+    // @Units: Percent
+    // @User: Advanced
+    GSCALAR(land_flap_percent,     "LAND_FLAP_PERCNT", 0),
+
     // @Param: RSSI_PIN
     // @DisplayName: Receiver RSSI sensing pin
     // @Description: This selects an analog pin for the receiver RSSI voltage. It assumes the voltage is 5V for max rssi, 0V for minimum
@@ -916,7 +941,14 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Group: RNGFND
     // @Path: ../libraries/AP_RangeFinder/RangeFinder.cpp
-    GOBJECT(sonar,                  "RNGFND", RangeFinder),
+    GOBJECT(rangefinder,            "RNGFND", RangeFinder),
+
+    // @Param: RNGFND_LANDING
+    // @DisplayName: Enable rangefinder for landing
+    // @Description: This enables the use of a rangefinder for automatic landing. The rangefinder will be used both on the landing approach and for final flare
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Standard
+    GSCALAR(rangefinder_landing,    "RNGFND_LANDING",   0),
 
 #if AP_TERRAIN_AVAILABLE
     // @Group: TERRAIN_
