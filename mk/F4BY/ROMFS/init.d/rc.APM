@@ -55,7 +55,7 @@ then
 fi
 
 set deviceC /dev/ttyS1
-set deviceD /dev/null
+set deviceD /dev/ttyS3
 
 if uorb start
 then
