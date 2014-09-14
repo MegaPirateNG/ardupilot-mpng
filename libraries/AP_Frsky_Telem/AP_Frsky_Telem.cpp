@@ -85,7 +85,7 @@ void  AP_Frsky_Telem::frsky_send_data(uint8_t id, int16_t data)
  * Sends frame 1 (every 200ms):
  *  barometer altitude,  battery voltage & current
  */
-void AP_Frsky_Telem::frsky_send_frame1(uint8_t mode)
+void AP_Frsky_Telem::frsky_send_frame1(uint8_t mode, uint16_t throttle)
 {
     struct Location loc;
     float battery_amps = _battery.current_amps();
@@ -119,6 +119,7 @@ void AP_Frsky_Telem::frsky_send_frame1(uint8_t mode)
  
     frsky_send_data(FRSKY_ID_VFAS, roundf(_battery.voltage() * 10.0f));
     frsky_send_data(FRSKY_ID_CURRENT, (battery_amps < 0) ? 0 : roundf(battery_amps * 10.0f));
+    frsky_send_data(FRSKY_ID_RPM, throttle);
   
 }
 
@@ -135,7 +136,7 @@ float  AP_Frsky_Telem::frsky_format_gps(float dec)
  * Sends frame 2 (every 1000ms):
  * course(heading), latitude, longitude, ground speed, GPS altitude
  */
-void  AP_Frsky_Telem::frsky_send_frame2()
+void  AP_Frsky_Telem::frsky_send_frame2(uint8_t base_mode, float wp_dist, uint16_t sensors_health)
 {
 
     // we send the heading based on the ahrs instead of GPS course which is not very usefull
@@ -182,7 +183,14 @@ void  AP_Frsky_Telem::frsky_send_frame2()
   
 	frsky_send_data(FRSKY_ID_GPS_ALT_BP, alt_gps_meters);
 	frsky_send_data(FRSKY_ID_GPS_ALT_AP, alt_gps_cm);
-  
+	
+	frsky_send_data(FRSKY_ID_BASEMODE, base_mode);
+	//TODO: health
+	frsky_send_data(FRSKY_ID_HEALTH, sensors_health);
+	frsky_send_data(FRSKY_ID_WP_DIST, wp_dist);
+	
+	
+	
     }
 }
 
@@ -201,7 +209,7 @@ void AP_Frsky_Telem::check_sport_input(void)
   allow this code to poll for serial bytes coming from the receiver
   for the SPort protocol
  */
-void AP_Frsky_Telem::send_frames(uint8_t control_mode, enum FrSkyProtocol protocol)
+void AP_Frsky_Telem::send_frames(uint8_t control_mode, uint8_t base_mode, float wp_dist, uint16_t throttle, uint16_t sensors_health, enum FrSkyProtocol protocol)
 {
     if (!_initialised) {
         return;
@@ -217,12 +225,12 @@ void AP_Frsky_Telem::send_frames(uint8_t control_mode, enum FrSkyProtocol protoc
     // send frame1 every 200ms
     if (now - _last_frame1_ms > 200) {
         _last_frame1_ms = now;
-        frsky_send_frame1(control_mode);        
+        frsky_send_frame1(control_mode, throttle);
     }
 
     // send frame2 every second
     if (now - _last_frame2_ms > 1000) {
         _last_frame2_ms = now;
-        frsky_send_frame2();
+        frsky_send_frame2(base_mode, wp_dist, sensors_health);
     }
 }

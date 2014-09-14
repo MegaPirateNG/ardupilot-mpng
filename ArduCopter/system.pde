@@ -173,8 +173,7 @@ static void init_ardupilot()
 #if MAVLINK_COMM_NUM_BUFFERS > 2
     if (g.serial2_protocol == SERIAL2_FRSKY_DPORT || 
         g.serial2_protocol == SERIAL2_FRSKY_SPORT) {
-        //frsky_telemetry.init(hal.uartD, g.serial2_protocol);
-        frsky_telemetry2.init(hal.uartD, g.serial2_protocol);
+        frsky_telemetry.init(hal.uartD, g.serial2_protocol);
     } else {
         gcs[2].setup_uart(hal.uartD, map_baudrate(g.serial2_baud), 128, 128);
     }
@@ -296,9 +295,6 @@ static void init_ardupilot()
     }
 
     cliSerial->print_P(PSTR("\nReady to FLY "));
-
-    // flag that initialisation has completed
-    ap.initialised = true;
 }
 
 
@@ -400,8 +396,134 @@ static void check_usb_mux(void)
 static void telemetry_send(void)
 {
 #if FRSKY_TELEM_ENABLED == ENABLED
-    /*frsky_telemetry.send_frames((uint8_t)control_mode, 
-                                (AP_Frsky_Telem::FrSkyProtocol)g.serial2_protocol.get());*/
-    frsky_telemetry2.send_frames((uint8_t)control_mode);
+	uint8_t base_mode = MAV_MODE_FLAG_CUSTOM_MODE_ENABLED;
+	if (motors.armed()) {
+        base_mode |= MAV_MODE_FLAG_SAFETY_ARMED;
+    }
+    
+    uint32_t control_sensors_present;
+    uint32_t control_sensors_enabled;
+    uint32_t control_sensors_health;
+
+    // default sensors present
+    control_sensors_present = MAVLINK_SENSOR_PRESENT_DEFAULT;
+
+    // first what sensors/controllers we have
+    if (g.compass_enabled) {
+        control_sensors_present |= MAV_SYS_STATUS_SENSOR_3D_MAG; // compass present
+    }
+    if (gps.status() > AP_GPS::NO_GPS) {
+        control_sensors_present |= MAV_SYS_STATUS_SENSOR_GPS;
+    }
+#if OPTFLOW == ENABLED
+    if (g.optflow_enabled) {
+        control_sensors_present |= MAV_SYS_STATUS_SENSOR_OPTICAL_FLOW;
+    }
+#endif
+    if (ap.rc_receiver_present) {
+        control_sensors_present |= MAV_SYS_STATUS_SENSOR_RC_RECEIVER;
+    }
+
+    // all present sensors enabled by default except altitude and position control which we will set individually
+    control_sensors_enabled = control_sensors_present & (~MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL & ~MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL);
+
+    switch (control_mode) {
+    case ALT_HOLD:
+    case AUTO:
+    case GUIDED:
+    case LOITER:
+    case RTL:
+    case CIRCLE:
+    case LAND:
+    case OF_LOITER:
+    case POSHOLD:
+        control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL;
+        control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL;
+        break;
+    case SPORT:
+        control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL;
+        break;
+    }
+
+    // default to all healthy except baro, compass, gps and receiver which we set individually
+    control_sensors_health = control_sensors_present & ~(MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE |
+                                                         MAV_SYS_STATUS_SENSOR_3D_MAG |
+                                                         MAV_SYS_STATUS_SENSOR_GPS |
+                                                         MAV_SYS_STATUS_SENSOR_RC_RECEIVER);
+    if (barometer.healthy()) {
+        control_sensors_health |= MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE;
+    }
+    if (g.compass_enabled && compass.healthy(0) && ahrs.use_compass()) {
+        control_sensors_health |= MAV_SYS_STATUS_SENSOR_3D_MAG;
+    }
+    if (gps.status() > AP_GPS::NO_GPS && (!gps_glitch.glitching()||ap.usb_connected)) {
+        control_sensors_health |= MAV_SYS_STATUS_SENSOR_GPS;
+    }
+    if (ap.rc_receiver_present && !failsafe.radio) {
+        control_sensors_health |= MAV_SYS_STATUS_SENSOR_RC_RECEIVER;
+    }
+    if (!ins.get_gyro_health_all()) {
+        control_sensors_health &= ~MAV_SYS_STATUS_SENSOR_3D_GYRO;
+    }
+    if (!ins.get_accel_health_all()) {
+        control_sensors_health &= ~MAV_SYS_STATUS_SENSOR_3D_ACCEL;
+    }
+
+    if (!ahrs.healthy()) {
+        // AHRS subsystem is unhealthy
+        control_sensors_health &= ~MAV_SYS_STATUS_AHRS;
+    }
+
+    int16_t battery_current = -1;
+    int8_t battery_remaining = -1;
+
+    if (battery.monitoring() == AP_BATT_MONITOR_VOLTAGE_AND_CURRENT) {
+        battery_remaining = battery.capacity_remaining_pct();
+        battery_current = battery.current_amps() * 100;
+    }
+
+#if AP_TERRAIN_AVAILABLE
+    switch (terrain.status()) {
+    case AP_Terrain::TerrainStatusDisabled:
+        break;
+    case AP_Terrain::TerrainStatusUnhealthy:
+        control_sensors_present |= MAV_SYS_STATUS_TERRAIN;
+        control_sensors_enabled |= MAV_SYS_STATUS_TERRAIN;
+        break;
+    case AP_Terrain::TerrainStatusOK:
+        control_sensors_present |= MAV_SYS_STATUS_TERRAIN;
+        control_sensors_enabled |= MAV_SYS_STATUS_TERRAIN;
+        control_sensors_health  |= MAV_SYS_STATUS_TERRAIN;
+        break;
+    }
+#endif
+
+	uint16_t sensors_health = 0; // Default - All sensors status: ok
+	if ( control_sensors_enabled & MAV_SYS_STATUS_SENSOR_3D_GYRO )
+	if (!( control_sensors_health & MAV_SYS_STATUS_SENSOR_3D_GYRO ))                    sensors_health |= MAV_SYS_STATUS_SENSOR_3D_GYRO;
+	if ( control_sensors_enabled & MAV_SYS_STATUS_SENSOR_3D_ACCEL )
+	if (!( control_sensors_health & MAV_SYS_STATUS_SENSOR_3D_ACCEL ))                   sensors_health |= MAV_SYS_STATUS_SENSOR_3D_ACCEL;
+	if ( control_sensors_enabled & MAV_SYS_STATUS_SENSOR_3D_MAG )
+	if (!( control_sensors_health & MAV_SYS_STATUS_SENSOR_3D_MAG ))                     sensors_health |= MAV_SYS_STATUS_SENSOR_3D_MAG;
+	if ( control_sensors_enabled & MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE )
+	if (!( control_sensors_health & MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE ))          sensors_health |= MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE;
+	if ( control_sensors_enabled & MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE )
+	if (!( control_sensors_health & MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE ))      sensors_health |= MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE;
+	if ( control_sensors_enabled & MAV_SYS_STATUS_SENSOR_GPS )
+	if (!( control_sensors_health & MAV_SYS_STATUS_SENSOR_GPS ))                        sensors_health |= MAV_SYS_STATUS_SENSOR_GPS;
+	if ( control_sensors_enabled & MAV_SYS_STATUS_SENSOR_OPTICAL_FLOW )
+	if (!( control_sensors_health & MAV_SYS_STATUS_SENSOR_OPTICAL_FLOW ))               sensors_health |= MAV_SYS_STATUS_SENSOR_OPTICAL_FLOW;
+	if ( control_sensors_enabled & MAV_SYS_STATUS_GEOFENCE )
+	if (!( control_sensors_health & MAV_SYS_STATUS_GEOFENCE ))                          sensors_health |= MAV_SYS_STATUS_GEOFENCE;
+	if ( control_sensors_enabled & MAV_SYS_STATUS_AHRS )
+	if (!( control_sensors_health & MAV_SYS_STATUS_AHRS ))                              sensors_health |= MAV_SYS_STATUS_AHRS;
+    
+    frsky_telemetry.send_frames(
+    	(uint8_t)control_mode, 
+    	base_mode,
+    	wp_distance / 1.0e2f,
+    	g.rc_3.servo_out/10,
+    	sensors_health,
+        (AP_Frsky_Telem::FrSkyProtocol)g.serial2_protocol.get());
 #endif
 }
