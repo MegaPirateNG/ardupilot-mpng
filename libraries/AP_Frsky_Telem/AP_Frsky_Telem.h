@@ -45,6 +45,9 @@
 #define FRSKY_ID_GPS_LONG_AP    0x1A
 #define FRSKY_ID_GPS_LAT_AP     0x1B
 #define FRSKY_ID_GPS_COURS_AP   0x1C
+#define FRSKY_ID_BASEMODE       0x1D
+#define FRSKY_ID_WP_DIST        0x1E
+#define FRSKY_ID_HEALTH         0x1F
 #define FRSKY_ID_BARO_ALT_AP    0x21
 #define FRSKY_ID_GPS_LONG_EW    0x22
 #define FRSKY_ID_GPS_LAT_NS     0x23
@@ -77,13 +80,13 @@ class AP_Frsky_Telem
     };
 
     void init(AP_HAL::UARTDriver *port, uint8_t frsky_type);
-    void send_frames(uint8_t control_mode, enum FrSkyProtocol protocol);
+    void send_frames(uint8_t control_mode, uint8_t base_mode, float wp_dist, uint16_t throttle, uint16_t sensors_health, enum FrSkyProtocol protocol);
 
 
  private:
     void frsky_send_data(uint8_t id, int16_t data);
-    void frsky_send_frame1(uint8_t mode);
-    void frsky_send_frame2();
+    void frsky_send_frame1(uint8_t mode, uint16_t throttle);
+    void frsky_send_frame2(uint8_t base_mode, float wp_dist, uint16_t sensors_health);
     void check_sport_input(void);
 	
     float frsky_format_gps(float dec);
