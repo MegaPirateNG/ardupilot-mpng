@@ -119,12 +119,12 @@ void F4BYStorage::_storage_open(void)
  */
 void F4BYStorage::_mark_dirty(uint16_t loc, uint16_t length)
 {
-	uint16_t end = loc + length;
-	while (loc < end) {
-		uint8_t line = (loc >> F4BY_STORAGE_LINE_SHIFT);
-		_dirty_mask |= 1 << line;
-		loc += F4BY_STORAGE_LINE_SIZE;
-	}
+    uint16_t end = loc + length;
+    for (uint8_t line=loc>>F4BY_STORAGE_LINE_SHIFT;
+         line <= end>>F4BY_STORAGE_LINE_SHIFT;
+         line++) {
+        _dirty_mask |= 1U << line;
+    }
 }
 
 uint8_t F4BYStorage::read_byte(uint16_t loc) 
