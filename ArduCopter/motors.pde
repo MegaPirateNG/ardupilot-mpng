@@ -182,20 +182,13 @@ static void init_arm_motors()
     // set hover throttle
     motors.set_mid_throttle(g.throttle_mid);
 
-    // Cancel arming if throttle is raised too high so that copter does not suddenly take off
-    read_radio();
-    if (g.rc_3.control_in > g.throttle_cruise && g.throttle_cruise > 100) {
-        motors.output_min();
-        failsafe_enable();
-        AP_Notify::flags.armed = false;
-        AP_Notify::flags.arming_failed = false;
-        return;
-    }
-
 #if SPRAYER == ENABLED
     // turn off sprayer's test if on
     sprayer.test_pump(false);
 #endif
+
+    // short delay to allow reading of rc inputs
+    delay(30);
 
     // enable output to motors
     output_min();
@@ -371,6 +364,22 @@ static void pre_arm_checks(bool display_failure)
             }
             return;
         }
+
+#if INS_MAX_INSTANCES > 1
+        // check all gyros are consistent
+        if (ins.get_gyro_count() > 1) {
+            for(uint8_t i=0; i<ins.get_gyro_count(); i++) {
+                // get rotation rate difference between gyro #i and primary gyro
+                Vector3f vec_diff = ins.get_gyro(i) - ins.get_gyro();
+                if (vec_diff.length() > PREARM_MAX_GYRO_VECTOR_DIFF) {
+                    if (display_failure) {
+                        gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: Gyros inconsistent"));
+                    }
+                    return;
+                }
+            }
+        }
+#endif
     }
 #if CONFIG_HAL_BOARD != HAL_BOARD_VRBRAIN
 #if !defined(CONFIG_ARCH_BOARD_PX4FMU_V1) && !defined(CONFIG_ARCH_BOARD_F4BY)
@@ -510,6 +519,16 @@ static bool arm_checks(bool display_failure)
     // succeed if arming checks are disabled
     if (g.arming_check == ARMING_CHECK_NONE) {
         return true;
+    }
+
+    // check throttle is down
+    if ((g.arming_check == ARMING_CHECK_ALL) || (g.arming_check & ARMING_CHECK_RC)) {
+        if (g.rc_3.control_in > 0) {
+            if (display_failure) {
+                gcs_send_text_P(SEVERITY_HIGH,PSTR("Arm: Thr too high"));
+            }
+            return false;
+        }
     }
 
     // check Baro & inav alt are within 1m
