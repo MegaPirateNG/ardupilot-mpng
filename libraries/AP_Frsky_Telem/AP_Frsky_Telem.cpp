@@ -115,12 +115,19 @@ void AP_Frsky_Telem::frsky_send_frame1(uint8_t mode, uint16_t throttle)
     frsky_send_data(FRSKY_ID_BARO_ALT_BP, baro_alt_meters);
     frsky_send_data(FRSKY_ID_BARO_ALT_AP, baro_alt_cm);
   
-    frsky_send_data(FRSKY_ID_FUEL, roundf(_battery.capacity_remaining_pct()));
- 
-    frsky_send_data(FRSKY_ID_VFAS, roundf(_battery.voltage() * 10.0f));
+    float voltage = _battery.voltage() * 0.5238f;
+    uint16_t battery_voltage = (uint16_t)voltage;
+    uint16_t battery_voltage_dec = (voltage - battery_voltage) *10;
+    frsky_send_data(FRSKY_ID_VOLTS_BP, battery_voltage);
+    frsky_send_data(FRSKY_ID_VOLTS_AP, battery_voltage_dec);
     frsky_send_data(FRSKY_ID_CURRENT, (battery_amps < 0) ? 0 : roundf(battery_amps * 10.0f));
+    
+    
     frsky_send_data(FRSKY_ID_RPM, throttle);
   
+  	// we send the heading based on the ahrs instead of GPS course which is not very usefull
+    uint16_t course_in_degrees = (_ahrs.yaw_sensor / 100) % 360;
+    frsky_send_data(FRSKY_ID_GPS_COURS_BP, course_in_degrees);
 }
 
 /**
@@ -138,60 +145,54 @@ float  AP_Frsky_Telem::frsky_format_gps(float dec)
  */
 void  AP_Frsky_Telem::frsky_send_frame2(uint8_t base_mode, float wp_dist, uint16_t sensors_health)
 {
-
-    // we send the heading based on the ahrs instead of GPS course which is not very usefull
-    uint16_t course_in_degrees = (_ahrs.yaw_sensor / 100) % 360;
-    frsky_send_data(FRSKY_ID_GPS_COURS_BP, course_in_degrees);
-
     const AP_GPS &gps = _ahrs.get_gps();
     bool posok = (gps.status() >= 3);
-    if  (posok){
-	// send formatted frame 
-	float lat = 0, lon = 0,  alt = 0, speed= 0;
-	char lat_ns = 0, lon_ew = 0;
-	Location loc = gps.location();//get gps instance 0
+    if  (posok)
+    {
+		// send formatted frame 
+		float lat = 0, lon = 0,  alt = 0, speed= 0;
+		char lat_ns = 0, lon_ew = 0;
+		Location loc = gps.location();//get gps instance 0
 	
-	lat = frsky_format_gps(fabsf(loc.lat/10000000.0));
-	uint16_t latdddmm = lat;
-	uint16_t latmmmm = (lat - latdddmm) * 10000;
-	lat_ns = (loc.lat < 0) ? 'S' : 'N';
+		lat = frsky_format_gps(fabsf(loc.lat/10000000.0));
+		uint16_t latdddmm = lat;
+		uint16_t latmmmm = (lat - latdddmm) * 10000;
+		lat_ns = (loc.lat < 0) ? 'S' : 'N';
 	
-	lon = frsky_format_gps(fabsf(loc.lng/10000000.0));
-	uint16_t londddmm = lon;
-	uint16_t lonmmmm = (lon - londddmm) * 10000;
-	lon_ew = (loc.lng < 0) ? 'W' : 'E';
+		lon = frsky_format_gps(fabsf(loc.lng/10000000.0));
+		uint16_t londddmm = lon;
+		uint16_t lonmmmm = (lon - londddmm) * 10000;
+		lon_ew = (loc.lng < 0) ? 'W' : 'E';
 
-	alt = loc.alt / 100;
-	uint16_t alt_gps_meters = alt;
-	uint16_t alt_gps_cm = (alt - alt_gps_meters) * 100;
+		alt = loc.alt / 100;
+		uint16_t alt_gps_meters = alt;
+		uint16_t alt_gps_cm = (alt - alt_gps_meters) * 100;
 
-	speed = gps.ground_speed ();
-	uint16_t speed_in_meter = speed;
-	uint16_t speed_in_centimeter = (speed - speed_in_meter) * 100;
+		speed = gps.ground_speed ();
+		uint16_t speed_in_meter = speed;
+		uint16_t speed_in_centimeter = (speed - speed_in_meter) * 100;
   
   
-	frsky_send_data(FRSKY_ID_GPS_LAT_BP, latdddmm);
-	frsky_send_data(FRSKY_ID_GPS_LAT_AP, latmmmm);
-	frsky_send_data(FRSKY_ID_GPS_LAT_NS, lat_ns);
+		frsky_send_data(FRSKY_ID_GPS_LAT_BP, latdddmm);
+		frsky_send_data(FRSKY_ID_GPS_LAT_AP, latmmmm);
+		frsky_send_data(FRSKY_ID_GPS_LAT_NS, lat_ns);
 
-	frsky_send_data(FRSKY_ID_GPS_LONG_BP, londddmm);
-	frsky_send_data(FRSKY_ID_GPS_LONG_AP, lonmmmm);
-	frsky_send_data(FRSKY_ID_GPS_LONG_EW, lon_ew);
+		frsky_send_data(FRSKY_ID_GPS_LONG_BP, londddmm);
+		frsky_send_data(FRSKY_ID_GPS_LONG_AP, lonmmmm);
+		frsky_send_data(FRSKY_ID_GPS_LONG_EW, lon_ew);
   
-	frsky_send_data(FRSKY_ID_GPS_SPEED_BP, speed_in_meter);
-	frsky_send_data(FRSKY_ID_GPS_SPEED_AP, speed_in_centimeter);
+		frsky_send_data(FRSKY_ID_GPS_SPEED_BP, speed_in_meter);
+		frsky_send_data(FRSKY_ID_GPS_SPEED_AP, speed_in_centimeter);
   
-	frsky_send_data(FRSKY_ID_GPS_ALT_BP, alt_gps_meters);
-	frsky_send_data(FRSKY_ID_GPS_ALT_AP, alt_gps_cm);
-	
-	frsky_send_data(FRSKY_ID_BASEMODE, base_mode);
-	//TODO: health
-	frsky_send_data(FRSKY_ID_HEALTH, sensors_health);
-	frsky_send_data(FRSKY_ID_WP_DIST, wp_dist);
-	
-	
-	
+		frsky_send_data(FRSKY_ID_GPS_ALT_BP, alt_gps_meters);
+		frsky_send_data(FRSKY_ID_GPS_ALT_AP, alt_gps_cm);
+		
+		frsky_send_data(FRSKY_ID_WP_DIST, wp_dist);	
     }
+    
+    frsky_send_data(FRSKY_ID_BASEMODE, base_mode);
+	frsky_send_data(FRSKY_ID_HEALTH, sensors_health);
+	frsky_send_data(FRSKY_ID_FUEL, _battery.capacity_remaining_pct());
 }
 
 
