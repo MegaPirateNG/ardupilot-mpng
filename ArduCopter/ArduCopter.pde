@@ -147,7 +147,6 @@
 #include <AP_BattMonitor.h>     // Battery monitor library
 #include <AP_BoardConfig.h>     // board configuration library
 #include <AP_Frsky_Telem.h>
-#include <FrSky.h>
 #if SPRAYER == ENABLED
 #include <AC_Sprayer.h>         // crop sprayer library
 #endif
@@ -562,8 +561,7 @@ static AP_BattMonitor battery;
 ////////////////////////////////////////////////////////////////////////////////
 // FrSky telemetry support
 #if FRSKY_TELEM_ENABLED == ENABLED
-//static AP_Frsky_Telem frsky_telemetry(ahrs, battery);
-static FrSky frsky_telemetry2(ahrs, battery);
+static AP_Frsky_Telem frsky_telemetry(ahrs, battery);
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
