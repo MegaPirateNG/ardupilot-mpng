@@ -3,6 +3,7 @@
 #define __AP_HAL_F4BY_UARTDRIVER_H__
 
 #include <AP_HAL_F4BY.h>
+#include <Semaphore.h>
 #include <systemlib/perf_counter.h>
 
 class F4BY::F4BYUARTDriver : public AP_HAL::UARTDriver {
@@ -75,6 +76,7 @@ private:
     uint32_t _total_read;
     uint32_t _total_written;
     enum flow_control _flow_control;
+    sem_t _semaphore;
 };
 
 #endif // __AP_HAL_F4BY_UARTDRIVER_H__

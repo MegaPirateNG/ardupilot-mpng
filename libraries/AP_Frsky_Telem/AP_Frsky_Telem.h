@@ -1,16 +1,16 @@
 /*
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #ifndef __AP_FRSKY_TELEM_H__
@@ -23,6 +23,7 @@
 #include <AP_AHRS.h>
 #include <AP_Baro.h>
 #include <AP_BattMonitor.h>
+#include <AP_InertialNav.h>     // ArduPilot Mega inertial navigation library
 
 /* FrSky sensor hub data IDs */
 #define FRSKY_ID_GPS_ALT_BP     0x01
@@ -45,9 +46,6 @@
 #define FRSKY_ID_GPS_LONG_AP    0x1A
 #define FRSKY_ID_GPS_LAT_AP     0x1B
 #define FRSKY_ID_GPS_COURS_AP   0x1C
-#define FRSKY_ID_BASEMODE       0x1D
-#define FRSKY_ID_WP_DIST        0x1E
-#define FRSKY_ID_HEALTH         0x1F
 #define FRSKY_ID_BARO_ALT_AP    0x21
 #define FRSKY_ID_GPS_LONG_EW    0x22
 #define FRSKY_ID_GPS_LAT_NS     0x23
@@ -59,19 +57,30 @@
 #define FRSKY_ID_VFAS           0x39
 #define FRSKY_ID_VOLTS_BP       0x3A
 #define FRSKY_ID_VOLTS_AP       0x3B
+#define FRSKY_ID_PREARM         0xEF
+
+// Default sensor data IDs (Physical IDs + CRC)
+#define DATA_ID_VARIO            0x00 // 0
+#define DATA_ID_FLVSS            0xA1 // 1
+#define DATA_ID_FAS              0x22 // 2
+#define DATA_ID_GPS              0x83 // 3
+#define DATA_ID_RPM              0xE4 // 4
+#define DATA_ID_SP2UH            0x45 // 5
+#define DATA_ID_SP2UR            0xC6 // 6
 
 #define HUB_PORT true
 #define S_PORT false
 
 class AP_Frsky_Telem
 {
- public:
+public:
     //constructor
-    AP_Frsky_Telem(AP_AHRS &ahrs, AP_BattMonitor &battery) :
-    _initialised(false),
-    _ahrs(ahrs),
-    _battery(battery)
-        {}
+    AP_Frsky_Telem(AP_AHRS &ahrs, AP_BattMonitor &battery, AP_InertialNav &inertial_nav) :
+	_initialised(false),
+	_ahrs(ahrs),
+	_battery(battery),
+	_inertial_nav(inertial_nav)
+    {}
 
     // these enums must match up with TELEM2_PROTOCOL in vehicle code
     enum FrSkyProtocol {
@@ -79,25 +88,87 @@ class AP_Frsky_Telem
         FrSkySPORT = 3
     };
 
-    void init(AP_HAL::UARTDriver *port, uint8_t frsky_type);
-    void send_frames(uint8_t control_mode, uint8_t base_mode, float wp_dist, uint16_t throttle, uint16_t sensors_health, enum FrSkyProtocol protocol);
+    void init(AP_HAL::UARTDriver *port, enum FrSkyProtocol protocol);
+    void send_frames(uint8_t control_mode);
 
 
- private:
-    void frsky_send_data(uint8_t id, int16_t data);
-    void frsky_send_frame1(uint8_t mode, uint16_t throttle);
-    void frsky_send_frame2(uint8_t base_mode, float wp_dist, uint16_t sensors_health);
-    void check_sport_input(void);
-	
-    float frsky_format_gps(float dec);
+private:
+
+    void calc_crc (uint8_t byte);
+    void send_crc();
+
     void frsky_send_byte(uint8_t value);
     void frsky_send_hub_startstop();
+    void frsky_send_sport_prim();
+
+    void frsky_send_data(uint8_t id, int16_t data);
+
+    void calc_baro_alt();
+    float frsky_format_gps(float dec);
+    void calc_gps_position();
+    void calc_battery();
+    void calc_gps_sats();
+
+    void send_gps_sats (void);
+    void send_mode (void);
+    void send_baro_alt_m (void);
+    void send_baro_alt_cm (void);
+    void send_batt_remain (void);
+    void send_batt_volts (void);
+    void send_current (void);
+    void send_prearm_error (void);
+    void send_heading (void);
+    void send_gps_lat_dd (void);
+    void send_gps_lat_mm (void);
+    void send_gps_lat_ns (void);
+    void send_gps_lon_dd (void);
+    void send_gps_lon_mm (void);
+    void send_gps_lon_ew (void);
+    void send_gps_speed_meter (void);
+    void send_gps_speed_cm (void);
+    void send_gps_alt_meter (void);
+    void send_gps_alt_cm (void);
+    void send_hub_frame();
+    void sport_tick ();
 
     AP_HAL::UARTDriver *_port;
     bool _initialised;
     AP_AHRS &_ahrs;
     AP_BattMonitor &_battery;
+    AP_InertialNav &_inertial_nav;
+    enum FrSkyProtocol _protocol;
+
+    uint16_t crc;
     uint32_t _last_frame1_ms;
     uint32_t _last_frame2_ms;
+
+    uint16_t batt_remaining;
+    uint16_t batt_volts;
+    uint16_t batt_amps;
+
+    uint16_t gps_sats;
+
+    uint16_t course_in_degrees;
+    bool pos_gps_ok;
+    char lat_ns, lon_ew;
+    uint16_t latdddmm;
+    uint16_t latmmmm;
+    uint16_t londddmm;
+    uint16_t lonmmmm;	
+    uint16_t alt_gps_meters;
+    uint16_t alt_gps_cm ;
+    int16_t speed_in_meter;
+    uint16_t speed_in_centimeter;
+    int16_t baro_alt_meters ;
+    uint16_t baro_alt_cm ;
+    uint8_t _mode; 
+
+    int16_t _count;//TODO : delete
+    uint8_t fas_call ;
+    uint8_t gps_call;
+    uint8_t vario_call;
+    uint8_t various_call;
+
+    sem_t sem;
 };
 #endif

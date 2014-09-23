@@ -559,12 +559,6 @@ static Vector3f flip_orig_attitude;         // original copter attitude before f
 static AP_BattMonitor battery;
 
 ////////////////////////////////////////////////////////////////////////////////
-// FrSky telemetry support
-#if FRSKY_TELEM_ENABLED == ENABLED
-static AP_Frsky_Telem frsky_telemetry(ahrs, battery);
-#endif
-
-////////////////////////////////////////////////////////////////////////////////
 // Altitude
 ////////////////////////////////////////////////////////////////////////////////
 // The cm/s we are moving up or down based on filtered data - Positive = UP
@@ -642,6 +636,12 @@ static float G_Dt = 0.02;
 static AP_InertialNav_NavEKF inertial_nav(ahrs, barometer, gps_glitch, baro_glitch);
 #else
 static AP_InertialNav inertial_nav(ahrs, barometer, gps_glitch, baro_glitch);
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
+// FrSky telemetry support
+#if FRSKY_TELEM_ENABLED == ENABLED
+static AP_Frsky_Telem frsky_telemetry(ahrs, battery, inertial_nav);
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
