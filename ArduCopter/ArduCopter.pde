@@ -390,6 +390,7 @@ static union {
         uint8_t compass_mot         : 1; // 15  // true if we are currently performing compassmot calibration
         uint8_t motor_test          : 1; // 16  // true if we are currently performing the motors test
         uint8_t initialised         : 1; // 17  // true once the init_ardupilot function has completed.  Extended status to GCS is not sent until this completes
+        uint8_t land_complete_maybe : 1; // 18  // true if we may have landed (less strict version of land_complete)
     };
     uint32_t value;
 } ap;
@@ -824,6 +825,9 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
 #if FRSKY_TELEM_ENABLED == ENABLED
     { telemetry_send,       80,     10 },	
 #endif
+#if EPM_ENABLED == ENABLED
+    { epm_update,           40,     10 },
+#endif
 #ifdef USERHOOK_FASTLOOP
     { userhook_FastLoop,     4,     10 },
 #endif
@@ -888,6 +892,9 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { read_receiver_rssi,   10,      50 },
 #if FRSKY_TELEM_ENABLED == ENABLED
     { telemetry_send,       20,     100 },	
+#endif
+#if EPM_ENABLED == ENABLED
+    { epm_update,           10,      20 },
 #endif
 #ifdef USERHOOK_FASTLOOP
     { userhook_FastLoop,     1,    100  },
@@ -1113,7 +1120,7 @@ static void ten_hz_logging_loop()
     if (g.log_bitmask & MASK_LOG_RCOUT) {
         DataFlash.Log_Write_RCOUT();
     }
-    if ((g.log_bitmask & MASK_LOG_NTUN) && mode_requires_GPS(control_mode)) {
+    if ((g.log_bitmask & MASK_LOG_NTUN) && (mode_requires_GPS(control_mode) || landing_with_GPS())) {
         Log_Write_Nav_Tuning();
     }
 }

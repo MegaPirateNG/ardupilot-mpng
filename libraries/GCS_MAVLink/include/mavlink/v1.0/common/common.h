@@ -2,11 +2,11 @@
  *	@brief MAVLink comm protocol generated from common.xml
  *	@see http://qgroundcontrol.org/mavlink/
  */
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef MAVLINK_COMMON_H
+#define MAVLINK_COMMON_H
 
 #ifndef MAVLINK_H
-    #error Wrong include order: COMMON.H MUST NOT BE DIRECTLY USED. Include mavlink.h from the same directory instead or set ALL AND EVERY defines from MAVLINK.H manually accordingly, including the #define MAVLINK_H call.
+    #error Wrong include order: MAVLINK_COMMON.H MUST NOT BE DIRECTLY USED. Include mavlink.h from the same directory instead or set ALL AND EVERY defines from MAVLINK.H manually accordingly, including the #define MAVLINK_H call.
 #endif
 
 #ifdef __cplusplus
@@ -349,6 +349,18 @@ typedef enum MAV_ROI
 } MAV_ROI;
 #endif
 
+/** @brief  */
+#ifndef HAVE_ENUM_PARACHUTE_ACTION
+#define HAVE_ENUM_PARACHUTE_ACTION
+typedef enum PARACHUTE_ACTION
+{
+	PARACHUTE_DISABLE=0, /* Disable parachute release | */
+	PARACHUTE_ENABLE=1, /* Enable parachute release | */
+	PARACHUTE_RELEASE=2, /* Release parachute | */
+	PARACHUTE_ACTION_ENUM_END=3, /*  | */
+} PARACHUTE_ACTION;
+#endif
+
 /** @brief ACK / NACK / ERROR values as a result of MAV_CMDs and for mission item transmission. */
 #ifndef HAVE_ENUM_MAV_CMD_ACK
 #define HAVE_ENUM_MAV_CMD_ACK
@@ -681,4 +693,4 @@ typedef enum MAV_BATTERY_FUNCTION
 #ifdef __cplusplus
 }
 #endif // __cplusplus
-#endif // COMMON_H
+#endif // MAVLINK_COMMON_H

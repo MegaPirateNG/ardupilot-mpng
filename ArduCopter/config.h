@@ -81,9 +81,13 @@
 
 #define MAGNETOMETER ENABLED
 
+// disable some features for APM1/APM2
 #if HAL_CPU_CLASS < HAL_CPU_CLASS_75
  # define PARACHUTE DISABLED
  # define AC_RALLY DISABLED
+ # define EPM_ENABLED DISABLED
+ # define CLI_ENABLED           DISABLED
+ # define FRSKY_TELEM_ENABLED   DISABLED
 #endif
 
 #if HAL_CPU_CLASS < HAL_CPU_CLASS_75 || CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL || CONFIG_HAL_BOARD == HAL_BOARD_LINUX
@@ -295,6 +299,11 @@
 #define FS_GCS_ENABLED_ALWAYS_RTL           1
 #define FS_GCS_ENABLED_CONTINUE_MISSION     2
 
+// pre-arm baro vs inertial nav max alt disparity
+#ifndef PREARM_MAX_ALT_DISPARITY_CM
+ # define PREARM_MAX_ALT_DISPARITY_CM       200     // barometer and inertial nav altitude must be within this many centimeters
+#endif
+
 // pre-arm check max velocity
 #ifndef PREARM_MAX_VELOCITY_CMS
  # define PREARM_MAX_VELOCITY_CMS           50.0f   // vehicle must be travelling under 50cm/s before arming
@@ -392,7 +401,7 @@
 //////////////////////////////////////////////////////////////////////////////
 //	EPM cargo gripper
 #ifndef EPM_ENABLED
- # define EPM_ENABLED DISABLED
+ # define EPM_ENABLED ENABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -452,6 +461,9 @@
 #endif
 #ifndef LAND_DETECTOR_TRIGGER
  # define LAND_DETECTOR_TRIGGER 50    // number of 50hz iterations with near zero climb rate and low throttle that triggers landing complete.
+#endif
+#ifndef LAND_DETECTOR_MAYBE_TRIGGER
+ # define LAND_DETECTOR_MAYBE_TRIGGER   10  // number of 50hz iterations with near zero climb rate and low throttle that means we might be landed (used to reset horizontal position targets to prevent tipping over)
 #endif
 #ifndef LAND_DETECTOR_CLIMBRATE_MAX
 # define LAND_DETECTOR_CLIMBRATE_MAX    30  // vehicle climb rate must be between -30 and +30 cm/s

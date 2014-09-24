@@ -161,8 +161,10 @@ static NOINLINE void send_extended_status1(mavlink_channel_t chan)
         control_sensors_present |= MAV_SYS_STATUS_SENSOR_RC_RECEIVER;
     }
 
-    // all present sensors enabled by default except altitude and position control which we will set individually
-    control_sensors_enabled = control_sensors_present & (~MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL & ~MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL);
+    // all present sensors enabled by default except altitude and position control and motors which we will set individually
+    control_sensors_enabled = control_sensors_present & (~MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL &
+                                                         ~MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL &
+                                                         ~MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS);
 
     switch (control_mode) {
     case ALT_HOLD:
@@ -180,6 +182,11 @@ static NOINLINE void send_extended_status1(mavlink_channel_t chan)
     case SPORT:
         control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL;
         break;
+    }
+
+    // set motors outputs as enabled if safety switch is not disarmed (i.e. either NONE or ARMED)
+    if (hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED) {
+        control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS;
     }
 
     // default to all healthy except baro, compass, gps and receiver which we set individually
@@ -891,6 +898,20 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             }
         }
 
+        // set the safety switch position
+        if (packet.base_mode & MAV_MODE_FLAG_DECODE_POSITION_SAFETY) {
+            if (packet.custom_mode == 0) {
+                // turn safety off (pwm outputs flow to the motors)
+                hal.rcout->force_safety_off();
+                result = MAV_RESULT_ACCEPTED;
+            } else if (packet.custom_mode == 1) {
+                // turn safety on (no pwm outputs to the motors)
+                if (hal.rcout->force_safety_on()) {
+                    result = MAV_RESULT_ACCEPTED;
+                }
+            }
+        }
+
         // send ACK or NAK
         mavlink_msg_command_ack_send_buf(msg, chan, MAVLINK_MSG_ID_SET_MODE, result);
         break;
@@ -1218,6 +1239,29 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
 #endif
             break;
 
+#if PARACHUTE == ENABLED
+        case MAV_CMD_DO_PARACHUTE:
+            // configure or release parachute
+            result = MAV_RESULT_ACCEPTED;
+            switch ((uint16_t)packet.param1) {
+                case PARACHUTE_DISABLE:
+                    parachute.enabled(false);
+                    Log_Write_Event(DATA_PARACHUTE_DISABLED);
+                    break;
+                case PARACHUTE_ENABLE:
+                    parachute.enabled(true);
+                    Log_Write_Event(DATA_PARACHUTE_ENABLED);
+                    break;
+                case PARACHUTE_RELEASE:
+                    // treat as a manual release which performs some additional check of altitude
+                    parachute_manual_release();
+                    break;
+                default:
+                    result = MAV_RESULT_FAILED;
+                    break;
+            }
+#endif
+
         case MAV_CMD_DO_MOTOR_TEST:
             // param1 : motor sequence number (a number from 1 to max number of motors on the vehicle)
             // param2 : throttle type (0=throttle percentage, 1=PWM, 2=pilot throttle channel pass-through. See MOTOR_TEST_THROTTLE_TYPE enum)
@@ -1226,6 +1270,28 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             result = mavlink_motor_test_start(chan, (uint8_t)packet.param1, (uint8_t)packet.param2, (uint16_t)packet.param3, packet.param4);
             break;
 
+#if EPM_ENABLED == ENABLED
+        case MAV_CMD_DO_GRIPPER:
+            // param1 : gripper number (ignored)
+            // param2 : action (0=release, 1=grab). See GRIPPER_ACTIONS enum.
+            if(!epm.enabled()) {
+                result = MAV_RESULT_FAILED;
+            } else {
+                result = MAV_RESULT_ACCEPTED;
+                switch ((uint8_t)packet.param2) {
+                    case GRIPPER_ACTION_RELEASE:
+                        epm.release();
+                        break;
+                    case GRIPPER_ACTION_GRAB:
+                        epm.grab();
+                        break;
+                    default:
+                        result = MAV_RESULT_FAILED;
+                        break;
+                }
+            }
+            break;
+#endif
         default:
             result = MAV_RESULT_UNSUPPORTED;
             break;
