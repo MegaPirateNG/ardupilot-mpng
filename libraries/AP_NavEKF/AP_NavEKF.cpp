@@ -1746,7 +1746,7 @@ void NavEKF::FuseVelPosNED()
                 velInnov2[i] = statesAtVelTime.vel2[i] - observation[i]; // IMU2
                 // calculate innovation variance
                 varInnovVelPos[i] = P[stateIndex][stateIndex] + R_OBS[i];
-                // calculate error weightings for singloe IMU velocity states using
+                // calculate error weightings for single IMU velocity states using
                 // observation error to normalise
                 float R_hgt;
                 if (i == 2) {
@@ -1839,12 +1839,15 @@ void NavEKF::FuseVelPosNED()
             if (fuseData[obsIndex]) {
                 stateIndex = 4 + obsIndex;
                 // calculate the measurement innovation, using states from a different time coordinate if fusing height data
+                // adjust scaling on GPS measurement noise variances if not enough satellites
                 if (obsIndex <= 2)
                 {
                     innovVelPos[obsIndex] = statesAtVelTime.velocity[obsIndex] - observation[obsIndex];
+                    R_OBS[obsIndex] *= sq(gpsNoiseScaler);
                 }
                 else if (obsIndex == 3 || obsIndex == 4) {
                     innovVelPos[obsIndex] = statesAtPosTime.position[obsIndex-3] - observation[obsIndex];
+                    R_OBS[obsIndex] *= sq(gpsNoiseScaler);
                 } else {
                     innovVelPos[obsIndex] = statesAtHgtTime.position[obsIndex-3] - observation[obsIndex];
                 }
@@ -3102,6 +3105,15 @@ void NavEKF::readGpsData()
         // read the NED velocity from the GPS
         velNED = _ahrs->get_gps().velocity();
 
+        // check if we have enough GPS satellites and increase the gps noise scaler if we don't
+        if (_ahrs->get_gps().num_sats() >= 6) {
+            gpsNoiseScaler = 1.0f;
+        } else if (_ahrs->get_gps().num_sats() == 5) {
+            gpsNoiseScaler = 1.4f;
+        } else if (_ahrs->get_gps().num_sats() <= 4) {
+            gpsNoiseScaler = 2.0f;
+        }
+
         // Check if GPS can output vertical velocity and set GPS fusion mode accordingly
         if (!_ahrs->get_gps().have_vertical_velocity()) {
             // vertical velocity should not be fused
@@ -3373,6 +3385,7 @@ void NavEKF::ZeroVariables()
     secondLastFixTime_ms = imuSampleTime_ms;
     lastDecayTime_ms = imuSampleTime_ms;
 
+    gpsNoiseScaler = 1.0f;
     velTimeout = false;
     posTimeout = false;
     hgtTimeout = false;
@@ -3468,7 +3481,7 @@ void NavEKF::checkDivergence()
     float tempLength = tempVec.length();
     if (tempLength != 0.0f) {
         float temp = constrain_float((P[10][10] + P[11][11] + P[12][12]),1e-12f,1e-8f);
-        scaledDeltaGyrBiasLgth = (5e-7f / temp) * tempVec.length() / dtIMU;
+        scaledDeltaGyrBiasLgth = (5e-8f / temp) * tempVec.length() / dtIMU;
     }
     bool divergenceDetected = (scaledDeltaGyrBiasLgth > 1.0f);
     lastGyroBias = state.gyro_bias;
