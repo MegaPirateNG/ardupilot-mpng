@@ -197,9 +197,9 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @DisplayName: Receiver RSSI voltage range
     // @Description: Receiver RSSI voltage range
     // @Units: Volt
-    // @Values: 3.3:3.3V, 5.0:5V
+    // @Values: 3.3:3.3V, 5:5V
     // @User: Standard
-    GSCALAR(rssi_range,          "RSSI_RANGE",         5.0),
+    GSCALAR(rssi_range,          "RSSI_RANGE",         5.0f),
 
     // @Param: WP_YAW_BEHAVIOR
     // @DisplayName: Yaw behaviour during missions
@@ -355,7 +355,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Param: LOG_BITMASK
     // @DisplayName: Log bitmask
     // @Description: 2 byte bitmap of log types to enable
-    // @Values: 830:Default,894:Default+RCIN,958:Default+IMU,1854:Default+Motors,-6146:NearlyAll,0:Disabled
+    // @Values: 830:Default,894:Default+RCIN,958:Default+IMU,1854:Default+Motors,-6146:NearlyAll,-22530:All,0:Disabled
     // @User: Standard
     GSCALAR(log_bitmask,    "LOG_BITMASK",          DEFAULT_LOG_BITMASK),
 
