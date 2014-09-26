@@ -48,7 +48,11 @@ public:
     virtual bool set_override(uint8_t channel, int16_t override) = 0;
     /* clear_overrides: equivelant to setting all overrides to 0 */
     virtual void clear_overrides() = 0;
-
+    
+	/**
+     * Return rssi value from reciever
+     */
+	virtual uint8_t rssi() { return 0; }
 };
 
 #endif // __AP_HAL_RC_INPUT_H__

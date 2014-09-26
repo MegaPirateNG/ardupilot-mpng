@@ -100,6 +100,14 @@ void F4BYRCInput::clear_overrides()
 	}
 }
 
+uint8_t F4BYRCInput::rssi()
+{
+	pthread_mutex_lock(&rcin_mutex);
+	uint8_t v = _rcin.rssi;
+	pthread_mutex_unlock(&rcin_mutex);
+	return v;
+}
+
 void F4BYRCInput::_timer_tick(void)
 {
 	perf_begin(_perf_rcin);
