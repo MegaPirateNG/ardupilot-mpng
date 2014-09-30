@@ -891,6 +891,11 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
         mavlink_set_mode_t packet;
         mavlink_msg_set_mode_decode(msg, &packet);
 
+        // exit immediately if this command is not meant for this vehicle
+        if (mavlink_check_target(packet.target_system, 0)) {
+            break;
+        }
+
         // only accept custom modes because there is no easy mapping from Mavlink flight modes to AC flight modes
         if (packet.base_mode & MAV_MODE_FLAG_CUSTOM_MODE_ENABLED) {
             if (set_mode(packet.custom_mode)) {
@@ -931,6 +936,7 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
 #if defined(PX4_GIT_VERSION) && defined(NUTTX_GIT_VERSION)
         send_text_P(SEVERITY_LOW, PSTR("PX4: " PX4_GIT_VERSION " NuttX: " NUTTX_GIT_VERSION));
 #endif
+        send_text_P(SEVERITY_LOW, PSTR("Frame: " FRAME_CONFIG_STRING));
         handle_param_request_list(msg);
         break;
     }
