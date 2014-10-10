@@ -90,7 +90,10 @@ void F4BYRCOutput::set_freq(uint32_t chmask, uint16_t freq_hz)
      */
     if (freq_hz > 50) {
         // we are setting high rates on the given channels
-        _rate_mask |= chmask & 0xFF;
+        _rate_mask |= chmask & 0xFFF;
+        if (_rate_mask & 0xFF) {
+            _rate_mask |= 0xFF;
+        }
         if (_rate_mask & 0x3) {
             _rate_mask |= 0x3;
         }
@@ -128,7 +131,7 @@ uint16_t F4BYRCOutput::get_freq(uint8_t ch)
 
 void F4BYRCOutput::enable_ch(uint8_t ch)
 {
-    if (ch >= 8 && !(_enabled_channels & (1U<<ch))) {
+    if (ch >= 12 && !(_enabled_channels & (1U<<ch))) {
         // this is the first enable of an auxillary channel - setup
         // aux channels now. This delayed setup makes it possible to
         // use BRD_PWM_COUNT to setup the number of PWM channels.

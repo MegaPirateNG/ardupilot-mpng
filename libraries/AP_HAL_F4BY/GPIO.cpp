@@ -74,7 +74,7 @@ void F4BYGPIO::init()
 void F4BYGPIO::pinMode(uint8_t pin, uint8_t output)
 {
     switch (pin) {
-    case F4BY_GPIO_FMU_SERVO_PIN(0) ... F4BY_GPIO_FMU_SERVO_PIN(7):
+    case F4BY_GPIO_FMU_SERVO_PIN(0) ... F4BY_GPIO_FMU_SERVO_PIN(11):
         ioctl(_gpio_fmu_fd, output?GPIO_SET_OUTPUT:GPIO_SET_INPUT, 1U<<(pin-F4BY_GPIO_FMU_SERVO_PIN(0)));
         break;
     }
@@ -219,7 +219,7 @@ void F4BYGPIO::write(uint8_t pin, uint8_t value)
             break;
 #endif
 
-    case F4BY_GPIO_FMU_SERVO_PIN(0) ... F4BY_GPIO_FMU_SERVO_PIN(7):
+    case F4BY_GPIO_FMU_SERVO_PIN(0) ... F4BY_GPIO_FMU_SERVO_PIN(11):
         ioctl(_gpio_fmu_fd, value==LOW?GPIO_CLEAR:GPIO_SET, 1U<<(pin-F4BY_GPIO_FMU_SERVO_PIN(0)));
         break;
     }
