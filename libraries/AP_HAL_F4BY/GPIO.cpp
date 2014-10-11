@@ -127,7 +127,7 @@ uint8_t F4BYGPIO::read(uint8_t pin) {
             return (relays & F4BYIO_P_SETUP_RELAYS_ACC2)?HIGH:LOW;
 #endif
 
-    case F4BY_GPIO_FMU_SERVO_PIN(0) ... F4BY_GPIO_FMU_SERVO_PIN(7): {
+    case F4BY_GPIO_FMU_SERVO_PIN(0) ... F4BY_GPIO_FMU_SERVO_PIN(11): {
         uint32_t v = 0;
         ioctl(_gpio_fmu_fd, GPIO_GET, (unsigned long)&v);
         return (v & (1U<<(pin-F4BY_GPIO_FMU_SERVO_PIN(0))))?HIGH:LOW;
