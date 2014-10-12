@@ -90,10 +90,8 @@ void F4BYRCOutput::set_freq(uint32_t chmask, uint16_t freq_hz)
      */
     if (freq_hz > 50) {
         // we are setting high rates on the given channels
-        _rate_mask |= chmask & 0xFFF;
-        if (_rate_mask & 0xFF) {
-            _rate_mask |= 0xFF;
-        }
+        _rate_mask |= chmask & 0xFF;
+       
         if (_rate_mask & 0x3) {
             _rate_mask |= 0x3;
         }

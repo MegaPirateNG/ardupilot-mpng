@@ -33,7 +33,7 @@
 #define BOARD_PWM_COUNT_DEFAULT 2
 #define BOARD_SER1_RTSCTS_DEFAULT 0 // no flow control on UART5 on FMUv1
 #elif defined(CONFIG_ARCH_BOARD_F4BY)
-#define BOARD_PWM_COUNT_DEFAULT 8
+#define BOARD_PWM_COUNT_DEFAULT 12
 #define BOARD_SER1_RTSCTS_DEFAULT 0 // no flow control on UART5 on FMUv1
 #else
 #define BOARD_PWM_COUNT_DEFAULT 4
@@ -101,7 +101,8 @@ void AP_BoardConfig::init()
 	/* configurre the FMU driver for the right number of PWMs */
 
     // ensure only valid values are set, rounding up
-    if (_pwm_count > 8) _pwm_count.set(8);
+    if (_pwm_count > 12) _pwm_count.set(12);
+    if (_pwm_count == 8) _pwm_count.set(8);
     if (_pwm_count < 0) _pwm_count.set(0);
     if (_pwm_count == 1) _pwm_count.set(2);
     if (_pwm_count == 3) _pwm_count.set(4);
