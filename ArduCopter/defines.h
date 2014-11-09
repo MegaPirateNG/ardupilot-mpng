@@ -195,8 +195,10 @@ enum AutoMode {
 // Guided modes
 enum GuidedMode {
     Guided_TakeOff,
-    Guided_WP,
-    Guided_Velocity
+    Guided_WP
+#if NAV_GUIDED == ENABLED
+    ,Guided_Velocity
+#endif
 };
 
 // RTL states
@@ -263,6 +265,8 @@ enum FlipState {
 #define MASK_LOG_COMPASS                (1<<13)
 #define MASK_LOG_INAV                   (1<<14) // deprecated
 #define MASK_LOG_CAMERA                 (1<<15)
+#define MASK_LOG_WHEN_DISARMED          (1UL<<16)
+#define MASK_LOG_ANY                    0xFFFF
 
 // DATA - event logging
 #define DATA_MAVLINK_FLOAT              1

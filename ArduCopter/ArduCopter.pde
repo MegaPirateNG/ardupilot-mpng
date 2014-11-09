@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduCopter V3.2-rc10"
+#define THISFIRMWARE "ArduCopter V3.2"
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -206,6 +206,9 @@ static AP_Notify notify;
 
 // used to detect MAVLink acks from GCS to stop compassmot
 static uint8_t command_ack_counter;
+
+// has a log download started?
+static bool in_log_download;
 
 ////////////////////////////////////////////////////////////////////////////////
 // prototypes
@@ -574,8 +577,8 @@ static int16_t climb_rate;
 static int16_t sonar_alt;
 static uint8_t sonar_alt_health;   // true if we can trust the altitude from the sonar
 static float target_sonar_alt;      // desired altitude in cm above the ground
-// The altitude as reported by Baro in cm - Values can be quite high
-static int32_t baro_alt;
+static int32_t baro_alt;            // barometer altitude in cm above home
+static float baro_climbrate;        // barometer climbrate in cm/s
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -808,7 +811,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
 #endif
     { update_notify,         8,     10 },
     { one_hz_loop,         400,     42 },
-    { ekf_check,            40,      2 },
+    { ekf_dcm_check,        40,      2 },
     { crash_check,          40,      2 },
     { gcs_check_input,	     8,    550 },
     { gcs_send_heartbeat,  400,    150 },
@@ -876,7 +879,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
 #endif
     { update_notify,         2,     100 },
     { one_hz_loop,         100,     420 },
-    { ekf_check,            10,      20 },
+    { ekf_dcm_check,        10,      20 },
     { crash_check,          10,      20 },
     { gcs_check_input,	     2,     550 },
     { gcs_send_heartbeat,  100,     150 },
@@ -945,7 +948,7 @@ static void barometer_accumulate(void)
 
 static void perf_update(void)
 {
-    if (g.log_bitmask & MASK_LOG_PM)
+    if (should_log(MASK_LOG_PM))
         Log_Write_Performance();
     if (scheduler.debug()) {
         cliSerial->printf_P(PSTR("PERF: %u/%u %lu\n"),
@@ -1092,7 +1095,7 @@ static void update_batt_compass(void)
         compass.set_throttle((float)g.rc_3.servo_out/1000.0f);
         compass.read();
         // log compass information
-        if (g.log_bitmask & MASK_LOG_COMPASS) {
+        if (should_log(MASK_LOG_COMPASS)) {
             Log_Write_Compass();
         }
     }
@@ -1105,16 +1108,16 @@ static void update_batt_compass(void)
 // should be run at 10hz
 static void ten_hz_logging_loop()
 {
-    if (g.log_bitmask & MASK_LOG_ATTITUDE_MED) {
+    if (should_log(MASK_LOG_ATTITUDE_MED)) {
         Log_Write_Attitude();
     }
-    if (g.log_bitmask & MASK_LOG_RCIN) {
+    if (should_log(MASK_LOG_RCIN)) {
         DataFlash.Log_Write_RCIN();
     }
-    if (g.log_bitmask & MASK_LOG_RCOUT) {
+    if (should_log(MASK_LOG_RCOUT)) {
         DataFlash.Log_Write_RCOUT();
     }
-    if ((g.log_bitmask & MASK_LOG_NTUN) && (mode_requires_GPS(control_mode) || landing_with_GPS())) {
+    if (should_log(MASK_LOG_NTUN) && (mode_requires_GPS(control_mode) || landing_with_GPS())) {
         Log_Write_Nav_Tuning();
     }
 }
@@ -1129,11 +1132,11 @@ static void fifty_hz_logging_loop()
 #endif
 
 #if HIL_MODE == HIL_MODE_DISABLED
-    if (g.log_bitmask & MASK_LOG_ATTITUDE_FAST) {
+    if (should_log(MASK_LOG_ATTITUDE_FAST)) {
         Log_Write_Attitude();
     }
 
-    if (g.log_bitmask & MASK_LOG_IMU) {
+    if (should_log(MASK_LOG_IMU)) {
         DataFlash.Log_Write_IMU(ins);
     }
 #endif
@@ -1163,12 +1166,12 @@ static void three_hz_loop()
 // one_hz_loop - runs at 1Hz
 static void one_hz_loop()
 {
-    if (g.log_bitmask != 0) {
+    if (should_log(MASK_LOG_ANY)) {
         Log_Write_Data(DATA_AP_STATE, ap.value);
     }
 
     // log battery info to the dataflash
-    if (g.log_bitmask & MASK_LOG_CURRENT) {
+    if (should_log(MASK_LOG_CURRENT)) {
         Log_Write_Current();
     }
 
@@ -1227,7 +1230,7 @@ static void update_optical_flow(void)
         of_log_counter++;
         if( of_log_counter >= 4 ) {
             of_log_counter = 0;
-            if (g.log_bitmask & MASK_LOG_OPTFLOW) {
+            if (should_log(MASK_LOG_OPTFLOW)) {
                 Log_Write_Optflow();
             }
         }
@@ -1251,7 +1254,7 @@ static void update_GPS(void)
             last_gps_reading[i] = gps.last_message_time_ms(i);
 
             // log GPS message
-            if (g.log_bitmask & MASK_LOG_GPS) {
+            if (should_log(MASK_LOG_GPS)) {
                 DataFlash.Log_Write_GPS(gps, i, current_loc.alt);
             }
 
@@ -1337,7 +1340,7 @@ init_simple_bearing()
     super_simple_sin_yaw = simple_sin_yaw;
 
     // log the simple bearing to dataflash
-    if (g.log_bitmask != 0) {
+    if (should_log(MASK_LOG_ANY)) {
         Log_Write_Data(DATA_INIT_SIMPLE_BEARING, ahrs.yaw_sensor);
     }
 }
@@ -1402,13 +1405,13 @@ static void read_AHRS(void)
 static void update_altitude()
 {
     // read in baro altitude
-    baro_alt            = read_barometer();
+    read_barometer();
 
     // read in sonar altitude
     sonar_alt           = read_sonar();
 
     // write altitude info to dataflash logs
-    if (g.log_bitmask & MASK_LOG_CTUN) {
+    if (should_log(MASK_LOG_CTUN)) {
         Log_Write_Control_Tuning();
     }
 }

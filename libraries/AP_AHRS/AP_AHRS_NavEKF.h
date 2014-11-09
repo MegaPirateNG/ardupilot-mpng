@@ -28,6 +28,7 @@
 #include <AP_NavEKF.h>
 
 #define AP_AHRS_NAVEKF_AVAILABLE 1
+#define AP_AHRS_NAVEKF_SETTLE_TIME_MS 20000     // time in milliseconds the ekf needs to settle after being started
 
 class AP_AHRS_NavEKF : public AP_AHRS_DCM
 {
@@ -47,6 +48,10 @@ public:
 
     // return the current drift correction integrator value
     const Vector3f &get_gyro_drift(void) const;
+
+    // reset the current gyro drift estimate
+    //  should be called if gyro offsets are recalculated
+    void reset_gyro_drift(void);
 
     void            update(void);
     void            reset(bool recover_eulers = false);
@@ -94,6 +99,9 @@ public:
 
     // is the AHRS subsystem healthy?
     bool healthy(void);
+
+    // true if the AHRS has completed initialisation
+    bool initialised(void) const;
 
 private:
     bool using_EKF(void) const;

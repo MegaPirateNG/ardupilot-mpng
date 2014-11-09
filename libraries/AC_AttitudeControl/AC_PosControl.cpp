@@ -475,7 +475,7 @@ void AC_PosControl::get_stopping_point_xy(Vector3f &stopping_point) const
     float vel_total = pythagorous2(curr_vel.x, curr_vel.y);
 
     // avoid divide by zero by using current position if the velocity is below 10cm/s, kP is very low or acceleration is zero
-    if (kP <= 0.0f || _accel_cms <= 0.0f) {
+    if (kP <= 0.0f || _accel_cms <= 0.0f || vel_total == 0.0f) {
         stopping_point.x = curr_pos.x;
         stopping_point.y = curr_pos.y;
         return;
@@ -551,6 +551,7 @@ void AC_PosControl::update_xy_controller(bool use_desired_velocity)
     uint32_t now = hal.scheduler->millis();
     if ((now - _last_update_xy_ms) >= POSCONTROL_ACTIVE_TIMEOUT_MS) {
         init_xy_controller();
+        now = _last_update_xy_ms;
     }
 
     // check if xy leash needs to be recalculated

@@ -464,6 +464,8 @@ struct PACKED log_Attitude {
     int16_t  pitch;
     uint16_t control_yaw;
     uint16_t yaw;
+    uint16_t error_rp;
+    uint16_t error_yaw;
 };
 
 // Write an attitude packet
@@ -478,7 +480,9 @@ static void Log_Write_Attitude()
         control_pitch   : (int16_t)targets.y,
         pitch           : (int16_t)ahrs.pitch_sensor,
         control_yaw     : (uint16_t)targets.z,
-        yaw             : (uint16_t)ahrs.yaw_sensor
+        yaw             : (uint16_t)ahrs.yaw_sensor,
+        error_rp        : (uint16_t)(ahrs.get_error_rp() * 100),
+        error_yaw       : (uint16_t)(ahrs.get_error_yaw() * 100)
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 
@@ -529,7 +533,7 @@ struct PACKED log_Event {
 // Wrote an event packet
 static void Log_Write_Event(uint8_t id)
 {
-    if (g.log_bitmask != 0) {
+    if (should_log(MASK_LOG_ANY)) {
         struct log_Event pkt = {
             LOG_PACKET_HEADER_INIT(LOG_EVENT_MSG),
             id  : id
@@ -547,7 +551,7 @@ struct PACKED log_Data_Int16t {
 // Write an int16_t data packet
 static void Log_Write_Data(uint8_t id, int16_t value)
 {
-    if (g.log_bitmask != 0) {
+    if (should_log(MASK_LOG_ANY)) {
         struct log_Data_Int16t pkt = {
             LOG_PACKET_HEADER_INIT(LOG_DATA_INT16_MSG),
             id          : id,
@@ -566,7 +570,7 @@ struct PACKED log_Data_UInt16t {
 // Write an uint16_t data packet
 static void Log_Write_Data(uint8_t id, uint16_t value)
 {
-    if (g.log_bitmask != 0) {
+    if (should_log(MASK_LOG_ANY)) {
         struct log_Data_UInt16t pkt = {
             LOG_PACKET_HEADER_INIT(LOG_DATA_UINT16_MSG),
             id          : id,
@@ -585,7 +589,7 @@ struct PACKED log_Data_Int32t {
 // Write an int32_t data packet
 static void Log_Write_Data(uint8_t id, int32_t value)
 {
-    if (g.log_bitmask != 0) {
+    if (should_log(MASK_LOG_ANY)) {
         struct log_Data_Int32t pkt = {
             LOG_PACKET_HEADER_INIT(LOG_DATA_INT32_MSG),
             id          : id,
@@ -604,7 +608,7 @@ struct PACKED log_Data_UInt32t {
 // Write a uint32_t data packet
 static void Log_Write_Data(uint8_t id, uint32_t value)
 {
-    if (g.log_bitmask != 0) {
+    if (should_log(MASK_LOG_ANY)) {
         struct log_Data_UInt32t pkt = {
             LOG_PACKET_HEADER_INIT(LOG_DATA_UINT32_MSG),
             id          : id,
@@ -623,7 +627,7 @@ struct PACKED log_Data_Float {
 // Write a float data packet
 static void Log_Write_Data(uint8_t id, float value)
 {
-    if (g.log_bitmask != 0) {
+    if (should_log(MASK_LOG_ANY)) {
         struct log_Data_Float pkt = {
             LOG_PACKET_HEADER_INIT(LOG_DATA_FLOAT_MSG),
             id          : id,
@@ -684,7 +688,7 @@ static const struct LogStructure log_structure[] PROGMEM = {
     { LOG_PERFORMANCE_MSG, sizeof(log_Performance), 
       "PM",  "HHIhBHB",    "NLon,NLoop,MaxT,PMT,I2CErr,INSErr,INAVErr" },
     { LOG_ATTITUDE_MSG, sizeof(log_Attitude),       
-      "ATT", "IccccCC",      "TimeMS,DesRoll,Roll,DesPitch,Pitch,DesYaw,Yaw" },
+      "ATT", "IccccCCCC",    "TimeMS,DesRoll,Roll,DesPitch,Pitch,DesYaw,Yaw,ErrRP,ErrYaw" },
     { LOG_MODE_MSG, sizeof(log_Mode),
       "MODE", "Mh",          "Mode,ThrCrs" },
     { LOG_STARTUP_MSG, sizeof(log_Startup),         
@@ -714,7 +718,8 @@ static void Log_Read(uint16_t log_num, uint16_t start_page, uint16_t end_page)
  #endif
 
     cliSerial->printf_P(PSTR("\n" FIRMWARE_STRING
-                             "\nFree RAM: %u\n"),
+                             "\nFree RAM: %u\n"
+                             "\nFrame: " FRAME_CONFIG_STRING "\n"),
                         (unsigned) hal.util->available_memory());
 
     cliSerial->println_P(PSTR(HAL_BOARD_NAME));
@@ -745,6 +750,7 @@ static void start_logging()
             if (hal.util->get_system_id(sysid)) {
                 DataFlash.Log_Write_Message(sysid);
             }
+            DataFlash.Log_Write_Message_P(PSTR("Frame: " FRAME_CONFIG_STRING));
 
             // log the flight mode
             Log_Write_Mode(control_mode);

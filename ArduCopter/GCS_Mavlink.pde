@@ -199,14 +199,14 @@ static NOINLINE void send_extended_status1(mavlink_channel_t chan)
     if (ap.rc_receiver_present && !failsafe.radio) {
         control_sensors_health |= MAV_SYS_STATUS_SENSOR_RC_RECEIVER;
     }
-    if (!ins.get_gyro_health_all()) {
+    if (!ins.get_gyro_health_all() || !ins.gyro_calibrated_ok_all()) {
         control_sensors_health &= ~MAV_SYS_STATUS_SENSOR_3D_GYRO;
     }
     if (!ins.get_accel_health_all()) {
         control_sensors_health &= ~MAV_SYS_STATUS_SENSOR_3D_ACCEL;
     }
 
-    if (!ahrs.healthy()) {
+    if (ahrs.initialised() && !ahrs.healthy()) {
         // AHRS subsystem is unhealthy
         control_sensors_health &= ~MAV_SYS_STATUS_AHRS;
     }
@@ -884,6 +884,11 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
         mavlink_set_mode_t packet;
         mavlink_msg_set_mode_decode(msg, &packet);
 
+        // exit immediately if this command is not meant for this vehicle
+        if (mavlink_check_target(packet.target_system, 0)) {
+            break;
+        }
+
         // only accept custom modes because there is no easy mapping from Mavlink flight modes to AC flight modes
         if (packet.base_mode & MAV_MODE_FLAG_CUSTOM_MODE_ENABLED) {
             if (set_mode(packet.custom_mode)) {
@@ -910,6 +915,7 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
 #if defined(PX4_GIT_VERSION) && defined(NUTTX_GIT_VERSION)
         send_text_P(SEVERITY_LOW, PSTR("PX4: " PX4_GIT_VERSION " NuttX: " NUTTX_GIT_VERSION));
 #endif
+        send_text_P(SEVERITY_LOW, PSTR("Frame: " FRAME_CONFIG_STRING));
         handle_param_request_list(msg);
         break;
     }
@@ -1104,10 +1110,11 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             break;
 
         case MAV_CMD_PREFLIGHT_CALIBRATION:
-            if (packet.param1 == 1 ||
-                packet.param2 == 1) {
-                ins.init_accel();
-                ahrs.set_trim(Vector3f(0,0,0));             // clear out saved trim
+            if (packet.param1 == 1) {
+                // gyro offset calibration
+                ins.init_gyro();
+                // reset ahrs gyro bias
+                ahrs.reset_gyro_drift();
                 result = MAV_RESULT_ACCEPTED;
             }
             if (packet.param3 == 1) {
@@ -1152,8 +1159,12 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
                 // run pre_arm_checks and arm_checks and display failures
                 pre_arm_checks(true);
                 if(ap.pre_arm_check && arm_checks(true)) {
-                    init_arm_motors();
+                    if (init_arm_motors()) {
                     result = MAV_RESULT_ACCEPTED;
+                    } else {
+                        AP_Notify::flags.arming_failed = true;  // init_arm_motors function will reset flag back to false
+                        result = MAV_RESULT_UNSUPPORTED;
+                    }
                 }else{
                     AP_Notify::flags.arming_failed = true;  // init_arm_motors function will reset flag back to false
                     result = MAV_RESULT_UNSUPPORTED;
@@ -1292,11 +1303,21 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
     case MAVLINK_MSG_ID_RADIO:
     case MAVLINK_MSG_ID_RADIO_STATUS:       // MAV ID: 109
     {
-        handle_radio_status(msg, DataFlash, (g.log_bitmask & MASK_LOG_PM) != 0);
+        handle_radio_status(msg, DataFlash, should_log(MASK_LOG_PM));
         break;
     }
 
-    case MAVLINK_MSG_ID_LOG_REQUEST_LIST ... MAVLINK_MSG_ID_LOG_REQUEST_END:    // MAV ID: 117 ... 122
+    case MAVLINK_MSG_ID_LOG_REQUEST_DATA:
+    case MAVLINK_MSG_ID_LOG_ERASE:
+        in_log_download = true;
+        // fallthru
+    case MAVLINK_MSG_ID_LOG_REQUEST_LIST:
+        if (!in_mavlink_delay && !motors.armed()) {
+            handle_log_message(msg, DataFlash);
+        }
+        break;
+    case MAVLINK_MSG_ID_LOG_REQUEST_END:
+        in_log_download = false;
         if (!in_mavlink_delay && !motors.armed()) {
             handle_log_message(msg, DataFlash);
         }

@@ -50,8 +50,27 @@ const Vector3f &AP_AHRS_NavEKF::get_gyro_drift(void) const
     return _gyro_bias;
 }
 
+// reset the current gyro drift estimate
+//  should be called if gyro offsets are recalculated
+void AP_AHRS_NavEKF::reset_gyro_drift(void)
+{
+    // update DCM
+    AP_AHRS_DCM::reset_gyro_drift();
+
+    // reset the EKF gyro bias states
+    EKF.resetGyroBias();
+}
+
 void AP_AHRS_NavEKF::update(void)
 {
+    // we need to restore the old DCM attitude values as these are
+    // used internally in DCM to calculate error values for gyro drift
+    // correction
+    roll = _dcm_attitude.x;
+    pitch = _dcm_attitude.y;
+    yaw = _dcm_attitude.z;
+    update_cd_values();
+
     AP_AHRS_DCM::update();
 
     // keep DCM attitude available for get_secondary_attitude()
@@ -78,11 +97,8 @@ void AP_AHRS_NavEKF::update(void)
             roll  = eulers.x;
             pitch = eulers.y;
             yaw   = eulers.z;
-            roll_sensor  = degrees(roll) * 100;
-            pitch_sensor = degrees(pitch) * 100;
-            yaw_sensor   = degrees(yaw) * 100;
-            if (yaw_sensor < 0)
-                yaw_sensor += 36000;
+
+            update_cd_values();
             update_trig();
 
             // keep _gyro_bias for get_gyro_drift()
@@ -265,6 +281,13 @@ bool AP_AHRS_NavEKF::healthy(void)
     }
     return AP_AHRS_DCM::healthy();    
 }
+
+// true if the AHRS has completed initialisation
+bool AP_AHRS_NavEKF::initialised(void) const
+{
+    // initialisation complete 10sec after ekf has started
+    return (ekf_started && (hal.scheduler->millis() - start_time_ms > AP_AHRS_NAVEKF_SETTLE_TIME_MS));
+};
 
 #endif // AP_AHRS_NAVEKF_AVAILABLE
 

@@ -354,8 +354,8 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: LOG_BITMASK
     // @DisplayName: Log bitmask
-    // @Description: 2 byte bitmap of log types to enable
-    // @Values: 830:Default,894:Default+RCIN,958:Default+IMU,1854:Default+Motors,-6146:NearlyAll,0:Disabled
+    // @Description: 4 byte bitmap of log types to enable
+    // @Values: 830:Default,894:Default+RCIN,958:Default+IMU,1854:Default+Motors,-6146:NearlyAll-AC315,43006:NearlyAll,131070:All+DisarmedLogging,0:Disabled
     // @User: Standard
     GSCALAR(log_bitmask,    "LOG_BITMASK",          DEFAULT_LOG_BITMASK),
 
@@ -456,11 +456,18 @@ const AP_Param::Info var_info[] PROGMEM = {
     GSCALAR(land_repositioning, "LAND_REPOSITION",     LAND_REPOSITION_DEFAULT),
 
     // @Param: EKF_CHECK_THRESH
-    // @DisplayName: EKF and InertialNav check compass and velocity variance threshold
+    // @DisplayName: EKF check compass and velocity variance threshold
     // @Description: Allows setting the maximum acceptable compass and velocity variance (0 to disable check)
     // @Values: 0:Disabled, 0.6:Default, 1.0:Relaxed
     // @User: Advanced
     GSCALAR(ekfcheck_thresh, "EKF_CHECK_THRESH",    EKFCHECK_THRESHOLD_DEFAULT),
+
+    // @Param: DCM_CHECK_THRESH
+    // @DisplayName: DCM yaw error threshold
+    // @Description: Allows setting the maximum acceptable yaw error as a sin of the yaw error (0 to disable check)
+    // @Values: 0:Disabled, 0.8:Default, 0.98:Relaxed
+    // @User: Advanced
+    GSCALAR(dcmcheck_thresh, "DCM_CHECK_THRESH",    DCMCHECK_THRESHOLD_DEFAULT),
 
 #if FRAME_CONFIG ==     HELI_FRAME
     // @Group: HS1_
@@ -1135,6 +1142,7 @@ const AP_Param::ConversionInfo conversion_table[] PROGMEM = {
     { Parameters::k_param_volt_div_ratio,     0,      AP_PARAM_FLOAT, "BATT_VOLT_MULT" },
     { Parameters::k_param_curr_amp_per_volt,  0,      AP_PARAM_FLOAT, "BATT_AMP_PERVOLT" },
     { Parameters::k_param_pack_capacity,      0,      AP_PARAM_INT32, "BATT_CAPACITY" },
+    { Parameters::k_param_log_bitmask_old,    0,      AP_PARAM_INT16, "LOG_BITMASK" },
 };
 
 static void load_parameters(void)
