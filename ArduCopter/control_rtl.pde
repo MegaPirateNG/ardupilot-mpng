@@ -334,7 +334,7 @@ static void rtl_land_run()
 
 #if LAND_REQUIRE_MIN_THROTTLE_TO_DISARM == ENABLED
         // disarm when the landing detector says we've landed and throttle is at minimum
-        if (ap.land_complete && (g.rc_3.control_in == 0 || failsafe.radio)) {
+        if (ap.land_complete && (ap.throttle_zero || failsafe.radio)) {
             init_disarm_motors();
         }
 #else
@@ -377,7 +377,7 @@ static void rtl_land_run()
 
     // call z-axis position controller
     float cmb_rate = get_throttle_land();
-    pos_control.set_alt_target_from_climb_rate(cmb_rate, G_Dt);
+    pos_control.set_alt_target_from_climb_rate(cmb_rate, G_Dt, true);
     pos_control.update_z_controller();
 
     // roll & pitch from waypoint controller, yaw rate from pilot

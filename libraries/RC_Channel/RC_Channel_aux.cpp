@@ -65,6 +65,19 @@ void RC_Channel_aux::disable_aux_channel(uint8_t channel)
     }    
 }
 
+/*
+  return the current function for a channel
+*/
+RC_Channel_aux::Aux_servo_function_t RC_Channel_aux::channel_function(uint8_t channel)
+{
+    for (uint8_t i = 0; i < RC_AUX_MAX_CHANNELS; i++) {
+        if (_aux_channels[i] && _aux_channels[i]->_ch_out == channel) {
+            return (RC_Channel_aux::Aux_servo_function_t)_aux_channels[i]->function.get();
+        }
+    }    
+    return RC_Channel_aux::k_none;
+}
+
 /// Update the _aux_channels array of pointers to rc_x channels
 /// This is to be done before rc_init so that the channels get correctly initialized.
 /// It also should be called periodically because the user might change the configuration and
@@ -81,8 +94,6 @@ void RC_Channel_aux::update_aux_servo_function(void)
 		switch (function) {
 		case RC_Channel_aux::k_flap:
 		case RC_Channel_aux::k_flap_auto:
-		case RC_Channel_aux::k_flaperon1:
-		case RC_Channel_aux::k_flaperon2:
 		case RC_Channel_aux::k_egg_drop:
 			_aux_channels[i]->set_range(0,100);
 			break;
@@ -94,6 +105,8 @@ void RC_Channel_aux::update_aux_servo_function(void)
 		case RC_Channel_aux::k_dspoiler2:
 		case RC_Channel_aux::k_rudder:
 		case RC_Channel_aux::k_steering:
+		case RC_Channel_aux::k_flaperon1:
+		case RC_Channel_aux::k_flaperon2:
 		    _aux_channels[i]->set_angle(4500);
 			break;
 		default:

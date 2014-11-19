@@ -179,14 +179,16 @@ enum AutoMode {
     Auto_CircleMoveToEdge,
     Auto_Circle,
     Auto_Spline,
-    Auto_NavGuided
+    Auto_NavGuided,
+    Auto_Loiter
 };
 
 // Guided modes
 enum GuidedMode {
     Guided_TakeOff,
     Guided_WP,
-    Guided_Velocity
+    Guided_Velocity,
+    Guided_Spline
 };
 
 // RTL states
@@ -255,6 +257,8 @@ enum FlipState {
 #define MASK_LOG_COMPASS                (1<<13)
 #define MASK_LOG_INAV                   (1<<14) // deprecated
 #define MASK_LOG_CAMERA                 (1<<15)
+#define MASK_LOG_WHEN_DISARMED          (1UL<<16)
+#define MASK_LOG_ANY                    0xFFFF
 
 // DATA - event logging
 #define DATA_MAVLINK_FLOAT              1
@@ -325,6 +329,7 @@ enum FlipState {
 #define ERROR_SUBSYSTEM_EKFINAV_CHECK       16
 #define ERROR_SUBSYSTEM_FAILSAFE_EKFINAV    17
 #define ERROR_SUBSYSTEM_BARO                18
+#define ERROR_SUBSYSTEM_CPU                 19
 // general error codes
 #define ERROR_CODE_ERROR_RESOLVED           0
 #define ERROR_CODE_FAILED_TO_INITIALISE     1
@@ -382,6 +387,13 @@ enum FlipState {
 #define FS_GPS_ALTHOLD                      2       // switch to ALTHOLD mode on GPS failsafe
 #define FS_GPS_LAND_EVEN_STABILIZE          3       // switch to LAND mode on GPS failsafe even if in a manual flight mode like Stabilize
 
+// for mavlink SET_POSITION_TARGET messages
+#define MAVLINK_SET_POS_TYPE_MASK_POS_IGNORE      ((1<<0) | (1<<1) | (1<<2))
+#define MAVLINK_SET_POS_TYPE_MASK_VEL_IGNORE      ((1<<3) | (1<<4) | (1<<5))
+#define MAVLINK_SET_POS_TYPE_MASK_ACC_IGNORE      ((1<<6) | (1<<7) | (1<<8))
+#define MAVLINK_SET_POS_TYPE_MASK_FORCE           (1<<10)
+#define MAVLINK_SET_POS_TYPE_MASK_YAW_IGNORE      (1<<11)
+#define MAVLINK_SET_POS_TYPE_MASK_YAW_RATE_IGNORE (1<<12)
 
 enum Serial2Protocol {
     SERIAL2_MAVLINK     = 1,

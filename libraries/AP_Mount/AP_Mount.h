@@ -52,7 +52,7 @@ public:
     // MAVLink methods
     void                    configure_msg(mavlink_message_t* msg);
     void                    control_msg(mavlink_message_t* msg);
-    void                    status_msg(mavlink_message_t* msg, mavlink_channel_t chan);
+    void                    status_msg(mavlink_channel_t chan);
     void                    set_roi_cmd(const struct Location *target_loc);
     void                    configure_cmd();
     void                    control_cmd();
@@ -98,6 +98,8 @@ private:
     uint8_t                         _pan_idx;  ///< RC_Channel_aux mount pan  function index
     uint8_t                         _open_idx; ///< RC_Channel_aux mount open function index
 
+    uint8_t                         mount_axis_mask; //  used to track user input on each axis
+    
     float                           _roll_control_angle; ///< radians
     float                           _tilt_control_angle; ///< radians
     float                           _pan_control_angle;  ///< radians
@@ -129,6 +131,9 @@ private:
     AP_Vector3f                     _retract_angles; ///< retracted position for mount, vector.x = roll vector.y = tilt, vector.z=pan
     AP_Vector3f                     _neutral_angles; ///< neutral position for mount, vector.x = roll vector.y = tilt, vector.z=pan
     AP_Vector3f                     _control_angles; ///< GCS controlled position for mount, vector.x = roll vector.y = tilt, vector.z=pan
+
+    AP_Float _roll_stb_lead;
+    AP_Float _pitch_stb_lead;
 };
 
 #endif // __AP_MOUNT_H__

@@ -180,6 +180,7 @@ AP_Compass_HMC5843::init()
     uint16_t expected_yz = 715;
     float gain_multiple = 1.0;
 
+    hal.scheduler->suspend_timer_procs();
     hal.scheduler->delay(10);
 
     _i2c_sem = hal.i2c->get_semaphore();
@@ -193,6 +194,7 @@ AP_Compass_HMC5843::init()
         !read_register(ConfigRegA, &_base_config)) {
         _healthy[0] = false;
         _i2c_sem->give();
+        hal.scheduler->resume_timer_procs();
         return false;
     }
     if ( _base_config == (SampleAveraging_8<<5 | DataOutputRate_75HZ<<2 | NormalOperation)) {
@@ -212,6 +214,7 @@ AP_Compass_HMC5843::init()
     } else {
         // not behaving like either supported compass type
         _i2c_sem->give();
+        hal.scheduler->resume_timer_procs();
         return false;
     }
 
@@ -298,10 +301,12 @@ AP_Compass_HMC5843::init()
     // leave test mode
     if (!re_initialise()) {
         _i2c_sem->give();
+        hal.scheduler->resume_timer_procs();
         return false;
     }
 
     _i2c_sem->give();
+    hal.scheduler->resume_timer_procs();
     _initialised = true;
 
 	// perform an initial read
@@ -364,22 +369,14 @@ bool AP_Compass_HMC5843::read()
     _field[0].rotate(MAG_BOARD_ORIENTATION);
 
     // add user selectable orientation
-    _field[0].rotate((enum Rotation)_orientation.get());
+    _field[0].rotate((enum Rotation)_orientation[0].get());
 
-    if (!_external) {
+    if (!_external[0]) {
         // and add in AHRS_ORIENTATION setting if not an external compass
         _field[0].rotate(_board_orientation);
     }
 
-    _field[0] += _offset[0].get();
-
-    // apply motor compensation
-    if(_motor_comp_type != AP_COMPASS_MOT_COMP_DISABLED && _thr_or_curr != 0.0f) {
-        _motor_offset[0] = _motor_compensation[0].get() * _thr_or_curr;
-        _field[0] += _motor_offset[0];
-    }else{
-        _motor_offset[0].zero();
-    }
+    apply_corrections(_field[0],0);
 
     _healthy[0] = true;
 

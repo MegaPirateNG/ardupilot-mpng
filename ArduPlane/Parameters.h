@@ -127,6 +127,9 @@ public:
         k_param_land_flap_percent,
         k_param_takeoff_flap_percent,
         k_param_flap_slewrate,
+        k_param_rtl_autoland,
+        k_param_override_channel,
+        k_param_stall_prevention,
 
         // 100: Arming parameters
         k_param_arming = 100,
@@ -326,6 +329,8 @@ public:
     AP_Float hil_err_limit;
 #endif
 
+    AP_Int8  rtl_autoland;
+
     // Feed-forward gains
     //
     AP_Float kff_rudder_mix;
@@ -466,6 +471,9 @@ public:
     AP_Int8 fbwa_tdrag_chan;
     AP_Int8 rangefinder_landing;
     AP_Int8 flap_slewrate;
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+    AP_Int8 override_channel;
+#endif
 
     // RC channels
     RC_Channel rc_1;

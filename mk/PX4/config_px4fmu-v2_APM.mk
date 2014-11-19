@@ -19,6 +19,7 @@ MODULES		+= drivers/stm32/tone_alarm
 MODULES		+= drivers/led
 MODULES		+= drivers/px4fmu
 MODULES		+= drivers/px4io
+MODULES		+= drivers/px4flow
 MODULES		+= drivers/boards/px4fmu-v2
 MODULES		+= drivers/rgbled
 MODULES		+= drivers/lsm303d
@@ -50,8 +51,13 @@ MODULES		+= systemcmds/reboot
 MODULES		+= systemcmds/top
 MODULES		+= systemcmds/tests
 MODULES		+= systemcmds/nshterm
+# the conditional allows for building with upstream master
+# which doesn't have auth
+ifneq ($(wildcard systemcmds/auth),)  
 MODULES		+= systemcmds/auth
+endif
 MODULES         += systemcmds/mtd
+MODULES         += systemcmds/reflect
 
 #
 # Library modules
@@ -60,9 +66,19 @@ MODULES		+= modules/systemlib
 MODULES		+= modules/systemlib/mixer
 MODULES		+= modules/uORB
 MODULES		+= lib/mathlib/math/filter
+# the conditional allows for building with upstream master
+# which doesn't have libtomcrypt and libtomfastmath
+ifneq ($(wildcard modules/libtomfastmath),)  
 MODULES	        += modules/libtomfastmath
 MODULES         += modules/libtomcrypt
+endif
 MODULES		+= lib/conversion
+
+ifneq ($(wildcard $(SKETCHBOOK)/../uavcan),)  
+MODULES         += modules/uavcan
+MODULES         += lib/mathlib
+LIBRARIES       += lib/mathlib/CMSIS
+endif
 
 #
 # Transitional support - add commands from the NuttX export archive.

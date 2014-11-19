@@ -35,6 +35,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Param: SYSID_SW_TYPE
     // @DisplayName: Software Type
     // @Description: This is used by the ground station to recognise the software type (eg ArduPlane vs ArduCopter)
+    // @Values: 0:ArduPlane,4:AntennaTracker,10:Copter,20:Rover
     // @User: Advanced
     GSCALAR(software_type,  "SYSID_SW_TYPE",   Parameters::k_software_type),
 
@@ -144,7 +145,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: FS_GCS_ENABLE
     // @DisplayName: Ground Station Failsafe Enable
-    // @Description: Controls whether failsafe will be invoked (and what action to take) when connection with Ground station is lost for at least 5 seconds
+    // @Description: Controls whether failsafe will be invoked (and what action to take) when connection with Ground station is lost for at least 5 seconds. NB. The GCS Failsafe is only active when RC_OVERRIDE is being used to control the vehicle.
     // @Values: 0:Disabled,1:Enabled always RTL,2:Enabled Continue with Mission in Auto Mode
     // @User: Standard
     GSCALAR(failsafe_gcs, "FS_GCS_ENABLE", FS_GCS_ENABLED_ALWAYS_RTL),
@@ -162,13 +163,6 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     GSCALAR(compass_enabled,        "MAG_ENABLE",   MAGNETOMETER),
-
-    // @Param: FLOW_ENABLE
-    // @DisplayName: Optical Flow enable/disable
-    // @Description: Setting this to Enabled(1) will enable optical flow. Setting this to Disabled(0) will disable optical flow
-    // @Values: 0:Disabled,1:Enabled
-    // @User: Standard
-    GSCALAR(optflow_enabled,        "FLOW_ENABLE",  DISABLED),
 
     // @Param: SUPER_SIMPLE
     // @DisplayName: Super Simple Mode
@@ -354,8 +348,8 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: LOG_BITMASK
     // @DisplayName: Log bitmask
-    // @Description: 2 byte bitmap of log types to enable
-    // @Values: 830:Default,894:Default+RCIN,958:Default+IMU,1854:Default+Motors,-6146:NearlyAll,-22530:All,0:Disabled
+    // @Description: 4 byte bitmap of log types to enable
+    // @Values: 830:Default,894:Default+RCIN,958:Default+IMU,1854:Default+Motors,-6146:NearlyAll-AC315,43006:NearlyAll,131070:All+DisarmedLogging,0:Disabled
     // @User: Standard
     GSCALAR(log_bitmask,    "LOG_BITMASK",          DEFAULT_LOG_BITMASK),
 
@@ -418,6 +412,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Param: ANGLE_MAX
     // @DisplayName: Angle Max
     // @Description: Maximum lean angle in all flight modes
+    // @Units: Centi-degrees
     // @Range 1000 8000
     // @User: Advanced
     ASCALAR(angle_max, "ANGLE_MAX",                 DEFAULT_ANGLE_MAX),
@@ -435,6 +430,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Param: PHLD_BRAKE_RATE
     // @DisplayName: PosHold braking rate
     // @Description: PosHold flight mode's rotation rate during braking in deg/sec
+    // @Units: deg/sec
     // @Range: 4 12
     // @User: Advanced
     GSCALAR(poshold_brake_rate, "PHLD_BRAKE_RATE",  POSHOLD_BRAKE_RATE_DEFAULT),
@@ -456,11 +452,18 @@ const AP_Param::Info var_info[] PROGMEM = {
     GSCALAR(land_repositioning, "LAND_REPOSITION",     LAND_REPOSITION_DEFAULT),
 
     // @Param: EKF_CHECK_THRESH
-    // @DisplayName: EKF and InertialNav check compass and velocity variance threshold
+    // @DisplayName: EKF check compass and velocity variance threshold
     // @Description: Allows setting the maximum acceptable compass and velocity variance (0 to disable check)
     // @Values: 0:Disabled, 0.8:Default, 1.0:Relaxed
     // @User: Advanced
     GSCALAR(ekfcheck_thresh, "EKF_CHECK_THRESH",    EKFCHECK_THRESHOLD_DEFAULT),
+
+    // @Param: DCM_CHECK_THRESH
+    // @DisplayName: DCM yaw error threshold
+    // @Description: Allows setting the maximum acceptable yaw error as a sin of the yaw error (0 to disable check)
+    // @Values: 0:Disabled, 0.8:Default, 0.98:Relaxed
+    // @User: Advanced
+    GSCALAR(dcmcheck_thresh, "DCM_CHECK_THRESH",    DCMCHECK_THRESHOLD_DEFAULT),
 
 #if FRAME_CONFIG ==     HELI_FRAME
     // @Group: HS1_
@@ -574,7 +577,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: ACRO_BAL_ROLL
     // @DisplayName: Acro Balance Roll
-    // @Description: rate at which roll angle returns to level in acro mode
+    // @Description: rate at which roll angle returns to level in acro mode.  A higher value causes the vehicle to return to level faster.
     // @Range: 0 3
     // @Increment: 0.1
     // @User: Advanced
@@ -582,7 +585,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: ACRO_BAL_PITCH
     // @DisplayName: Acro Balance Pitch
-    // @Description: rate at which pitch angle returns to level in acro mode
+    // @Description: rate at which pitch angle returns to level in acro mode.  A higher value causes the vehicle to return to level faster.
     // @Range: 0 3
     // @Increment: 0.1
     // @User: Advanced
@@ -1112,6 +1115,12 @@ const AP_Param::Info var_info[] PROGMEM = {
     GOBJECT(terrain,                "TERRAIN_", AP_Terrain),
 #endif
 
+#if OPTFLOW == ENABLED
+    // @Group: FLOW
+    // @Path: ../libraries/AP_OpticalFlow/OpticalFlow.cpp
+    GOBJECT(optflow,   "FLOW", OpticalFlow),
+#endif
+
     AP_VAREND
 };
 
@@ -1135,6 +1144,7 @@ const AP_Param::ConversionInfo conversion_table[] PROGMEM = {
     { Parameters::k_param_volt_div_ratio,     0,      AP_PARAM_FLOAT, "BATT_VOLT_MULT" },
     { Parameters::k_param_curr_amp_per_volt,  0,      AP_PARAM_FLOAT, "BATT_AMP_PERVOLT" },
     { Parameters::k_param_pack_capacity,      0,      AP_PARAM_INT32, "BATT_CAPACITY" },
+    { Parameters::k_param_log_bitmask_old,    0,      AP_PARAM_INT16, "LOG_BITMASK" },
 };
 
 static void load_parameters(void)

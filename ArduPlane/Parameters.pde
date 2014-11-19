@@ -73,11 +73,11 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: AUTOTUNE_LEVEL
     // @DisplayName: Autotune level
-    // @Description: Level of agressiveness for autotune. When autotune is run a lower AUTOTUNE_LEVEL will result in a 'softer' tune, with less agressive gains. For most users a level of 5 is recommended.
+    // @Description: Level of agressiveness for autotune. When autotune is run a lower AUTOTUNE_LEVEL will result in a 'softer' tune, with less agressive gains. For most users a level of 6 is recommended.
     // @Range: 1 10
     // @Increment: 1
     // @User: Standard
-    ASCALAR(autotune_level, "AUTOTUNE_LEVEL",  5),
+    ASCALAR(autotune_level, "AUTOTUNE_LEVEL",  6),
 
     // @Param: TELEM_DELAY
     // @DisplayName: Telemetry startup delay 
@@ -145,7 +145,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: TKOFF_THR_MINSPD
     // @DisplayName: Takeoff throttle min speed
-    // @Description: Minimum GPS ground speed in m/s used by the speed check that un-suppresses throttle in auto-takeoff. This can be be used for catapult launches where you want the motor to engage only after the plane leaves the catapult, but it is preferable to use the TKOFF_THR_MINACC and TKOFF_THR_DELAY parameters for cvatapult launches due to the errors associated with GPS measurements. For hand launches with a pusher prop it is strongly advised that this parameter be set to a value no less than 4 m/s to provide additional protection against premature motor start. Note that the GPS velocity will lag the real velocity by about 0.5 seconds. The ground speed check is delayed by the TKOFF_THR_DELAY parameter.
+    // @Description: Minimum GPS ground speed in m/s used by the speed check that un-suppresses throttle in auto-takeoff. This can be be used for catapult launches where you want the motor to engage only after the plane leaves the catapult, but it is preferable to use the TKOFF_THR_MINACC and TKOFF_THR_DELAY parameters for catapult launches due to the errors associated with GPS measurements. For hand launches with a pusher prop it is strongly advised that this parameter be set to a value no less than 4 m/s to provide additional protection against premature motor start. Note that the GPS velocity will lag the real velocity by about 0.5 seconds. The ground speed check is delayed by the TKOFF_THR_DELAY parameter.
     // @Units: m/s
     // @Range: 0 30
     // @Increment: 0.1
@@ -154,7 +154,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: TKOFF_THR_MINACC
     // @DisplayName: Takeoff throttle min acceleration
-    // @Description: Minimum forward acceleration in m/s/s before arming the ground speed check in auto-takeoff. This is meant to be used for hand launches. Setting this value to 0 disables the acceleration test which means the ground speed check will always be armed which could allow GPS velocity jumps to start the engine. For hand launches this should be set to 15.
+    // @Description: Minimum forward acceleration in m/s/s before arming the ground speed check in auto-takeoff. This is meant to be used for hand launches. Setting this value to 0 disables the acceleration test which means the ground speed check will always be armed which could allow GPS velocity jumps to start the engine. For hand launches and bungee launches this should be set to around 15.
     // @Units: m/s/s
     // @Range: 0 30
     // @Increment: 0.1
@@ -163,9 +163,9 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: TKOFF_THR_DELAY
     // @DisplayName: Takeoff throttle delay
-    // @Description: This parameter sets the time delay (in 1/10ths of a second) that the ground speed check is delayed after the forward acceleration check controlled by TKOFF_THR_MINACC has passed. For hand launches with pusher propellers it is essential that this is set to a value of no less than 2 (0.2 seconds) to ensure that the aircraft is safely clear of the throwers arm before the motor can start. 
+    // @Description: This parameter sets the time delay (in 1/10ths of a second) that the ground speed check is delayed after the forward acceleration check controlled by TKOFF_THR_MINACC has passed. For hand launches with pusher propellers it is essential that this is set to a value of no less than 2 (0.2 seconds) to ensure that the aircraft is safely clear of the throwers arm before the motor can start. For bungee launches a larger value can be used (such as 30) to give time for the bungee to release from the aircraft before the motor is started.
     // @Units: 0.1 seconds
-    // @Range: 0 15
+    // @Range: 0 127
     // @Increment: 1
     // @User: User
     GSCALAR(takeoff_throttle_delay,     "TKOFF_THR_DELAY",  2),
@@ -201,7 +201,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @DisplayName: Takeoff throttle slew rate
     // @Description: This parameter sets the slew rate for the throttle during auto takeoff. When this is zero the THR_SLEWRATE parameter is used during takeoff. For rolling takeoffs it can be a good idea to set a lower slewrate for takeoff to give a slower acceleration which can improve ground steering control. The value is a percentage throttle change per second, so a value of 20 means to advance the throttle over 5 seconds on takeoff. Values below 20 are not recommended as they may cause the plane to try to climb out with too little throttle.
     // @Units: percent
-    // @Range: 0 100
+    // @Range: 0 127
     // @Increment: 1
     // @User: User
     GSCALAR(takeoff_throttle_slewrate, "TKOFF_THR_SLEW",  0),
@@ -373,20 +373,27 @@ const AP_Param::Info var_info[] PROGMEM = {
     GSCALAR(fence_ret_rally,        "FENCE_RET_RALLY",  0),     
 #endif
 
+    // @Param: STALL_PREVENTION
+    // @DisplayName: Enable stall prevention
+    // @Description: This controls the use of stall prevention techniques, including roll limits at low speed and raising the minimum airspeed in turns. The limits are based on the aerodynamic load factor of a banked turn. This option relies on the correct ARSPD_FBW_MIN value being set correctly. Note that if you don't have an airspeed sensor then stall prevention will use an airspeed estimate based on the ground speed plus a wind estimate taken from the response of the autopilot banked turns. That synthetic airspeed estimate may be inaccurate, so you should not assume that stall prevention with no airspeed sensor will be effective.
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Standard
+    ASCALAR(stall_prevention, "STALL_PREVENTION",  1),
+
     // @Param: ARSPD_FBW_MIN
-    // @DisplayName: Fly By Wire Minimum Airspeed
-    // @Description: Airspeed corresponding to minimum throttle in auto throttle modes (FBWB, CRUISE, AUTO, GUIDED, LOITER, CIRCLE and RTL). This is a calibrated (apparent) airspeed.
+    // @DisplayName: Minimum Airspeed
+    // @Description: This is the minimum airspeed you want to fly at in modes where the autopilot controls the airspeed. This should be set to a value around 20% higher than the level flight stall speed for the airframe. This value is also used in the STALL_PREVENTION code.
     // @Units: m/s
-    // @Range: 5 50
+    // @Range: 5 100
     // @Increment: 1
     // @User: Standard
     ASCALAR(airspeed_min, "ARSPD_FBW_MIN",  AIRSPEED_FBW_MIN),
 
     // @Param: ARSPD_FBW_MAX
-    // @DisplayName: Fly By Wire Maximum Airspeed
-    // @Description: Airspeed corresponding to maximum throttle in auto throttle modes (FBWB, CRUISE, AUTO, GUIDED, LOITER, CIRCLE and RTL). This is a calibrated (apparent) airspeed.
+    // @DisplayName: Maximum Airspeed
+    // @Description: This is the maximum airspeed that you want to allow for your airframe in auto-throttle modes. You should ensure that this value is sufficiently above the ARSPD_FBW_MIN value to allow for a sufficient flight envelope to accurately control altitude using airspeed. A value at least 50% above ARSPD_FBW_MIN is recommended.
     // @Units: m/s
-    // @Range: 5 50
+    // @Range: 5 100
     // @Increment: 1
     // @User: Standard
     ASCALAR(airspeed_max, "ARSPD_FBW_MAX",  AIRSPEED_FBW_MAX),
@@ -454,7 +461,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @DisplayName: Throttle slew rate
     // @Description: maximum percentage change in throttle per second. A setting of 10 means to not change the throttle by more than 10% of the full throttle range in one second.
     // @Units: Percent
-    // @Range: 0 100
+    // @Range: 0 127
     // @Increment: 1
     // @User: Standard
     ASCALAR(throttle_slewrate,      "THR_SLEWRATE",   100),
@@ -821,7 +828,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: FLAP_IN_CHANNEL
     // @DisplayName: Flap input channel
-    // @Description: An RC input channel to use for flaps control. If this is set to a RC channel number then that channel will be used for manual flaps control. When enabled, the percentage of flaps is taken as the percentage travel from the TRIM value of the channel to the MIN value of the channel. A value above the TRIM values will give inverse flaps (spoilers). This option needs to be enabled in conjunction with a FUNCTION setting on an output channel to one of the flap functions. When a FLAP_IN_CHANNEL is combined with auto-flaps the higher of the two flap percentages is taken. You must also enable a FLAPERON_OUTPUT flaperon mixer setting.
+    // @Description: An RC input channel to use for flaps control. If this is set to a RC channel number then that channel will be used for manual flaps control. When enabled, the percentage of flaps is taken as the percentage travel from the TRIM value of the channel to the MIN value of the channel. A value above the TRIM values will give inverse flaps (spoilers). This option needs to be enabled in conjunction with a FUNCTION setting on an output channel to one of the flap functions. When a FLAP_IN_CHANNEL is combined with auto-flaps the higher of the two flap percentages is taken. You must also enable a FLAPERON_OUTPUT flaperon mixer setting if using flaperons.
     // @User: User
     GSCALAR(flapin_channel,         "FLAP_IN_CHANNEL",  0),
 
@@ -874,6 +881,14 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Advanced
     GSCALAR(land_flap_percent,     "LAND_FLAP_PERCNT", 0),
 
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+    // @Param: OVERRIDE_CHAN
+    // @DisplayName: PX4IO override channel
+    // @Description: If set to a non-zero value then this is an RC input channel number to use for testing manual control in case the main FMU microcontroller on a PX4 or Pixhawk fails. When this RC input channel goes above 1750 the FMU will stop sending servo controls to the PX4IO board, which will trigger the PX4IO board to start using its failsafe override behaviour, which should give you manual control of the aircraft. That allows you to test for correct manual behaviour without actually crashing the FMU. This parameter is normally only set to a non-zero value for ground testing purposes. When the override channel is used it also forces the PX4 safety switch into an armed state. This allows it to be used as a way to re-arm a plane after an in-flight reboot. Use in that way is considered a developer option, for people testing unstable developer code. Note that you may set OVERRIDE_CHAN to the same channel as FLTMODE_CH to get PX4IO based override when in flight mode 6. Note that when override is triggered the 6 auxillary output channels on Pixhawk will no longer be updated, so all the flight controls you need must be assigned to the first 8 channels.
+    // @User: Advanced
+    GSCALAR(override_channel,      "OVERRIDE_CHAN",  0),
+#endif
+
     // @Param: RSSI_PIN
     // @DisplayName: Receiver RSSI sensing pin
     // @Description: This selects an analog pin for the receiver RSSI voltage. It assumes the voltage is 5V for max rssi, 0V for minimum
@@ -913,6 +928,13 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Advanced
     GSCALAR(hil_err_limit,         "HIL_ERR_LIMIT",   5),
 #endif
+
+    // @Param: RTL_AUTOLAND
+    // @DisplayName: RTL auto land
+    // @Description: Automatically begin landing sequence after arriving at RTL location. This requires the addition of a DO_LAND_START mission item, which acts as a marker for the start of a landing sequence. The closest landing sequence will be chosen to the current location. 
+    // @Values: 0:Disable,1:Enable
+    // @User: Standard
+    GSCALAR(rtl_autoland,         "RTL_AUTOLAND",   0),
 
     // barometer ground calibration. The GND_ prefix is chosen for
     // compatibility with previous releases of ArduPlane

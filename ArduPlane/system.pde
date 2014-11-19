@@ -87,6 +87,12 @@ static void init_ardupilot()
     //
     load_parameters();
 
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+    // this must be before BoardConfig.init() so if
+    // BRD_SAFETYENABLE==0 then we don't have safety off yet
+    setup_failsafe_mixing();
+#endif
+
     BoardConfig.init();
 
     // allow servo set on all channels except first 4
@@ -146,11 +152,7 @@ static void init_ardupilot()
     }
 #endif
 
-    // Register mavlink_delay_cb, which will run anytime you have
-    // more than 5ms remaining in your call to hal.scheduler->delay
-    hal.scheduler->register_delay_callback(mavlink_delay_cb, 5);
-
-#if CONFIG_INS_TYPE == CONFIG_INS_OILPAN || CONFIG_HAL_BOARD == HAL_BOARD_APM1
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM1
     apm1_adc.Init();      // APM ADC library initialization
 #endif
 
@@ -166,6 +168,10 @@ static void init_ardupilot()
         }
     }
 
+    // Register mavlink_delay_cb, which will run anytime you have
+    // more than 5ms remaining in your call to hal.scheduler->delay
+    hal.scheduler->register_delay_callback(mavlink_delay_cb, 5);
+
     // give AHRS the airspeed sensor
     ahrs.set_airspeed(&airspeed);
 
@@ -174,7 +180,6 @@ static void init_ardupilot()
 
     //mavlink_system.sysid = MAV_SYSTEM_ID;				// Using g.sysid_this_mav
     mavlink_system.compid = 1;          //MAV_COMP_ID_IMU;   // We do not check for comp id
-    mavlink_system.type = MAV_TYPE_FIXED_WING;
 
     init_rc_in();               // sets up rc channels from radio
     init_rc_out();              // sets up the timer libs
@@ -297,6 +302,15 @@ static void set_mode(enum FlightMode mode)
     // don't cross-track when starting a mission
     auto_state.next_wp_no_crosstrack = true;
 
+    // reset landing check
+    auto_state.checked_for_autoland = false;
+
+    // reset go around command
+    auto_state.commanded_go_around = false;
+
+    // zero locked course
+    steer_state.locked_course_err = 0;
+
     // set mode
     previous_mode = control_mode;
     control_mode = mode;
@@ -393,6 +407,30 @@ static void set_mode(enum FlightMode mode)
     steerController.reset_I();    
 }
 
+/*
+  set_mode() wrapper for MAVLink SET_MODE
+ */
+static bool mavlink_set_mode(uint8_t mode)
+{
+    switch (mode) {
+    case MANUAL:
+    case CIRCLE:
+    case STABILIZE:
+    case TRAINING:
+    case ACRO:
+    case FLY_BY_WIRE_A:
+    case AUTOTUNE:
+    case FLY_BY_WIRE_B:
+    case CRUISE:
+    case AUTO:
+    case RTL:
+    case LOITER:
+        set_mode((enum FlightMode)mode);
+        return true;
+    }
+    return false;
+}
+
 // exit_mode - perform any cleanup required when leaving a flight mode
 static void exit_mode(enum FlightMode mode)
 {
@@ -410,10 +448,7 @@ static void check_long_failsafe()
     // only act on changes
     // -------------------
     if(failsafe.state != FAILSAFE_LONG && failsafe.state != FAILSAFE_GCS) {
-        if (failsafe.rc_override_active && (tnow - failsafe.last_heartbeat_ms) > g.long_fs_timeout*1000) {
-            failsafe_long_on_event(FAILSAFE_LONG);
-        } else if (!failsafe.rc_override_active && 
-                   failsafe.state == FAILSAFE_SHORT && 
+        if (failsafe.state == FAILSAFE_SHORT &&
                    (tnow - failsafe.ch3_timer_ms) > g.long_fs_timeout*1000) {
             failsafe_long_on_event(FAILSAFE_LONG);
         } else if (g.gcs_heartbeat_fs_enabled != GCS_FAILSAFE_OFF && 
@@ -431,11 +466,6 @@ static void check_long_failsafe()
             (tnow - failsafe.last_heartbeat_ms) < g.short_fs_timeout*1000) {
             failsafe.state = FAILSAFE_NONE;
         } else if (failsafe.state == FAILSAFE_LONG && 
-                   failsafe.rc_override_active && 
-                   (tnow - failsafe.last_heartbeat_ms) < g.short_fs_timeout*1000) {
-            failsafe.state = FAILSAFE_NONE;
-        } else if (failsafe.state == FAILSAFE_LONG && 
-                   !failsafe.rc_override_active && 
                    !failsafe.ch3_failsafe) {
             failsafe.state = FAILSAFE_NONE;
         }
@@ -467,8 +497,11 @@ static void startup_INS_ground(bool do_accel_init)
         // the barometer begins updating when we get the first
         // HIL_STATE message
         gcs_send_text_P(SEVERITY_LOW, PSTR("Waiting for first HIL_STATE message"));
-        delay(1000);
+        hal.scheduler->delay(1000);
     }
+    
+    // set INS to HIL mode
+    ins.set_hil_mode();
 #endif
 
     AP_InertialSensor::Start_style style;
@@ -502,7 +535,7 @@ static void startup_INS_ground(bool do_accel_init)
     if (airspeed.enabled()) {
         // initialize airspeed sensor
         // --------------------------
-        zero_airspeed();
+        zero_airspeed(true);
     } else {
         gcs_send_text_P(SEVERITY_LOW,PSTR("NO airspeed"));
     }
@@ -515,9 +548,11 @@ static void update_notify()
     notify.update();
 }
 
-static void resetPerfData(void) {
+static void resetPerfData(void) 
+{
     mainLoop_count                  = 0;
     G_Dt_max                        = 0;
+    G_Dt_min                        = 0;
     perf_mon_timer                  = millis();
 }
 

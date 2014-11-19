@@ -191,7 +191,6 @@ static void init_ardupilot()
 
 	//mavlink_system.sysid = MAV_SYSTEM_ID;				// Using g.sysid_this_mav
 	mavlink_system.compid = 1;	//MAV_COMP_ID_IMU;   // We do not check for comp id
-	mavlink_system.type = MAV_TYPE_GROUND_ROVER;
 
     rc_override_active = hal.rcin->set_overrides(rc_override, 8);
 
@@ -323,6 +322,24 @@ static void set_mode(enum mode mode)
 	if (should_log(MASK_LOG_MODE)) {
 		Log_Write_Mode();
     }
+}
+
+/*
+  set_mode() wrapper for MAVLink SET_MODE
+ */
+static bool mavlink_set_mode(uint8_t mode)
+{
+    switch (mode) {
+    case MANUAL:
+    case HOLD:
+    case LEARNING:
+    case STEERING:
+    case AUTO:
+    case RTL:
+        set_mode((enum mode)mode);
+        return true;
+    }
+    return false;
 }
 
 /*

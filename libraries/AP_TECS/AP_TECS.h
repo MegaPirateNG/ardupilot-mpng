@@ -50,7 +50,8 @@ public:
                                enum FlightStage flight_stage,
                                int32_t ptchMinCO_cd,
                                int16_t throttle_nudge,
-							   float hgt_afe);
+							   float hgt_afe,
+							   float load_factor);
 
 	// demanded throttle in percentage
 	// should return 0 to 100
@@ -206,9 +207,6 @@ private:
     // climbout mode
     enum FlightStage _flight_stage;
 
-	// throttle demand before limiting
-	float _throttle_dem_unc;
-
 	// pitch demand before limiting
 	float _pitch_dem_unc;
 
@@ -244,7 +242,7 @@ private:
 	uint8_t _flare_counter;
 
     // Update the airspeed internal state using a second order complementary filter
-    void _update_speed(void);
+    void _update_speed(float load_factor);
 
     // Update the demanded airspeed
     void _update_speed_demand(void);

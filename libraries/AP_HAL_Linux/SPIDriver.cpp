@@ -34,7 +34,8 @@ LinuxSPIDeviceDriver LinuxSPIDeviceManager::_device[LINUX_SPI_DEVICE_NUM_DEVICES
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
 LinuxSPIDeviceDriver LinuxSPIDeviceManager::_device[LINUX_SPI_DEVICE_NUM_DEVICES] = {
     /* MPU9250 is restricted to 1MHz for non-data and interrupt registers */
-    LinuxSPIDeviceDriver(0, AP_HAL::SPIDevice_MPU9250, SPI_MODE_3, 8, RPI_GPIO_7,  1*MHZ, 16*MHZ),
+    LinuxSPIDeviceDriver(0, AP_HAL::SPIDevice_MPU9250, SPI_MODE_0, 8, RPI_GPIO_7,  1*MHZ, 16*MHZ),
+    LinuxSPIDeviceDriver(0, AP_HAL::SPIDevice_Ublox, SPI_MODE_0, 8, RPI_GPIO_8,  1*MHZ, 4*MHZ),
 };
 #else
 // empty device table
@@ -65,7 +66,7 @@ void LinuxSPIDeviceDriver::init()
         hal.scheduler->panic("Unable to instantiate cs pin");
     }
     _cs->mode(HAL_GPIO_OUTPUT);
-    _cs->write(HIGH);       // do not hold the SPI bus initially
+    _cs->write(1);       // do not hold the SPI bus initially
 }
 
 AP_HAL::Semaphore* LinuxSPIDeviceDriver::get_semaphore()

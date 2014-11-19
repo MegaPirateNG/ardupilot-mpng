@@ -24,6 +24,7 @@
 class HAL_AVR_SITL;
 
 class AVR_SITL::SITL_State {
+    friend class AVR_SITL::SITLScheduler;
 public:
     void init(int argc, char * const argv[]);
 
@@ -121,7 +122,7 @@ private:
     static bool _motors_on;
 
     static AP_Baro_HIL *_barometer;
-    static AP_InertialSensor_HIL *_ins;
+    static AP_InertialSensor *_ins;
     static SITLScheduler *_scheduler;
     static AP_Compass_HIL *_compass;
 

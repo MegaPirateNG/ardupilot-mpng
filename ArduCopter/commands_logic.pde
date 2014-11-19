@@ -9,7 +9,8 @@ static void do_circle(const AP_Mission::Mission_Command& cmd);
 static void do_loiter_time(const AP_Mission::Mission_Command& cmd);
 static void do_spline_wp(const AP_Mission::Mission_Command& cmd);
 #if NAV_GUIDED == ENABLED
-static void do_nav_guided(const AP_Mission::Mission_Command& cmd);
+static void do_nav_guided_enable(const AP_Mission::Mission_Command& cmd);
+static void do_guided_limits(const AP_Mission::Mission_Command& cmd);
 #endif
 static void do_wait_delay(const AP_Mission::Mission_Command& cmd);
 static void do_within_distance(const AP_Mission::Mission_Command& cmd);
@@ -28,7 +29,7 @@ static bool verify_nav_wp(const AP_Mission::Mission_Command& cmd);
 static bool verify_circle(const AP_Mission::Mission_Command& cmd);
 static bool verify_spline_wp(const AP_Mission::Mission_Command& cmd);
 #if NAV_GUIDED == ENABLED
-static bool verify_nav_guided(const AP_Mission::Mission_Command& cmd);
+static bool verify_nav_guided_enable(const AP_Mission::Mission_Command& cmd);
 #endif
 static void auto_spline_start(const Vector3f& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Vector3f& next_spline_destination);
 
@@ -36,7 +37,7 @@ static void auto_spline_start(const Vector3f& destination, bool stopped_at_start
 static bool start_command(const AP_Mission::Mission_Command& cmd)
 {
     // To-Do: logging when new commands start/end
-    if (g.log_bitmask & MASK_LOG_CMD) {
+    if (should_log(MASK_LOG_CMD)) {
         Log_Write_Cmd(cmd);
     }
 
@@ -78,11 +79,9 @@ static bool start_command(const AP_Mission::Mission_Command& cmd)
         break;
 
 #if NAV_GUIDED == ENABLED
-#ifdef MAV_CMD_NAV_GUIDED
-    case MAV_CMD_NAV_GUIDED:             // 90  accept navigation commands from external nav computer
-        do_nav_guided(cmd);
+    case MAV_CMD_NAV_GUIDED_ENABLE:             // 92  accept navigation commands from external nav computer
+        do_nav_guided_enable(cmd);
         break;
-#endif
 #endif
 
     //
@@ -176,6 +175,12 @@ static bool start_command(const AP_Mission::Mission_Command& cmd)
         break;
 #endif
 
+#if NAV_GUIDED == ENABLED
+    case MAV_CMD_DO_GUIDED_LIMITS:                      // 220  accept guided mode limits
+        do_guided_limits(cmd);
+        break;
+#endif
+
     default:
         // do nothing with unrecognized MAVLink messages
         break;
@@ -232,11 +237,9 @@ static bool verify_command(const AP_Mission::Mission_Command& cmd)
         break;
 
 #if NAV_GUIDED == ENABLED
-#ifdef MAV_CMD_NAV_GUIDED
-    case MAV_CMD_NAV_GUIDED:
-        return verify_nav_guided(cmd);
+    case MAV_CMD_NAV_GUIDED_ENABLE:
+        return verify_nav_guided_enable(cmd);
         break;
-#endif
 #endif
 
     ///
@@ -278,13 +281,13 @@ static void exit_mission()
     // if we are not on the ground switch to loiter or land
     if(!ap.land_complete) {
         // try to enter loiter but if that fails land
-        if (!set_mode(LOITER)) {
+        if(!auto_loiter_start()) {
             set_mode(LAND);
         }
     }else{
 #if LAND_REQUIRE_MIN_THROTTLE_TO_DISARM == ENABLED
         // disarm when the landing detector says we've landed and throttle is at minimum
-        if (g.rc_3.control_in == 0 || failsafe.radio) {
+        if (ap.throttle_zero || failsafe.radio) {
             init_disarm_motors();
         }
 #else
@@ -323,18 +326,7 @@ static void do_takeoff(const AP_Mission::Mission_Command& cmd)
 static void do_nav_wp(const AP_Mission::Mission_Command& cmd)
 {
     const Vector3f &curr_pos = inertial_nav.get_position();
-    Vector3f local_pos = pv_location_to_vector(cmd.content.location);
-
-    // set target altitude to current altitude if not provided
-    if (cmd.content.location.alt == 0) {
-        local_pos.z = curr_pos.z;
-    }
-
-    // set lat/lon position to current position if not provided
-    if (cmd.content.location.lat == 0 && cmd.content.location.lng == 0) {
-        local_pos.x = curr_pos.x;
-        local_pos.y = curr_pos.y;
-    }
+    const Vector3f local_pos = pv_location_to_vector_with_default(cmd.content.location, curr_pos);
 
     // this will be used to remember the time in millis after we reach or pass the WP.
     loiter_time = 0;
@@ -474,7 +466,8 @@ static void do_loiter_time(const AP_Mission::Mission_Command& cmd)
 // do_spline_wp - initiate move to next waypoint
 static void do_spline_wp(const AP_Mission::Mission_Command& cmd)
 {
-    Vector3f local_pos = pv_location_to_vector(cmd.content.location);
+    const Vector3f& curr_pos = inertial_nav.get_position();
+    Vector3f local_pos = pv_location_to_vector_with_default(cmd.content.location, curr_pos);
 
     // this will be used to remember the time in millis after we reach or pass the WP.
     loiter_time = 0;
@@ -503,10 +496,10 @@ static void do_spline_wp(const AP_Mission::Mission_Command& cmd)
         // if the next nav command is a waypoint set end type to spline or straight
         if (temp_cmd.id == MAV_CMD_NAV_WAYPOINT) {
             seg_end_type = AC_WPNav::SEGMENT_END_STRAIGHT;
-            next_destination = pv_location_to_vector(temp_cmd.content.location);
+            next_destination = pv_location_to_vector_with_default(temp_cmd.content.location, local_pos);
         }else if (temp_cmd.id == MAV_CMD_NAV_SPLINE_WAYPOINT) {
             seg_end_type = AC_WPNav::SEGMENT_END_SPLINE;
-            next_destination = pv_location_to_vector(temp_cmd.content.location);
+            next_destination = pv_location_to_vector_with_default(temp_cmd.content.location, local_pos);
         }
     }
 
@@ -515,17 +508,16 @@ static void do_spline_wp(const AP_Mission::Mission_Command& cmd)
 }
 
 #if NAV_GUIDED == ENABLED
-// do_nav_guided - initiate accepting commands from exernal nav computer
-static void do_nav_guided(const AP_Mission::Mission_Command& cmd)
+// do_nav_guided_enable - initiate accepting commands from external nav computer
+static void do_nav_guided_enable(const AP_Mission::Mission_Command& cmd)
 {
-    // record start time so it can be compared vs timeout
-    nav_guided.start_time = millis();
+    if (cmd.p1 > 0) {
+        // initialise guided limits
+        guided_limit_init_time_and_pos();
 
-    // record start position so it can be compared vs horizontal limit
-    nav_guided.start_position = inertial_nav.get_position();
-
-    // set spline navigation target
-    auto_nav_guided_start();
+        // set spline navigation target
+        auto_nav_guided_start();
+    }
 }
 #endif  // NAV_GUIDED
 
@@ -571,6 +563,17 @@ static void do_gripper(const AP_Mission::Mission_Command& cmd)
             // do nothing
             break;
     }
+}
+#endif
+
+#if NAV_GUIDED == ENABLED
+// do_guided_limits - pass guided limits to guided controller
+static void do_guided_limits(const AP_Mission::Mission_Command& cmd)
+{
+    guided_limit_set(cmd.p1 * 1000, // convert seconds to ms
+                     cmd.content.guided_limits.alt_min * 100.0f,    // convert meters to cm
+                     cmd.content.guided_limits.alt_max * 100.0f,    // convert meters to cm
+                     cmd.content.guided_limits.horiz_max * 100.0f); // convert meters to cm
 }
 #endif
 
@@ -730,36 +733,15 @@ static bool verify_spline_wp(const AP_Mission::Mission_Command& cmd)
 
 #if NAV_GUIDED == ENABLED
 // verify_nav_guided - check if we have breached any limits
-static bool verify_nav_guided(const AP_Mission::Mission_Command& cmd)
+static bool verify_nav_guided_enable(const AP_Mission::Mission_Command& cmd)
 {
-    // check if we have passed the timeout
-    if ((cmd.p1 > 0) && ((millis() - nav_guided.start_time) / 1000 >= cmd.p1)) {
+    // if disabling guided mode then immediately return true so we move to next command
+    if (cmd.p1 == 0) {
         return true;
     }
 
-    // get current location
-    const Vector3f& curr_pos = inertial_nav.get_position();
-
-    // check if we have gone below min alt
-    if (cmd.content.nav_guided.alt_min != 0 && (curr_pos.z / 100) < cmd.content.nav_guided.alt_min) {
-        return true;
-    }
-
-    // check if we have gone above max alt
-    if (cmd.content.nav_guided.alt_max != 0 && (curr_pos.z / 100) > cmd.content.nav_guided.alt_max) {
-        return true;
-    }
-
-    // check if we have gone beyond horizontal limit
-    if (cmd.content.nav_guided.horiz_max != 0) {
-        float horiz_move = pv_get_horizontal_distance_cm(nav_guided.start_position, curr_pos) / 100;
-        if (horiz_move > cmd.content.nav_guided.horiz_max) {
-            return true;
-        }
-    }
-
-    // if we got here we should continue with the external nav controls
-    return false;
+    // check time and position limits
+    return guided_limit_check();
 }
 #endif  // NAV_GUIDED
 
@@ -887,17 +869,6 @@ static bool do_guided(const AP_Mission::Mission_Command& cmd)
             return true;
             break;
 
-#ifdef MAV_CMD_NAV_VELOCITY
-        case MAV_CMD_NAV_VELOCITY:
-            // set target velocity
-            pos_or_vel.x = cmd.content.nav_velocity.x * 100.0f;
-            pos_or_vel.y = cmd.content.nav_velocity.y * 100.0f;
-            pos_or_vel.z = cmd.content.nav_velocity.z * 100.0f;
-            guided_set_velocity(pos_or_vel);
-            return true;
-            break;
-#endif
-
         case MAV_CMD_CONDITION_YAW:
             do_yaw(cmd);
             return true;
@@ -944,7 +915,8 @@ static void do_take_picture()
 {
 #if CAMERA == ENABLED
     camera.trigger_pic();
-    if (g.log_bitmask & MASK_LOG_CAMERA) {
+    gcs_send_message(MSG_CAMERA_FEEDBACK);
+    if (should_log(MASK_LOG_CAMERA)) {
         DataFlash.Log_Write_Camera(ahrs, gps, current_loc);
     }
 #endif

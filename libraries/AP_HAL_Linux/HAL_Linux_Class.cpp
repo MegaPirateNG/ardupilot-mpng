@@ -23,14 +23,39 @@ static LinuxSemaphore  i2cSemaphore;
 static LinuxI2CDriver  i2cDriver(&i2cSemaphore, "/dev/i2c-1");
 static LinuxSPIDeviceManager spiDeviceManager;
 static LinuxAnalogIn analogIn;
+
+/*
+  select between FRAM and FS
+ */
+#if LINUX_STORAGE_USE_FRAM == 1
+static LinuxStorage_FRAM storageDriver;
+#else
 static LinuxStorage storageDriver;
-static LinuxGPIO gpioDriver;
+#endif
+
+/*
+  use the BBB gpio driver on ERLE and PXF
+ */
+#if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXF || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLE
+static LinuxGPIO_BBB gpioDriver;
+/*
+  use the RPI gpio driver on Navio
+ */
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
+static LinuxGPIO_RPI gpioDriver;
+#else
+static Empty::EmptyGPIO gpioDriver;
+#endif
 
 /*
   use the PRU based RCInput driver on ERLE and PXF
  */
 #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXF || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLE
 static LinuxRCInput_PRU rcinDriver;
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
+static LinuxRCInput_Navio rcinDriver;
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ZYNQ
+static LinuxRCInput_ZYNQ rcinDriver;
 #else
 static LinuxRCInput rcinDriver;
 #endif
@@ -40,9 +65,17 @@ static LinuxRCInput rcinDriver;
  */
 #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXF || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLE
 static LinuxRCOutput_PRU rcoutDriver;
+/*
+  use the PCA9685 based RCOutput driver on Navio
+ */
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
+static LinuxRCOutput_Navio rcoutDriver;
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ZYNQ
+static LinuxRCOutput_ZYNQ rcoutDriver;
 #else
 static Empty::EmptyRCOutput rcoutDriver;
 #endif
+
 static LinuxScheduler schedulerInstance;
 static LinuxUtil utilInstance;
 
@@ -103,10 +136,10 @@ void HAL_Linux::init(int argc,char* const argv[]) const
 
     scheduler->init(NULL);
     gpio->init();
+    i2c->begin();
     rcout->init(NULL);
     rcin->init(NULL);
-    uartA->begin(115200);
-    i2c->begin();
+    uartA->begin(115200);    
     spi->init(NULL);
     utilInstance.init(argc, argv);
 }

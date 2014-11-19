@@ -61,7 +61,7 @@ static void land_gps_run()
 
 #if LAND_REQUIRE_MIN_THROTTLE_TO_DISARM == ENABLED
         // disarm when the landing detector says we've landed and throttle is at minimum
-        if (ap.land_complete && (g.rc_3.control_in == 0 || failsafe.radio)) {
+        if (ap.land_complete && (ap.throttle_zero || failsafe.radio)) {
             init_disarm_motors();
         }
 #else
@@ -112,7 +112,7 @@ static void land_gps_run()
     }
 
     // update altitude target and call position controller
-    pos_control.set_alt_target_from_climb_rate(cmb_rate, G_Dt);
+    pos_control.set_alt_target_from_climb_rate(cmb_rate, G_Dt, true);
     pos_control.update_z_controller();
 }
 
@@ -131,7 +131,7 @@ static void land_nogps_run()
         attitude_control.set_throttle_out(0, false);
 #if LAND_REQUIRE_MIN_THROTTLE_TO_DISARM == ENABLED
         // disarm when the landing detector says we've landed and throttle is at minimum
-        if (ap.land_complete && (g.rc_3.control_in == 0 || failsafe.radio)) {
+        if (ap.land_complete && (ap.throttle_zero || failsafe.radio)) {
             init_disarm_motors();
         }
 #else
@@ -170,7 +170,7 @@ static void land_nogps_run()
     }
 
     // call position controller
-    pos_control.set_alt_target_from_climb_rate(cmb_rate, G_Dt);
+    pos_control.set_alt_target_from_climb_rate(cmb_rate, G_Dt, true);
     pos_control.update_z_controller();
 }
 
@@ -203,8 +203,13 @@ static bool land_complete_maybe()
 static void update_land_detector()
 {
     // detect whether we have landed by watching for low climb rate, motors hitting their lower limit, overall low throttle and low rotation rate
-    if ((abs(climb_rate) < LAND_DETECTOR_CLIMBRATE_MAX) && motors.limit.throttle_lower &&
-        (motors.get_throttle_out() < get_non_takeoff_throttle()) && (ahrs.get_gyro().length() < LAND_DETECTOR_ROTATION_MAX)) {
+    if ((abs(climb_rate) < LAND_DETECTOR_CLIMBRATE_MAX) &&
+        (abs(baro_climbrate) < LAND_DETECTOR_BARO_CLIMBRATE_MAX) &&
+        motors.limit.throttle_lower &&
+#if FRAME_CONFIG != HELI_FRAME
+        (motors.get_throttle_out() < get_non_takeoff_throttle()) &&
+#endif
+        (ahrs.get_gyro().length() < LAND_DETECTOR_ROTATION_MAX)) {
         if (!ap.land_complete) {
             // increase counter until we hit the trigger then set land complete flag
             if( land_detector < LAND_DETECTOR_TRIGGER) {

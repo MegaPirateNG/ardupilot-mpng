@@ -27,7 +27,7 @@ const AP_Param::GroupInfo AP_GPS::var_info[] PROGMEM = {
     // @Param: TYPE
     // @DisplayName: GPS type
     // @Description: GPS type
-    // @Values: 0:None,1:AUTO,2:uBlox,3:MTK,4:MTK19,5:NMEA,6:SiRF,7:HIL,8:SwiftNav
+    // @Values: 0:None,1:AUTO,2:uBlox,3:MTK,4:MTK19,5:NMEA,6:SiRF,7:HIL,8:SwiftNav,9:PX4EXPERIMENTAL
     AP_GROUPINFO("TYPE",    0, AP_GPS, _type[0], 1),
 
 #if GPS_MAX_INSTANCES > 1
@@ -35,7 +35,7 @@ const AP_Param::GroupInfo AP_GPS::var_info[] PROGMEM = {
     // @Param: TYPE2
     // @DisplayName: 2nd GPS type
     // @Description: GPS type of 2nd GPS
-    // @Values: 0:None,1:AUTO,2:uBlox,3:MTK,4:MTK19,5:NMEA,6:SiRF,7:HIL,8:SwiftNav
+    // @Values: 0:None,1:AUTO,2:uBlox,3:MTK,4:MTK19,5:NMEA,6:SiRF,7:HIL,8:SwiftNav,9:PX4EXPERIMENTAL
     AP_GROUPINFO("TYPE2",   1, AP_GPS, _type[1], 0),
 
 #endif
@@ -87,8 +87,8 @@ void AP_GPS::init(DataFlash_Class *dataflash)
 {
     _DataFlash = dataflash;
     hal.uartB->begin(38400UL, 256, 16);
-#if GPS_MAX_INSTANCES > 1
     primary_instance = 0;
+#if GPS_MAX_INSTANCES > 1
     if (hal.uartE != NULL) {
         hal.uartE->begin(38400UL, 256, 16);        
     }
@@ -145,13 +145,22 @@ AP_GPS::detect_instance(uint8_t instance)
     AP_GPS_Backend *new_gps = NULL;
     AP_HAL::UARTDriver *port = instance==0?hal.uartB:hal.uartE;
     struct detect_state *dstate = &detect_state[instance];
+    uint32_t now = hal.scheduler->millis();
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+    if (_type[instance] == GPS_TYPE_PX4) {
+        // check for explicitely chosen PX4 GPS beforehand
+        // it is not possible to autodetect it, nor does it require a real UART
+        hal.console->print_P(PSTR(" PX4 "));
+        new_gps = new AP_GPS_PX4(*this, state[instance], port);
+        goto found_gps;
+    }
+#endif
 
     if (port == NULL) {
         // UART not available
         return;
     }
-
-    uint32_t now = hal.scheduler->millis();
 
     state[instance].instance = instance;
     state[instance].status = NO_GPS;
@@ -227,6 +236,7 @@ AP_GPS::detect_instance(uint8_t instance)
 #endif
 	}
 
+found_gps:
 	if (new_gps != NULL) {
         state[instance].status = NO_FIX;
         drivers[instance] = new_gps;
@@ -349,9 +359,6 @@ AP_GPS::update(void)
         update_instance(i);
     }
 
-    // update notify with gps status. We always base this on the first GPS
-    AP_Notify::flags.gps_status = state[0].status;
-
 #if GPS_MAX_INSTANCES > 1
     // work out which GPS is the primary, and how many sensors we have
     for (uint8_t i=0; i<GPS_MAX_INSTANCES; i++) {
@@ -383,6 +390,8 @@ AP_GPS::update(void)
 #else
     num_instances = 1;
 #endif // GPS_MAX_INSTANCES
+	// update notify with gps status. We always base this on the primary_instance
+    AP_Notify::flags.gps_status = state[primary_instance].status;
 }
 
 /*

@@ -105,7 +105,7 @@ const AP_Param::GroupInfo AP_Airspeed::var_info[] PROGMEM = {
 
     // @Param: AUTOCAL
     // @DisplayName: Automatic airspeed ratio calibration
-    // @Description: If this is enabled then the APM will automatically adjust the ARSPD_RATIO during flight, based upon an estimation filter using ground speed and true airspeed. The automatic calibration will save the new ratio to EEPROM every 2 minutes if it changes by more than 5%
+    // @Description: If this is enabled then the APM will automatically adjust the ARSPD_RATIO during flight, based upon an estimation filter using ground speed and true airspeed. The automatic calibration will save the new ratio to EEPROM every 2 minutes if it changes by more than 5%. This option should be enabled for a calibration flight then disabled again when calibration is complete. Leaving it enabled all the time is not recommended.
     // @User: Advanced
     AP_GROUPINFO("AUTOCAL",  5, AP_Airspeed, _autocal, 0),
 
@@ -114,6 +114,13 @@ const AP_Param::GroupInfo AP_Airspeed::var_info[] PROGMEM = {
     // @Description: This parameter allows you to control whether the order in which the tubes are attached to your pitot tube matters. If you set this to 0 then the top connector on the sensor needs to be the dynamic pressure. If set to 1 then the bottom connector needs to be the dynamic pressure. If set to 2 (the default) then the airspeed driver will accept either order. The reason you may wish to specify the order is it will allow your airspeed sensor to detect if the aircraft it receiving excessive pressure on the static port, which would otherwise be seen as a positive airspeed.
     // @User: Advanced
     AP_GROUPINFO("TUBE_ORDER",  6, AP_Airspeed, _tube_order, 2),
+
+    // @Param: SKIP_CAL
+    // @DisplayName: Skip airspeed calibration on startup
+    // @Description: This parameter allows you to skip airspeed offset calibration on startup, instead using the offset from the last calibration. This may be desirable if the offset variance between flights for your sensor is low and you want to avoid having to cover the pitot tube on each boot.
+    // @Values: 0:Disable,1:Enable
+    // @User: Advanced
+    AP_GROUPINFO("SKIP_CAL",  7, AP_Airspeed, _skip_cal, 0),
 
     AP_GROUPEND
 };
@@ -170,11 +177,14 @@ bool AP_Airspeed::get_temperature(float &temperature)
 
 // calibrate the airspeed. This must be called at least once before
 // the get_airspeed() interface can be used
-void AP_Airspeed::calibrate()
+void AP_Airspeed::calibrate(bool in_startup)
 {
     float sum = 0;
     uint8_t count = 0;
     if (!_enable) {
+        return;
+    }
+    if (in_startup && _skip_cal) {
         return;
     }
     // discard first reading
@@ -208,6 +218,9 @@ void AP_Airspeed::read(void)
     }
     airspeed_pressure = get_pressure() - _offset;
 
+    // remember raw pressure for logging
+    _raw_pressure     = airspeed_pressure;
+
     /*
       we support different pitot tube setups so used can choose if
       they want to be able to detect pressure on the static port
@@ -240,5 +253,8 @@ void AP_Airspeed::setHIL(float airspeed, float diff_pressure, float temperature)
     _raw_airspeed = airspeed;
     _airspeed = airspeed;
     _last_pressure = diff_pressure;
-    _last_update_ms         = hal.scheduler->millis();    
+    _last_update_ms = hal.scheduler->millis();    
+    _hil_pressure = diff_pressure;
+    _hil_set = true;
+    _healthy = true;
 }

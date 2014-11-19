@@ -39,10 +39,21 @@ void PX4RCOutput::init(void* unused)
         return;
     }
 
+	_pwm_sub = orb_subscribe(ORB_ID_VEHICLE_CONTROLS);
+
+    // mark number of outputs given by px4io as zero
+    _outputs.noutputs = 0;
+
     _alt_fd = open("/dev/px4fmu", O_RDWR);
     if (_alt_fd == -1) {
         hal.console->printf("RCOutput: failed to open /dev/px4fmu");
         return;
+    }
+
+    // ensure not to write zeros to disabled channels
+    _enabled_channels = 0;
+    for (int i=0; i < PX4_NUM_OUTPUT_CHANNELS; i++) {
+        _period[i] = PWM_IGNORE_THIS_CHANNEL;
     }
 }
 
@@ -128,6 +139,9 @@ uint16_t PX4RCOutput::get_freq(uint8_t ch)
 
 void PX4RCOutput::enable_ch(uint8_t ch)
 {
+    if (ch >= PX4_NUM_OUTPUT_CHANNELS) {
+        return;
+    }
     if (ch >= 8 && !(_enabled_channels & (1U<<ch))) {
         // this is the first enable of an auxillary channel - setup
         // aux channels now. This delayed setup makes it possible to
@@ -135,11 +149,19 @@ void PX4RCOutput::enable_ch(uint8_t ch)
         _init_alt_channels();
     }
     _enabled_channels |= (1U<<ch);
+    if (_period[ch] == PWM_IGNORE_THIS_CHANNEL) {
+        _period[ch] = 0;
+    }
 }
 
 void PX4RCOutput::disable_ch(uint8_t ch)
 {
+    if (ch >= PX4_NUM_OUTPUT_CHANNELS) {
+        return;
+    }
+
     _enabled_channels &= ~(1U<<ch);
+    _period[ch] = PWM_IGNORE_THIS_CHANNEL;
 }
 
 void PX4RCOutput::set_safety_pwm(uint32_t chmask, uint16_t period_us)
@@ -218,6 +240,12 @@ uint16_t PX4RCOutput::read(uint8_t ch)
     if (ch >= PX4_NUM_OUTPUT_CHANNELS) {
         return 0;
     }
+    // if px4io has given us a value for this channel use that,
+    // otherwise use the value we last sent. This makes it easier to
+    // observe the behaviour of failsafe in px4io
+    if (ch < _outputs.noutputs) {
+        return _outputs.output[ch];
+    }
     return _period[ch];
 }
 
@@ -231,6 +259,11 @@ void PX4RCOutput::read(uint16_t* period_us, uint8_t len)
 void PX4RCOutput::_timer_tick(void)
 {
     uint32_t now = hal.scheduler->micros();
+
+    if ((_enabled_channels & ((1U<<_servo_count)-1)) == 0) {
+        // no channels enabled
+        goto update_pwm;
+    }
 
     // always send at least at 20Hz, otherwise the IO board may think
     // we are dead
@@ -257,6 +290,13 @@ void PX4RCOutput::_timer_tick(void)
         perf_end(_perf_rcout);
         _last_output = now;
     }
+
+update_pwm:
+	bool rc_updated = false;
+	if (_pwm_sub >= 0 && orb_check(_pwm_sub, &rc_updated) == 0 && rc_updated) {
+        orb_copy(ORB_ID_VEHICLE_CONTROLS, _pwm_sub, &_outputs);
+	}
+
 }
 
 #endif // CONFIG_HAL_BOARD

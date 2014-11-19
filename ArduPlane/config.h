@@ -85,7 +85,6 @@
 //////////////////////////////////////////////////////////////////////////////
 // sensor types
 
-#define CONFIG_INS_TYPE HAL_INS_DEFAULT
 #define CONFIG_BARO     HAL_BARO_DEFAULT
 #define CONFIG_COMPASS  HAL_COMPASS_DEFAULT
 
@@ -103,8 +102,6 @@
 #if HIL_MODE != HIL_MODE_DISABLED       // we are in HIL mode
  #undef CONFIG_BARO
  #define CONFIG_BARO HAL_BARO_HIL
- #undef CONFIG_INS_TYPE
- #define CONFIG_INS_TYPE HAL_INS_HIL
  #undef  CONFIG_COMPASS
  #define CONFIG_COMPASS HAL_COMPASS_HIL
 #endif
@@ -448,6 +445,10 @@
  # define INVERTED_FLIGHT_PWM 1750
 #endif
 
+#ifndef PX4IO_OVERRIDE_PWM
+ # define PX4IO_OVERRIDE_PWM 1750
+#endif
+
 //////////////////////////////////////////////////////////////////////////////
 // Developer Items
 //
@@ -456,9 +457,12 @@
  # define SCALING_SPEED          15.0
 #endif
 
-// use this to completely disable the CLI
+// use this to completely disable the CLI. We now default the CLI to
+// off as it really is no longer needed except for special developer
+// testing. This also allows us to keep supporting the APM2 for a bit
+// longer, as it saves us 20k of flash
 #ifndef CLI_ENABLED
- # define CLI_ENABLED ENABLED
+ # define CLI_ENABLED DISABLE
 #endif
 
 // use this to disable geo-fencing

@@ -137,11 +137,11 @@ void AC_PosControl::set_alt_target_with_slew(float alt_cm, float dt)
 ///     should be called continuously (with dt set to be the expected time between calls)
 ///     actual position target will be moved no faster than the speed_down and speed_up
 ///     target will also be stopped if the motors hit their limits or leash length is exceeded
-void AC_PosControl::set_alt_target_from_climb_rate(float climb_rate_cms, float dt)
+void AC_PosControl::set_alt_target_from_climb_rate(float climb_rate_cms, float dt, bool force_descend)
 {
     // adjust desired alt if motors have not hit their limits
     // To-Do: add check of _limit.pos_up and _limit.pos_down?
-    if ((climb_rate_cms<0 && !_motors.limit.throttle_lower) || (climb_rate_cms>0 && !_motors.limit.throttle_upper)) {
+    if ((climb_rate_cms<0 && (!_motors.limit.throttle_lower || force_descend)) || (climb_rate_cms>0 && !_motors.limit.throttle_upper)) {
         _pos_target.z += climb_rate_cms * dt;
     }
 }
@@ -247,7 +247,6 @@ void AC_PosControl::calc_leash_length_z()
 void AC_PosControl::pos_to_rate_z()
 {
     float curr_alt = _inav.get_altitude();
-    float linear_distance;  // half the distance we swap between linear and sqrt and the distance we offset sqrt.
 
     // clear position limit flags
     _limit.pos_up = false;
@@ -274,19 +273,8 @@ void AC_PosControl::pos_to_rate_z()
         _limit.pos_down = true;
     }
 
-    // check kP to avoid division by zero
-    if (_p_alt_pos.kP() != 0.0f) {
-        linear_distance = _accel_z_cms/(2.0f*_p_alt_pos.kP()*_p_alt_pos.kP());
-        if (_pos_error.z > 2*linear_distance ) {
-            _vel_target.z = safe_sqrt(2.0f*_accel_z_cms*(_pos_error.z-linear_distance));
-        }else if (_pos_error.z < -2.0f*linear_distance) {
-            _vel_target.z = -safe_sqrt(2.0f*_accel_z_cms*(-_pos_error.z-linear_distance));
-        }else{
-            _vel_target.z = _p_alt_pos.get_p(_pos_error.z);
-        }
-    }else{
-        _vel_target.z = 0;
-    }
+    // calculate _vel_target.z using from _pos_error.z using sqrt controller
+    _vel_target.z = AC_AttitudeControl::sqrt_controller(_pos_error.z, _p_alt_pos.kP(), _accel_z_cms);
 
     // call rate based throttle controller which will update accel based throttle controller targets
     rate_to_accel_z();
@@ -393,11 +381,8 @@ void AC_PosControl::accel_to_throttle(float accel_target_z)
     // get d term
     d = _pid_alt_accel.get_d(_accel_error.z, _dt);
 
-    // To-Do: pull min/max throttle from motors
-    // To-Do: we had a contraint here but it's now removed, is this ok?  with the motors library handle it ok?
+    // send throttle to attitude controller with angle boost
     _attitude_control.set_throttle_out((int16_t)p+i+d+_throttle_hover, true);
-    
-    // to-do add back in PID logging?
 }
 
 ///
@@ -475,7 +460,7 @@ void AC_PosControl::get_stopping_point_xy(Vector3f &stopping_point) const
     float vel_total = pythagorous2(curr_vel.x, curr_vel.y);
 
     // avoid divide by zero by using current position if the velocity is below 10cm/s, kP is very low or acceleration is zero
-    if (kP <= 0.0f || _accel_cms <= 0.0f) {
+    if (kP <= 0.0f || _accel_cms <= 0.0f || vel_total == 0.0f) {
         stopping_point.x = curr_pos.x;
         stopping_point.y = curr_pos.y;
         return;
@@ -551,6 +536,7 @@ void AC_PosControl::update_xy_controller(bool use_desired_velocity)
     uint32_t now = hal.scheduler->millis();
     if ((now - _last_update_xy_ms) >= POSCONTROL_ACTIVE_TIMEOUT_MS) {
         init_xy_controller();
+        now = _last_update_xy_ms;
     }
 
     // check if xy leash needs to be recalculated
